@@ -15,6 +15,24 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FlowFocus.Core\FlowFocus.Core.csproj" />
+    <ProjectReference Include="..\FlowFocus.UI\FlowFocus.UI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <_ContentIncludedByDefault Remove="Pages\AddTask.razor" />
+    <_ContentIncludedByDefault Remove="Pages\AllTasks.razor" />
+    <_ContentIncludedByDefault Remove="Pages\Graph.razor" />
+    <_ContentIncludedByDefault Remove="Pages\Home.razor" />
+    <_ContentIncludedByDefault Remove="Pages\Settings.razor" />
+    <_ContentIncludedByDefault Remove="Pages\Tomorrow.razor" />
+    <_ContentIncludedByDefault Remove="Pages\Unconfigured.razor" />
+    <_ContentIncludedByDefault Remove="Layout\MainLayout.razor" />
+    <_ContentIncludedByDefault Remove="Layout\NavMenu.razor" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="Layout\MainLayout.razor" />
+    <AdditionalFiles Include="Layout\NavMenu.razor" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,138 @@
+﻿@page "/"
+@using FlowFocus.Core.Models
+@using FlowFocus.Core
+
+@inject ISnackbar Snackbar
+
+<PageTitle>Сегодня</PageTitle>
+
+<MudPaper Class="pa-4" Elevation="1">
+
+    <MudStack Spacing="2" AlignItems="AlignItems.Center" JustifyContent="space-between">
+        <MudText Typo="Typo.h5">Сегодня — @AppStateManager.Shared.State.CurrentDay</MudText>
+
+        <MudStack Row="true" Spacing="2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="RecalculateToday">
+                <MudIcon Icon="@Icons.Material.Filled.Refresh" /> Пересчитать день
+            </MudButton>
+
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="StartNewDay">
+                <MudIcon Icon="@Icons.Material.Filled.WbSunny" /> Новый день
+            </MudButton>
+
+            <MudButton Variant="Variant.Outlined" Color="Color.Info" OnClick="SuggestAntiProcrastinationTask">
+                <MudIcon Icon="@Icons.Material.Filled.Psychology" /> Прокрастинирую
+            </MudButton>
+        </MudStack>
+    </MudStack>
+
+    <MudDivider Class="my-3" />
+
+    @if (TodayTasks.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+            Сегодня нет задач.
+        </MudAlert>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var task in TodayTasks)
+            {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudPaper Class="pa-3" Elevation="2">
+                        <MudStack Spacing="1">
+                            <MudText Typo="Typo.h6">@task.Title</MudText>
+                            <MudText Typo="Typo.body2">@GetTaskSummary(task)</MudText>
+
+                            <MudProgressLinear Value="@GetTaskProgress(task)" Color="Color.Primary" Height="4px" />
+
+                            <MudStack Row="true" Spacing="1">
+                                <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined">Инт: @task.Interest</MudChip>
+                                <MudChip T="string" Color="Color.Secondary" Variant="Variant.Outlined">Слож: @task.Complexity</MudChip>
+                                <MudChip T="string" Color="Color.Tertiary" Variant="Variant.Outlined">⏱ @task.Hours ч</MudChip>
+                            </MudStack>
+
+                            <MudStack Row="true" Spacing="2">
+                                <MudButton Variant="Variant.Outlined" Color="Color.Success" Size="Size.Small" OnClick="() => CompleteTaskAsync(task)">
+                                    Готово
+                                </MudButton>
+                                <MudButton Variant="Variant.Text" Color="Color.Warning" Size="Size.Small" OnClick="() => PostponeTaskAsync(task)">
+                                    Отложить
+                                </MudButton>
+                            </MudStack>
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</MudPaper>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await AppStateManager.Shared.LoadAsync();
+    }
+
+    List<TaskItem> TodayTasks =>
+        AppStateManager.Shared.State.Tasks
+            .FindAll(t => t.AssignedDate == AppStateManager.Shared.State.CurrentDay
+                          && t.Status == TodoTaskStatus.Planned);
+
+    async Task CompleteTaskAsync(TaskItem task)
+    {
+        task.Status = TodoTaskStatus.Completed;
+        await AppStateManager.Shared.UpdateTaskAsync(task);
+        Snackbar.Add($"Задача '{task.Title}' завершена.", Severity.Success);
+    }
+
+    async Task PostponeTaskAsync(TaskItem task)
+    {
+        task.AssignedDate = DateTime.Today.AddDays(1);
+        await AppStateManager.Shared.UpdateTaskAsync(task);
+        Snackbar.Add($"Задача '{task.Title}' перенесена на завтра.", Severity.Normal);
+    }
+
+    void RecalculateToday()
+    {
+        // сюда позже вставим логику перерасчёта даты задач
+        Snackbar.Add("Пересчёт задач на сегодня выполнен.", Severity.Success);
+    }
+
+    void StartNewDay()
+    {
+        var now = DateTime.Now.TimeOfDay;
+        var start = AppStateManager.Shared.State.Settings.DayStartTime;
+        var minStart = start.Add(TimeSpan.FromHours(-5));
+        var maxStart = start.Add(TimeSpan.FromHours(5));
+
+        if (now < minStart || now > maxStart)
+        {
+            Snackbar.Add("Нельзя начать новый день вне допустимого времени.", Severity.Warning);
+            return;
+        }
+
+        AppStateManager.Shared.State.CurrentDay = DateTime.Today;
+        Snackbar.Add("Новый день начат.", Severity.Info);
+    }
+
+    void SuggestAntiProcrastinationTask()
+    {
+        var candidate = AppStateManager.Shared.State.Tasks
+            .FindAll(t => t is { Interest: >= 7, Status: TodoTaskStatus.Planned })
+            .OrderByDescending(t => t.Interest)
+            .FirstOrDefault();
+
+        if (candidate != null)
+            Snackbar.Add($"Попробуй: {candidate.Title}", Severity.Info);
+        else
+            Snackbar.Add("Нет подходящих задач для фокуса.", Severity.Warning);
+    }
+
+    string GetTaskSummary(TaskItem task)
+        => task.Deadline.HasValue ? $"Дедлайн: {task.Deadline.Value:dd.MM}" : "Без дедлайна";
+
+    double GetTaskProgress(TaskItem task)
+        => task.Status == TodoTaskStatus.Completed ? 100 : 0;
+}
