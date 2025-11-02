@@ -12,6 +12,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlowFocus.UI", "FlowFocus.U
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlowFocus.WebApp", "FlowFocus.WebApp\FlowFocus.WebApp.csproj", "{75DA105F-B46D-4A4D-86B9-2CD01792EEE9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlowFocus.Data", "FlowFocus.Data\FlowFocus.Data.csproj", "{FFDC88AE-4ADB-4152-8A4E-89013CB245B0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -82,6 +84,18 @@ Global
 		{75DA105F-B46D-4A4D-86B9-2CD01792EEE9}.Release|x64.Build.0 = Release|Any CPU
 		{75DA105F-B46D-4A4D-86B9-2CD01792EEE9}.Release|x86.ActiveCfg = Release|Any CPU
 		{75DA105F-B46D-4A4D-86B9-2CD01792EEE9}.Release|x86.Build.0 = Release|Any CPU
+		{FFDC88AE-4ADB-4152-8A4E-89013CB245B0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FFDC88AE-4ADB-4152-8A4E-89013CB245B0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FFDC88AE-4ADB-4152-8A4E-89013CB245B0}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{FFDC88AE-4ADB-4152-8A4E-89013CB245B0}.Debug|x64.Build.0 = Debug|Any CPU
+		{FFDC88AE-4ADB-4152-8A4E-89013CB245B0}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{FFDC88AE-4ADB-4152-8A4E-89013CB245B0}.Debug|x86.Build.0 = Debug|Any CPU
+		{FFDC88AE-4ADB-4152-8A4E-89013CB245B0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FFDC88AE-4ADB-4152-8A4E-89013CB245B0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FFDC88AE-4ADB-4152-8A4E-89013CB245B0}.Release|x64.ActiveCfg = Release|Any CPU
+		{FFDC88AE-4ADB-4152-8A4E-89013CB245B0}.Release|x64.Build.0 = Release|Any CPU
+		{FFDC88AE-4ADB-4152-8A4E-89013CB245B0}.Release|x86.ActiveCfg = Release|Any CPU
+		{FFDC88AE-4ADB-4152-8A4E-89013CB245B0}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -18,17 +18,17 @@ public class AppState
 
 public class AppStateManager
 {
-    public static AppStateManager Shared { get; } = new();
+    public static AppStateManager Shared { get; set; } = new();
 
-    private IStorageService<AppState>? _storage;
+    public virtual IStorageService<AppState>? Storage { get; set; }
     public AppState State { get; private set; } = new AppState();
 
-    private AppStateManager()
+    public AppStateManager()
     {
     }
 
     /// <summary>Инициализация для WASM (LocalStorage) или десктопа (файл).</summary>
-    public void Init(IJSRuntime? js = null)
+    /*public void Init(IJSRuntime? js = null)
     {
 #if BLAZOR_WEBASSEMBLY
             if (js == null) throw new InvalidOperationException("Для WASM нужно передать IJSRuntime");
@@ -36,27 +36,27 @@ public class AppStateManager
 #else
         _storage = new Storage.FileStorageService<AppState>(AppSettings.FileName);
 #endif
-    }
+    }*/
 
     /// <summary>Загрузить state из storage</summary>
     public async Task LoadAsync()
     {
-        if (_storage == null) throw new InvalidOperationException("AppStateManager не инициализирован");
-        var loaded = await _storage.LoadAsync();
+        if (Storage == null) throw new InvalidOperationException("AppStateManager не инициализирован");
+        var loaded = await Storage.LoadAsync();
         if (loaded != null) State = loaded;
     }
 
     /// <summary>Сохранить state в storage</summary>
     public async Task SaveAsync()
     {
-        if (_storage == null) throw new InvalidOperationException("AppStateManager не инициализирован");
-        await _storage.SaveAsync(State);
+        if (Storage == null) throw new InvalidOperationException("AppStateManager не инициализирован");
+        await Storage.SaveAsync(State);
     }
 
     public async Task ClearAsync()
     {
         State = new AppState();
-        if (_storage != null) await _storage.ClearAsync();
+        if (Storage != null) await Storage.ClearAsync();
     }
 
     public async Task AddTaskAsync(TaskItem task)

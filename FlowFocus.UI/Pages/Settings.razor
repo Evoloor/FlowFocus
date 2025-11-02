@@ -1,6 +1,8 @@
 @page "/settings"
 @using FlowFocus.Core.Models
 @using FlowFocus.Core
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
 @inject ISnackbar Snackbar
 
 <PageTitle>Настройки</PageTitle>
@@ -12,7 +14,7 @@
     <MudForm>
         <MudTextField T="int"
                       Label="Время начала дня (часы, 0–23)"
-                      @bind-Value="_startHour"
+                      @bind-Value="StartHour"
                       Min="0" Max="23"
                       Adornment="Adornment.Start"
                       AdornmentIcon="@Icons.Material.Filled.AccessTime"
@@ -36,7 +38,7 @@
         _settings = AppStateManager.Shared.State.Settings;
     }
     // Костыль: отдельное числовое поле вместо TimeSpan
-    int _startHour
+    int StartHour
     {
         get => (int)_settings.DayStartTime.TotalHours;
         set => _settings.DayStartTime = TimeSpan.FromHours(value);

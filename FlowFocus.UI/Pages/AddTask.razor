@@ -1,6 +1,8 @@
 @page "/add"
 @using FlowFocus.Core.Models
 @using FlowFocus.Core
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
 
@@ -10,7 +12,7 @@
     <MudText Typo="Typo.h5">Новая задача</MudText>
     <MudDivider Class="my-3" />
 
-    <MudForm @ref="form">
+    <MudForm @ref="_form">
         <MudTextField @bind-Value="_task.Title" Label="Название" Required="true" />
         <MudNumericField T="int" Label="Интересность (1–10)" @bind-Value="_task.Interest" Min="1" Max="10" />
         <MudNumericField T="int" Label="Сложность (1–100)" @bind-Value="_task.Complexity" Min="1" Max="100" />
@@ -24,7 +26,7 @@
 </MudPaper>
 
 @code {
-    MudForm form = default!;
+    MudForm _form = default!;
     TaskItem _task = new();
 
     async Task SaveAsync()

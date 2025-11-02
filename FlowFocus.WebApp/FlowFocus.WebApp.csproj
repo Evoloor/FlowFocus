@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FlowFocus.Core\FlowFocus.Core.csproj" />
+    <ProjectReference Include="..\FlowFocus.Data\FlowFocus.Data.csproj" />
     <ProjectReference Include="..\FlowFocus.UI\FlowFocus.UI.csproj" />
   </ItemGroup>
 </Project>

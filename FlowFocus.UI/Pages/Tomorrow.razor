@@ -2,22 +2,24 @@
 @using FlowFocus.Core
 @using FlowFocus.Core.Models
 @using FlowFocus.Core.Utility
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
 
 <PageTitle>Завтра</PageTitle>
 
 <MudText Typo="Typo.h5" Class="mb-2">Задачи на завтра</MudText>
 
-@if (TomorrowTasks is null)
+@if (_tomorrowTasks is null)
 {
     <MudProgressCircular Indeterminate="true" />
 }
-else if (TomorrowTasks.Count == 0)
+else if (_tomorrowTasks.Count == 0)
 {
     <MudText>Нет задач на завтра 🎉</MudText>
 }
 else
 {
-    @foreach (var task in TomorrowTasks)
+    @foreach (var task in _tomorrowTasks)
     {
         <MudCard Class="mb-2">
             <MudCardContent>
@@ -29,7 +31,7 @@ else
 }
 
 @code {
-    private List<TaskItem> TomorrowTasks = new();
+    private List<TaskItem> _tomorrowTasks = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -37,7 +39,7 @@ else
         var startOfTomorrow = DateTime.Now.StartOfTomorrow();
         var endOfTomorrow = startOfTomorrow.AddDays(1);
 
-        TomorrowTasks = manager.State.Tasks
+        _tomorrowTasks = manager.State.Tasks
             .Where(t =>
             {
                 if (t.AssignedDate.Value.TimeOfDay != TimeSpan.Zero)

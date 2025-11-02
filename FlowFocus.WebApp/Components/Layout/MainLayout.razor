@@ -1,4 +1,5 @@
-﻿@inherits LayoutComponentBase
+﻿@using FlowFocus.Core
+@inherits LayoutComponentBase
 
 <MudThemeProvider Theme="@_theme" IsDarkMode="_isDarkMode" />
 <MudPopoverProvider />
@@ -6,7 +7,7 @@
 <MudSnackbarProvider />
 <MudLayout>
     <MudAppBar Elevation="1">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@DrawerToggle" />
         <MudText Typo="Typo.h5" Class="ml-3">Application</MudText>
         <MudSpacer />
         <MudIconButton Icon="@(DarkLightModeButtonIcon)" Color="Color.Inherit" OnClick="@DarkModeToggle" />
@@ -20,7 +21,6 @@
     </MudMainContent>
 </MudLayout>
 
-
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
     <a href="." class="reload">Reload</a>
@@ -30,7 +30,7 @@
 @code {
     private bool _drawerOpen = true;
     private bool _isDarkMode = true;
-    private MudTheme? _theme = null;
+    private MudTheme? _theme;
 
     protected override void OnInitialized()
     {
@@ -40,8 +40,9 @@
         {
             PaletteLight = _lightPalette,
             PaletteDark = _darkPalette,
-            LayoutProperties = new LayoutProperties()
+            LayoutProperties = new()
         };
+        AppStateManager.Shared = new AppManager();
     }
 
     private void DrawerToggle()
@@ -93,7 +94,7 @@
         OverlayLight = "#1e1e2d80",
     };
 
-    public string DarkLightModeButtonIcon => _isDarkMode switch
+    private string DarkLightModeButtonIcon => _isDarkMode switch
     {
         true => Icons.Material.Rounded.AutoMode,
         false => Icons.Material.Outlined.DarkMode,

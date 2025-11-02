@@ -1,6 +1,6 @@
 ﻿@using FlowFocus.Core
 @inherits LayoutComponentBase
-@inject IJSRuntime js;
+@inject IJSRuntime Js;
 <MudThemeProvider Theme="@_theme" IsDarkMode="_isDarkMode" />
 <MudPopoverProvider />
 <MudDialogProvider />
@@ -43,7 +43,7 @@
             PaletteDark = _darkPalette,
             LayoutProperties = new LayoutProperties()
         };
-        AppStateManager.Shared.Init(js);
+        //AppStateManager.Shared.Init(js);
     }
 
     private void DrawerToggle()
