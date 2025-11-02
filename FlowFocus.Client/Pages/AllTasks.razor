@@ -1,0 +1,46 @@
+@page "/all"
+@using FlowFocus.Core.Models
+@using FlowFocus.Core
+@inject ISnackbar Snackbar
+
+<PageTitle>Все задачи</PageTitle>
+
+<MudPaper Class="pa-4" Elevation="1">
+    <MudStack Spacing="2">
+        <MudText Typo="Typo.h5">Все задачи</MudText>
+        <MudTextField @bind-Value="_filter" Placeholder="Поиск..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
+
+        <MudDivider />
+
+        <MudTable Items="FilteredTasks">
+            <HeaderContent>
+                <MudTh>Название</MudTh>
+                <MudTh>Интерес</MudTh>
+                <MudTh>Сложность</MudTh>
+                <MudTh>⏱</MudTh>
+                <MudTh>Дата</MudTh>
+                <MudTh>Статус</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Title</MudTd>
+                <MudTd>@context.Interest</MudTd>
+                <MudTd>@context.Complexity</MudTd>
+                <MudTd>@context.Hours</MudTd>
+                <MudTd>@(context.AssignedDate?.ToString("dd.MM") ?? "-")</MudTd>
+                <MudTd>@context.Status</MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudStack>
+</MudPaper>
+
+@code {
+    protected override async Task OnInitializedAsync() => await AppStateManager.Shared.LoadAsync();
+
+    string _filter = "";
+
+    IEnumerable<TaskItem> FilteredTasks =>
+        string.IsNullOrWhiteSpace(_filter)
+            ? AppStateManager.Shared.State.Tasks
+            : AppStateManager.Shared.State.Tasks
+                .Where(t => t.Title.Contains(_filter, StringComparison.OrdinalIgnoreCase));
+}

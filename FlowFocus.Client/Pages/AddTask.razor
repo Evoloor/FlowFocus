@@ -1,0 +1,36 @@
+@page "/add"
+@using FlowFocus.Core.Models
+@using FlowFocus.Core
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>Добавить задачу</PageTitle>
+
+<MudPaper Class="pa-4" Elevation="1">
+    <MudText Typo="Typo.h5">Новая задача</MudText>
+    <MudDivider Class="my-3" />
+
+    <MudForm @ref="form">
+        <MudTextField @bind-Value="_task.Title" Label="Название" Required="true" />
+        <MudNumericField T="int" Label="Интересность (1–10)" @bind-Value="_task.Interest" Min="1" Max="10" />
+        <MudNumericField T="int" Label="Сложность (1–100)" @bind-Value="_task.Complexity" Min="1" Max="100" />
+        <MudNumericField T="double" Label="Часы" @bind-Value="_task.Hours" Min="0" Max="1000" />
+        <MudDatePicker Label="Дедлайн" @bind-Date="_task.Deadline" />
+
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-3" OnClick="SaveAsync">
+            <MudIcon Icon="@Icons.Material.Filled.Check" /> Сохранить
+        </MudButton>
+    </MudForm>
+</MudPaper>
+
+@code {
+    MudForm form = default!;
+    TaskItem _task = new();
+
+    async Task SaveAsync()
+    {
+        await AppStateManager.Shared.AddTaskAsync(_task);
+        Snackbar.Add($"Задача '{_task.Title}' добавлена.", Severity.Success);
+        Nav.NavigateTo("/unconfigured");
+    }
+}
