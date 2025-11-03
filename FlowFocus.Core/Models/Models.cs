@@ -38,9 +38,7 @@ public class TaskItem : AuditEntity
     public int Interest { get; set; } // 1–10
     public int Complexity { get; set; } // 1–100
     public double Hours { get; set; } // up to 1000
-
     public DateTime? Deadline { get; set; }
-    public DateTime? AssignedDate { get; set; }
 
     public TodoTaskStatus Status { get; set; } = TodoTaskStatus.Unconfigured;
     public bool IsFavorite { get; set; } = false;

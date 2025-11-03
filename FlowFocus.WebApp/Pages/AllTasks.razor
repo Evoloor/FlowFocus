@@ -1,8 +1,6 @@
 @page "/all"
 @using FlowFocus.Core.Models
 @using FlowFocus.Data
-@using Microsoft.AspNetCore.Components.Web
-@using MudBlazor
 
 @inject IDialogService _dialogService
 @inject ITaskRepository TaskRepo
@@ -106,9 +104,9 @@
                     <MudTd>@context.Complexity</MudTd>
                     <MudTd>@context.Hours</MudTd>
                     <MudTd>
-                        @if (context.AssignedDate.HasValue)
+                        @if (context.Deadline.HasValue)
                         {
-                            <MudText Typo="Typo.body2">@context.AssignedDate.Value.ToString("dd.MM.yyyy")</MudText>
+                            <MudText Typo="Typo.body2">@context.Deadline.Value.ToString("dd.MM.yyyy")</MudText>
                         }
                         else
                         {
@@ -199,7 +197,7 @@
                 "complexity" => query.OrderByDescending(t => t.Complexity),
                 "hours" => query.OrderByDescending(t => t.Hours),
                 "title" => query.OrderBy(t => t.Title),
-                _ => query.OrderBy(t => t.AssignedDate)
+                _ => query.OrderBy(t => t.Deadline)
             };
 
             return query.ToList();

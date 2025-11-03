@@ -3,6 +3,7 @@ using System;
 using FlowFocus.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FlowFocus.Data.Migrations
 {
     [DbContext(typeof(StorageContext))]
-    partial class StorageContextModelSnapshot : ModelSnapshot
+    [Migration("20251103204632_CodeCleanup")]
+    partial class CodeCleanup
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.10");
@@ -55,6 +58,9 @@ namespace FlowFocus.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime?>("AssignedDate")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("Complexity")
                         .HasColumnType("INTEGER");
 
@@ -92,7 +98,7 @@ namespace FlowFocus.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Deadline");
+                    b.HasIndex("AssignedDate");
 
                     b.HasIndex("IsFavorite");
 

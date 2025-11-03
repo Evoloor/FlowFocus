@@ -1,8 +1,6 @@
 ﻿@page "/"
 @using FlowFocus.Core.Models
 @using FlowFocus.Data
-@using Microsoft.AspNetCore.Components.Web
-@using MudBlazor
 
 @inject ITaskRepository TaskRepo
 @inject IRepository<UserAppSettings> SettingsRepo
@@ -79,10 +77,10 @@
     protected override void OnInitialized()
     {
         _settings = SettingsRepo.GetAll().First();
-        _currentDay = DateTime.Now.StartOfToday();
+        _currentDay = DateTime.Now.StartOfToday(_settings.DayStartTime);
     }
 
-    List<TaskItem> TodayTasks => TaskRepo.GetByDate(_currentDay);
+    List<TaskItem> TodayTasks => TaskRepo.GetByDate(_currentDay, _settings.DayStartTime);
 
     void CompleteTask(TaskItem task)
     {
@@ -95,7 +93,7 @@
 
     void PostponeTask(TaskItem task)
     {
-        task.AssignedDate = DateTime.Now.StartOfTomorrow();
+        task.Deadline = DateTime.Now.StartOfTomorrow();
         TaskRepo.Update(task);
         TaskRepo.SaveChanges();
         Snackbar.Add($"Задача '{task.Title}' перенесена на завтра.");

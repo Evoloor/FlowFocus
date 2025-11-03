@@ -1,12 +1,11 @@
 @page "/unconfigured"
 @using FlowFocus.Core.Models
 @using FlowFocus.Data
-@using Microsoft.AspNetCore.Components.Web
-@using MudBlazor
 
 @inject ITaskRepository TaskRepo
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
+@inject IRepository<UserAppSettings> SettingsRepo
 
 <PageTitle>Ненастроенные задачи</PageTitle>
 
@@ -53,8 +52,9 @@
 
     void ConfirmTask(TaskItem task)
     {
+        var settings = SettingsRepo.GetAll().First();
         task.Status = TodoTaskStatus.Planned;
-        task.AssignedDate = DateTime.Now.StartOfTomorrow(); // Планируем на завтра
+        //task.Deadline = DateTime.Now.StartOfTomorrow(settings.DayStartTime);
         TaskRepo.Update(task);
         TaskRepo.SaveChanges();
         Snackbar.Add($"Задача '{task.Title}' запланирована на завтра.", Severity.Success);

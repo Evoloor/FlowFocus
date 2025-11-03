@@ -109,7 +109,7 @@ public interface IRepository<T> where T : AuditEntity
 public interface ITaskRepository : IRepository<TaskItem>
 {
     List<TaskItem> GetByStatus(TodoTaskStatus status);
-    List<TaskItem> GetByDate(DateTime date);
+    List<TaskItem> GetByDate(DateTime date, TimeSpan? dayStartTime = null);
     List<TaskItem> GetUnconfigured();
 }
 
@@ -119,21 +119,32 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
     protected override DbSet<TaskItem> GetDbSet() => context.Tasks;
 
     protected override IQueryable<TaskItem> GetBaseQuery() =>
-        context.Tasks.Include(t => t.Blockers).OrderBy(t => t.AssignedDate);
+        context.Tasks.Include(t => t.Blockers).OrderBy(t => t.Deadline);
 
     // Специфичные методы
     public List<TaskItem> GetByStatus(TodoTaskStatus status)
         => GetAll().Where(t => t.Status == status).ToList();
 
-    public List<TaskItem> GetByDate(DateTime date)
+    public List<TaskItem> GetByDate(DateTime date, TimeSpan? dayStartTime = null)
     {
-        var dateStart = date.StartOfToday();
+        var dateStart = date.StartOfToday(dayStartTime);
         var nextDayStart = dateStart.AddDays(1);
-
-        return GetAll().Where(t =>
-            t.AssignedDate >= dateStart &&
-            t.AssignedDate < nextDayStart
+    
+        return GetAll().Where(t => 
+            t.Deadline.HasValue && IsTaskInDateRange(t.Deadline.Value, date, dateStart, nextDayStart)
         ).ToList();
+    }
+
+    private bool IsTaskInDateRange(DateTime taskDate, DateTime targetDate, DateTime dayStart, DateTime nextDayStart)
+    {
+        // Задачи на целый день (время = 00:00:00)
+        if (taskDate.TimeOfDay == TimeSpan.Zero)
+        {
+            return taskDate.Date == targetDate.Date;
+        }
+    
+        // Задачи с конкретным временем
+        return taskDate >= dayStart && taskDate < nextDayStart;
     }
 
     public List<TaskItem> GetUnconfigured()
@@ -243,7 +254,7 @@ public class StorageContext : DbContext
                 );
 
             entity.HasIndex(e => e.Status);
-            entity.HasIndex(e => e.AssignedDate);
+            entity.HasIndex(e => e.Deadline);
             entity.HasIndex(e => e.IsFavorite);
         });
 
