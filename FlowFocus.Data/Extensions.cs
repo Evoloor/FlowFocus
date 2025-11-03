@@ -1,10 +1,12 @@
-namespace FlowFocus.Core.Utility;
+using FlowFocus.Core.Models;
+
+namespace FlowFocus.Data;
 
 public static class Extensions
 {
     public static DateTime StartOfToday(this DateTime date)
     {
-        var hour = AppStateManager.Shared.State.Settings.DayStartTime.Hours;
+        var hour = AppState.Shared.Settings.DayStartTime.Hours;
         var baseDate = date.Hour < hour ? date.Date.AddDays(-1) : date.Date;
         return baseDate.AddHours(hour);
     }

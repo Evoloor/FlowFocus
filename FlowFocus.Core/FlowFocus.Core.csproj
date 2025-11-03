@@ -11,4 +11,8 @@
       <PackageReference Include="Microsoft.JSInterop" Version="9.0.10" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="Utility\" />
+    </ItemGroup>
+
 </Project>

@@ -24,7 +24,7 @@ public enum BlockerType
 
 public class TaskItem
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public int Id { get; set; }
     public string Title { get; set; } = "";
     public string? Description { get; set; }
 
@@ -48,9 +48,9 @@ public class TaskItem
 
 public class TaskBlocker
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid ParentTaskId { get; set; }
-    public Guid BlockerTaskId { get; set; }
+    public int Id { get; set; }
+    public int ParentTaskId { get; set; }
+    public int BlockerTaskId { get; set; }
     public BlockerType Type { get; set; } = BlockerType.And;
 }
 
@@ -59,10 +59,12 @@ public class RepeatInfo
     public RepeatType Type { get; set; } = RepeatType.None;
     public int Interval { get; set; } = 0; // N hours/days
     public List<DayOfWeek>? DaysOfWeek { get; set; } // for weekly repeats
+    public List<int>? DaysOfMonth { get; set; } // for monthly repeats
 }
 
 public class UserAppSettings
 {
+    public int Id { get; set; }
     public TimeSpan DayStartTime { get; set; } = new(5, 0, 0); // default 5:00
     public double DailyHoursLimit { get; set; } = 8.0;
     public int DailyComplexityLimit { get; set; } = 300;
@@ -71,6 +73,7 @@ public class UserAppSettings
 
 public class AppState
 {
+    public static AppState Shared = new (); 
     public DateTime CurrentDay { get; set; } = DateTime.Today;
     public List<TaskItem> Tasks { get; set; } = new();
     public UserAppSettings Settings { get; set; } = new();

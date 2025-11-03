@@ -1,8 +1,7 @@
 using System.Text.Json;
-using FlowFocus.Core;
+using FlowFocus.Core.Models;
 using FlowFocus.Core.Storage;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.JSInterop;
 
 namespace FlowFocus.Data;
 
@@ -18,166 +17,98 @@ public class StorageContext : DbContext
         _dbPath = Path.Combine(folder, dbPath ?? "flowfocus.db");
     }
 
-    public DbSet<StorageEntry> Entries => Set<StorageEntry>();
+    // Отдельные таблицы для каждой сущности
+    public DbSet<TaskItem> Tasks => Set<TaskItem>();
+    public DbSet<TaskBlocker> TaskBlockers => Set<TaskBlocker>();
+    public DbSet<UserAppSettings> Settings => Set<UserAppSettings>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder options)
         => options.UseSqlite($"Data Source={_dbPath}");
-}
 
-public class StorageEntry
-{
-    public int Id { get; set; }
-    public string Key { get; set; } = string.Empty;
-    public string Value { get; set; } = string.Empty;
-}
-
-public enum StorageKey
-{
-    UserSettings,
-    SessionState,
-    Tasks,
-    Preferences
-}
-
-public static class StorageKeys
-{
-    public static readonly Dictionary<StorageKey, string> Map = new()
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        { StorageKey.UserSettings, nameof(StorageKey.UserSettings) },
-        { StorageKey.SessionState, nameof(StorageKey.SessionState) },
-        { StorageKey.Tasks, nameof(StorageKey.Tasks) },
-        { StorageKey.Preferences, nameof(StorageKey.Preferences) },
-    };
-}
-
-public class DbStorageService<T>(StorageKey key) : IStorageService<T>
-{
-    private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
-
-    public async Task<T?> LoadAsync()
-    {
-        await using var db = new StorageContext();
-        await db.Database.EnsureCreatedAsync();
-        var entry = await db.Entries.FirstOrDefaultAsync(e => e.Key == StorageKeys.Map[key]);
-        if (entry == null) return default;
-        try
+        // TaskItem
+        modelBuilder.Entity<TaskItem>(entity =>
         {
-            return JsonSerializer.Deserialize<T>(entry.Value, Options);
-        }
-        catch
-        {
-            return default;
-        }
-    }
+            entity.HasKey(e => e.Id);
 
-    public async Task SaveAsync(T data)
-    {
-        await using var db = new StorageContext();
-        await db.Database.EnsureCreatedAsync();
-        var json = JsonSerializer.Serialize(data, Options);
-        var entry = await db.Entries.FirstOrDefaultAsync(e => e.Key == StorageKeys.Map[key]);
-        if (entry == null)
-        {
-            db.Entries.Add(new StorageEntry { Key = StorageKeys.Map[key], Value = json });
-        }
-        else
-        {
-            entry.Value = json;
-            db.Entries.Update(entry);
-        }
+            // Tags как JSON (проще чем CSV)
+            entity.Property(e => e.Tags)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions?)null) ?? new List<string>()
+                );
 
-        await db.SaveChangesAsync();
-    }
+            // RepeatInfo как JSON
+            entity.Property(e => e.Repeat)
+                .HasConversion(
+                    v => v == null ? null : JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => string.IsNullOrEmpty(v)
+                        ? null
+                        : JsonSerializer.Deserialize<RepeatInfo>(v, (JsonSerializerOptions?)null)
+                );
 
-    public async Task ClearAsync()
-    {
-        await using var db = new StorageContext();
-        var entry = await db.Entries.FirstOrDefaultAsync(e => e.Key == StorageKeys.Map[key]);
-        if (entry != null)
+            // Индексы для частых запросов
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.AssignedDate);
+            entity.HasIndex(e => e.IsFavorite);
+        });
+
+        // TaskBlocker
+        modelBuilder.Entity<TaskBlocker>(entity =>
         {
-            db.Entries.Remove(entry);
-            await db.SaveChangesAsync();
-        }
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.ParentTaskId);
+            entity.HasIndex(e => e.BlockerTaskId);
+        });
+
+        // UserAppSettings (будет только одна запись)
+        modelBuilder.Entity<UserAppSettings>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.DayStartTime).HasConversion(
+                v => v.Ticks,
+                v => TimeSpan.FromTicks(v)
+            );
+        });
     }
 }
 
-public class FileStorageService<T> : IStorageService<T>
+public class TaskRepository(StorageContext context) : ITaskRepository<TaskItem>
 {
-    private readonly string _filePath;
-    private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
+    public async Task<List<TaskItem>> GetAllAsync()
+        => await context.Tasks.OrderBy(t => t.AssignedDate).ToListAsync();
 
-    public FileStorageService(string? fileName = null)
+    public async Task<TaskItem?> GetByIdAsync(int id)
+        => await context.Tasks.FirstOrDefaultAsync(t => t.Id == id);
+
+    public async Task AddAsync(TaskItem task)
     {
-        fileName ??= AppSettings.FileName;
-        var folder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        if (string.IsNullOrWhiteSpace(folder))
-            folder = ".";
-        _filePath = Path.Combine(folder, fileName);
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
     }
 
-    public async Task<T?> LoadAsync()
+    public async Task UpdateAsync(TaskItem task)
     {
-        if (!File.Exists(_filePath))
-            return default;
-        try
+        context.Tasks.Update(task);
+        await context.SaveChangesAsync();
+    }
+
+    public async Task DeleteAsync(int id)
+    {
+        var task = await GetByIdAsync(id);
+        if (task != null)
         {
-            var json = await File.ReadAllTextAsync(_filePath);
-            return JsonSerializer.Deserialize<T>(json, Options);
-        }
-        catch
-        {
-            return default;
-        }
-    }
-
-    public async Task SaveAsync(T data)
-    {
-        var json = JsonSerializer.Serialize(data, Options);
-        await File.WriteAllTextAsync(_filePath, json);
-    }
-
-    public Task ClearAsync()
-    {
-        if (File.Exists(_filePath))
-            File.Delete(_filePath);
-        return Task.CompletedTask;
-    }
-}
-
-public class LocalStorageService<T> : IStorageService<T>
-{
-    private readonly string _key;
-    private readonly IJSRuntime _js;
-    private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
-
-    public LocalStorageService(IJSRuntime js, string key)
-    {
-        _js = js;
-        _key = key;
-    }
-
-    public async Task<T?> LoadAsync()
-    {
-        try
-        {
-            var json = await _js.InvokeAsync<string>("localStorage.getItem", _key);
-            if (string.IsNullOrWhiteSpace(json)) return default;
-            return JsonSerializer.Deserialize<T>(json, Options);
-        }
-        catch
-        {
-            return default;
+            context.Tasks.Remove(task);
+            await context.SaveChangesAsync();
         }
     }
 
-    public async Task SaveAsync(T data)
-    {
-        var json = JsonSerializer.Serialize(data, Options);
-        await _js.InvokeVoidAsync("localStorage.setItem", _key, json);
-    }
+    public async Task<List<TaskItem>> GetByStatusAsync(TodoTaskStatus status)
+        => await context.Tasks.Where(t => t.Status == status).ToListAsync();
 
-    public async Task ClearAsync()
-    {
-        await _js.InvokeVoidAsync("localStorage.removeItem", _key);
-    }
+    public async Task<List<TaskItem>> GetByDateAsync(DateTime date)
+        => await context.Tasks.Where(t => t.AssignedDate.HasValue &&
+                                          t.AssignedDate.Value.Date == date.Date)
+            .ToListAsync();
 }
