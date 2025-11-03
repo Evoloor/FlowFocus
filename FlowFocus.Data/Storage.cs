@@ -1,6 +1,5 @@
 using System.Text.Json;
 using FlowFocus.Core.Models;
-using FlowFocus.Core.Storage;
 using Microsoft.EntityFrameworkCore;
 
 namespace FlowFocus.Data;
@@ -74,41 +73,158 @@ public class StorageContext : DbContext
     }
 }
 
-public class TaskRepository(StorageContext context) : ITaskRepository<TaskItem>
+public interface IRepository<T> where T : class
 {
-    public async Task<List<TaskItem>> GetAllAsync()
-        => await context.Tasks.OrderBy(t => t.AssignedDate).ToListAsync();
+    List<T> GetAll();
+    T? GetById(int id);
+    void Add(T entity);
+    void Update(T entity);
+    void Delete(int id);
+    void SaveChanges();
+}
 
-    public async Task<TaskItem?> GetByIdAsync(int id)
-        => await context.Tasks.FirstOrDefaultAsync(t => t.Id == id);
+public interface ITaskRepository : IRepository<TaskItem>
+{
+    List<TaskItem> GetByStatus(TodoTaskStatus status);
+    List<TaskItem> GetByDate(DateTime date);
+    List<TaskItem> GetUnconfigured();
+    List<TaskItem> GetToday();
+}
 
-    public async Task AddAsync(TaskItem task)
+public class TaskRepository : ITaskRepository
+{
+    private readonly StorageContext _context;
+    private List<TaskItem>? _cache;
+    private bool _isDirty = true;
+
+    public TaskRepository(StorageContext context)
     {
-        context.Tasks.Add(task);
-        await context.SaveChangesAsync();
+        _context = context;
     }
 
-    public async Task UpdateAsync(TaskItem task)
+    public List<TaskItem> GetAll()
     {
-        context.Tasks.Update(task);
-        await context.SaveChangesAsync();
+        if (_isDirty || _cache == null)
+        {
+            _cache = _context.Tasks
+                .Include(t => t.Blockers)
+                .OrderBy(t => t.AssignedDate)
+                .ToList();
+            _isDirty = false;
+        }
+
+        return _cache;
     }
 
-    public async Task DeleteAsync(int id)
+    public TaskItem? GetById(int id) => GetAll().FirstOrDefault(t => t.Id == id);
+
+    public void Add(TaskItem task)
     {
-        var task = await GetByIdAsync(id);
+        if (task.Id == 0)
+        {
+            task.Id = GetAll().Count > 0 ? GetAll().Max(t => t.Id) + 1 : 1;
+        }
+
+        task.LastChange = DateTime.Now;
+
+        _context.Tasks.Add(task);
+        _isDirty = true;
+    }
+
+    public void Update(TaskItem task)
+    {
+        task.LastChange = DateTime.Now;
+        _context.Tasks.Update(task);
+        _isDirty = true;
+    }
+
+    public void Delete(int id)
+    {
+        var task = GetById(id);
         if (task != null)
         {
-            context.Tasks.Remove(task);
-            await context.SaveChangesAsync();
+            _context.Tasks.Remove(task);
+            _isDirty = true;
         }
     }
 
-    public async Task<List<TaskItem>> GetByStatusAsync(TodoTaskStatus status)
-        => await context.Tasks.Where(t => t.Status == status).ToListAsync();
+    public void SaveChanges()
+    {
+        _context.SaveChanges();
+        _isDirty = true;
+    }
 
-    public async Task<List<TaskItem>> GetByDateAsync(DateTime date)
-        => await context.Tasks.Where(t => t.AssignedDate.HasValue &&
-                                          t.AssignedDate.Value.Date == date.Date)
-            .ToListAsync();
+    // Специфичные методы
+    public List<TaskItem> GetByStatus(TodoTaskStatus status)
+        => GetAll().Where(t => t.Status == status).ToList();
+
+    public List<TaskItem> GetByDate(DateTime date)
+        => GetAll().Where(t => t.AssignedDate?.Date == date.Date).ToList();
+
+    public List<TaskItem> GetUnconfigured()
+        => GetByStatus(TodoTaskStatus.Unconfigured);
+
+    public List<TaskItem> GetToday()
+        => GetByDate(DateTime.Today);
+}
+
+public class SettingsRepository : IRepository<UserAppSettings>
+{
+    private readonly StorageContext _context;
+    private UserAppSettings? _cache;
+    private bool _isDirty = true;
+
+    public SettingsRepository(StorageContext context)
+    {
+        _context = context;
+    }
+
+    public List<UserAppSettings> GetAll()
+    {
+        if (_isDirty || _cache == null)
+        {
+            _cache = _context.Settings.FirstOrDefault();
+            if (_cache == null)
+            {
+                _cache = new UserAppSettings();
+                _context.Settings.Add(_cache);
+                _context.SaveChanges();
+            }
+
+            _isDirty = false;
+        }
+
+        return new List<UserAppSettings> { _cache };
+    }
+
+    public UserAppSettings? GetById(int id) => GetAll().FirstOrDefault();
+
+    public void Add(UserAppSettings entity)
+    {
+        // Настройки всегда одна запись
+        _context.Settings.Add(entity);
+        _isDirty = true;
+    }
+
+    public void Update(UserAppSettings entity)
+    {
+        _context.Settings.Update(entity);
+        _isDirty = true;
+    }
+
+    public void Delete(int id)
+    {
+        var settings = GetById(id);
+        if (settings != null)
+        {
+            _context.Settings.Remove(settings);
+            _isDirty = true;
+        }
+    }
+
+    public void SaveChanges()
+    {
+        _context.SaveChanges();
+        _isDirty = true;
+    }
 }

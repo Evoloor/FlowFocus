@@ -70,11 +70,3 @@ public class UserAppSettings
     public int DailyComplexityLimit { get; set; } = 300;
     public bool AutoRecalculateOnAdd { get; set; } = true;
 }
-
-public class AppState
-{
-    public static AppState Shared = new (); 
-    public DateTime CurrentDay { get; set; } = DateTime.Today;
-    public List<TaskItem> Tasks { get; set; } = new();
-    public UserAppSettings Settings { get; set; } = new();
-}

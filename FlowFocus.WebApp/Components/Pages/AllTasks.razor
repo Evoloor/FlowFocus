@@ -1,0 +1,279 @@
+@page "/all"
+@using FlowFocus.Core.Models
+@using FlowFocus.Data
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
+
+@inject IDialogService _dialogService
+@inject ITaskRepository TaskRepo
+@inject ISnackbar Snackbar
+
+<PageTitle>Все задачи</PageTitle>
+
+<MudPaper Class="pa-4" Elevation="1">
+    <MudStack Spacing="2">
+        <MudText Typo="Typo.h5">Все задачи</MudText>
+        
+        <MudTextField @bind-Value="_filter" 
+                      Placeholder="Поиск по названию..." 
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true" />
+
+        <MudDivider />
+
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="3">
+                <MudSelect T="TodoTaskStatus?" @bind-Value="_statusFilter" Label="Статус" Variant="Variant.Outlined">
+                    <MudSelectItem T="TodoTaskStatus?" Value="null">Все</MudSelectItem>
+                    <MudSelectItem T="TodoTaskStatus?" Value="@TodoTaskStatus.Unconfigured">Ненастроенные</MudSelectItem>
+                    <MudSelectItem T="TodoTaskStatus?" Value="@TodoTaskStatus.Planned">Запланированные</MudSelectItem>
+                    <MudSelectItem T="TodoTaskStatus?" Value="@TodoTaskStatus.Active">Активные</MudSelectItem>
+                    <MudSelectItem T="TodoTaskStatus?" Value="@TodoTaskStatus.Completed">Завершенные</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudSelect T="string" @bind-Value="_sortBy" Label="Сортировка" Variant="Variant.Outlined">
+                    <MudSelectItem T="string" Value="@("date")">По дате</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("interest")">По интересу</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("complexity")">По сложности</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("hours")">По времени</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("title")">По названию</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudSwitch T="bool" @bind-Checked="_showOnlyFavorites" Label="Только избранные" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ClearFilters" StartIcon="@Icons.Material.Filled.Clear">
+                    Сбросить фильтры
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+
+        <MudDivider />
+
+        @if (FilteredTasks.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                Задачи не найдены
+            </MudAlert>
+        }
+        else
+        {
+            <MudTable Items="FilteredTasks" Hover="true" Breakpoint="Breakpoint.Sm">
+                <HeaderContent>
+                    <MudTh>Название</MudTh>
+                    <MudTh>Статус</MudTh>
+                    <MudTh>Интерес</MudTh>
+                    <MudTh>Сложность</MudTh>
+                    <MudTh>⏱ Часы</MudTh>
+                    <MudTh>Дата</MudTh>
+                    <MudTh>Дедлайн</MudTh>
+                    <MudTh>Действия</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>
+                        <MudStack Spacing="1">
+                            <MudText Typo="Typo.body1">@context.Title</MudText>
+                            @if (!string.IsNullOrEmpty(context.Description))
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Description</MudText>
+                            }
+                            @if (context.Tags.Any())
+                            {
+                                <MudStack Row="true" Spacing="1">
+                                    @foreach (var tag in context.Tags.Take(3))
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled">@tag</MudChip>
+                                    }
+                                    @if (context.Tags.Count > 3)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Tertiary" Variant="Variant.Outlined">+@(context.Tags.Count - 3)</MudChip>
+                                    }
+                                </MudStack>
+                            }
+                        </MudStack>
+                    </MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)" Variant="Variant.Filled">
+                            @GetStatusText(context.Status)
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>
+                        <MudRating @bind-SelectedValue="context.Interest" ReadOnly="true" Size="Size.Small" />
+                    </MudTd>
+                    <MudTd>@context.Complexity</MudTd>
+                    <MudTd>@context.Hours</MudTd>
+                    <MudTd>
+                        @if (context.AssignedDate.HasValue)
+                        {
+                            <MudText Typo="Typo.body2">@context.AssignedDate.Value.ToString("dd.MM.yyyy")</MudText>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">—</MudText>
+                        }
+                    </MudTd>
+                    <MudTd>
+                        @if (context.Deadline.HasValue)
+                        {
+                            var isOverdue = context.Deadline.Value.Date < DateTime.Today && context.Status != TodoTaskStatus.Completed;
+                            <MudText Typo="Typo.body2" Color="@(isOverdue ? Color.Error : Color.Default)">
+                                @context.Deadline.Value.ToString("dd.MM.yyyy")
+                                @if (isOverdue)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" />
+                                }
+                            </MudText>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">—</MudText>
+                        }
+                    </MudTd>
+                    <MudTd>
+                        <MudStack Row="true" Spacing="1" Justify="Justify.FlexStart">
+                            <MudIconButton Icon="@Icons.Material.Filled.Favorite" 
+                                          Color="@(context.IsFavorite ? Color.Warning : Color.Default)" 
+                                          Size="Size.Small"
+                                          OnClick="@(() => ToggleFavorite(context))" />
+                            
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                          Size="Size.Small"
+                                          OnClick="@(() => EditTask(context))" />
+                            
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                          Color="Color.Error" 
+                                          Size="Size.Small"
+                                          OnClick="@(() => DeleteTask(context))" />
+                        </MudStack>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[]{10, 25, 50}" />
+                </PagerContent>
+            </MudTable>
+        }
+    </MudStack>
+</MudPaper>
+
+@code {
+    private string _filter = "";
+    private TodoTaskStatus? _statusFilter = null;
+    private string _sortBy = "date";
+    private bool _showOnlyFavorites = false;
+
+    private List<TaskItem> AllTasksList => TaskRepo.GetAll();
+
+    private List<TaskItem> FilteredTasks
+    {
+        get
+        {
+            var query = AllTasksList.AsEnumerable();
+
+            // Фильтр по поиску
+            if (!string.IsNullOrWhiteSpace(_filter))
+            {
+                query = query.Where(t => t.Title.Contains(_filter, StringComparison.OrdinalIgnoreCase) ||
+                                        (t.Description ?? "").Contains(_filter, StringComparison.OrdinalIgnoreCase) ||
+                                        t.Tags.Any(tag => tag.Contains(_filter, StringComparison.OrdinalIgnoreCase)));
+            }
+
+            // Фильтр по статусу
+            if (_statusFilter.HasValue)
+            {
+                query = query.Where(t => t.Status == _statusFilter.Value);
+            }
+
+            // Фильтр по избранному
+            if (_showOnlyFavorites)
+            {
+                query = query.Where(t => t.IsFavorite);
+            }
+
+            // Сортировка
+            query = _sortBy switch
+            {
+                "interest" => query.OrderByDescending(t => t.Interest),
+                "complexity" => query.OrderByDescending(t => t.Complexity),
+                "hours" => query.OrderByDescending(t => t.Hours),
+                "title" => query.OrderBy(t => t.Title),
+                _ => query.OrderBy(t => t.AssignedDate)
+            };
+
+            return query.ToList();
+        }
+    }
+
+    private Color GetStatusColor(TodoTaskStatus status)
+    {
+        return status switch
+        {
+            TodoTaskStatus.Unconfigured => Color.Default,
+            TodoTaskStatus.Planned => Color.Info,
+            TodoTaskStatus.Active => Color.Warning,
+            TodoTaskStatus.Completed => Color.Success,
+            _ => Color.Default
+        };
+    }
+
+    private string GetStatusText(TodoTaskStatus status)
+    {
+        return status switch
+        {
+            TodoTaskStatus.Unconfigured => "Ненастроена",
+            TodoTaskStatus.Planned => "Запланирована",
+            TodoTaskStatus.Active => "Активна",
+            TodoTaskStatus.Completed => "Завершена",
+            _ => status.ToString()
+        };
+    }
+
+    private void ToggleFavorite(TaskItem task)
+    {
+        task.IsFavorite = !task.IsFavorite;
+        TaskRepo.Update(task);
+        TaskRepo.SaveChanges();
+        Snackbar.Add($"Задача {(task.IsFavorite ? "добавлена в" : "удалена из")} избранного", Severity.Info);
+        StateHasChanged();
+    }
+
+    private void EditTask(TaskItem task)
+    {
+        // TODO: Реализовать редактирование
+        Snackbar.Add($"Редактирование задачи '{task.Title}'", Severity.Info);
+    }
+
+    private async void DeleteTask(TaskItem task)
+    {
+        var parameters = new DialogParameters
+        {
+            ["ContentText"] = $"Вы уверены, что хотите удалить задачу '{task.Title}'?",
+            ["ButtonText"] = "Удалить",
+            ["Color"] = Color.Error
+        };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        var dialog = await _dialogService.ShowAsync<MudDialog>("Подтверждение удаления", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            TaskRepo.Delete(task.Id);
+            TaskRepo.SaveChanges();
+            Snackbar.Add($"Задача '{task.Title}' удалена", Severity.Success);
+            StateHasChanged();
+        }
+    }
+
+    private void ClearFilters()
+    {
+        _filter = "";
+        _statusFilter = null;
+        _sortBy = "date";
+        _showOnlyFavorites = false;
+        StateHasChanged();
+    }
+}

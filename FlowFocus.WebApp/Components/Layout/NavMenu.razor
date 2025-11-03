@@ -1,10 +1,45 @@
-﻿
-<MudNavMenu>
-    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
-    <MudNavLink Href="counter" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Add">Counter</MudNavLink>
-    
-    <MudNavLink Href="weather" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.List">Weather</MudNavLink>
+﻿<MudNavMenu>
+
+    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Today">
+        Сегодня
+    </MudNavLink>
+
+    <MudNavLink Href="/tomorrow" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Event">
+        Завтра
+    </MudNavLink>
+
+    <MudNavLink Href="/all" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ViewList">
+        Все задачи
+    </MudNavLink>
+
+    <MudNavLink Href="/unconfigured" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.BuildCircle">
+        Ненастроенные
+    </MudNavLink>
+
+    <MudNavLink Href="/settings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Settings">
+        Настройки
+    </MudNavLink>
+
+    <MudNavLink Href="/graph" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.GraphicEq">
+        Граф
+    </MudNavLink>
 
 </MudNavMenu>
 
+<!-- Плавающая кнопка добавления задачи -->
+<MudFab Color="Color.Primary" Icon="@Icons.Material.Filled.Add"
+        Size="Size.Large"
+        Class="fab-add"
+        OnClick="@(() => NavigationManager.NavigateTo("/add"))" />
 
+<style>
+    .fab-add {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 1000;
+    }
+</style>
+@code {
+    [Inject] NavigationManager NavigationManager { get; set; } = default!;
+}

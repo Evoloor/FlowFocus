@@ -6,7 +6,7 @@ public static class Extensions
 {
     public static DateTime StartOfToday(this DateTime date)
     {
-        var hour = AppState.Shared.Settings.DayStartTime.Hours;
+        var hour = 5;// AppState.Shared.Settings.DayStartTime.Hours;
         var baseDate = date.Hour < hour ? date.Date.AddDays(-1) : date.Date;
         return baseDate.AddHours(hour);
     }

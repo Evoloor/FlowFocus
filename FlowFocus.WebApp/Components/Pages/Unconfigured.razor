@@ -1,0 +1,63 @@
+@page "/unconfigured"
+@using FlowFocus.Core.Models
+@using FlowFocus.Data
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
+
+@inject ITaskRepository TaskRepo
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>Ненастроенные задачи</PageTitle>
+
+<MudPaper Class="pa-4" Elevation="1">
+    <MudText Typo="Typo.h5">Ненастроенные задачи</MudText>
+    <MudDivider Class="my-2" />
+
+    @if (UnconfiguredTasks.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+            Все задачи настроены 👌
+        </MudAlert>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var task in UnconfiguredTasks)
+            {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudStack Spacing="2">
+                            <MudText Typo="Typo.h6">@task.Title</MudText>
+                            <MudText Typo="Typo.body2">@task.Description</MudText>
+                            
+                            <MudStack Row="true" Spacing="1">
+                                <MudChip T="double" Color="Color.Info" Variant="Variant.Outlined" Size="Size.Small">Инт: @task.Interest</MudChip>
+                                <MudChip T="double" Color="Color.Secondary" Variant="Variant.Outlined" Size="Size.Small">Слож: @task.Complexity</MudChip>
+                                <MudChip T="double" Color="Color.Tertiary" Variant="Variant.Outlined" Size="Size.Small">⏱ @task.Hours ч</MudChip>
+                            </MudStack>
+
+                            <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="() => ConfirmTask(task)" StartIcon="@Icons.Material.Filled.Check">
+                                Подтвердить и запланировать
+                            </MudButton>
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</MudPaper>
+
+@code {
+    private List<TaskItem> UnconfiguredTasks => TaskRepo.GetUnconfigured();
+
+    void ConfirmTask(TaskItem task)
+    {
+        task.Status = TodoTaskStatus.Planned;
+        task.AssignedDate = DateTime.Now.StartOfTomorrow(); // Планируем на завтра
+        TaskRepo.Update(task);
+        TaskRepo.SaveChanges();
+        Snackbar.Add($"Задача '{task.Title}' запланирована на завтра.", Severity.Success);
+        Nav.NavigateTo("/unconfigured", forceLoad: true);
+    }
+}

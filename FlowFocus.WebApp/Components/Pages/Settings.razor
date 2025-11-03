@@ -1,0 +1,68 @@
+@page "/settings"
+@using FlowFocus.Core.Models
+@using FlowFocus.Data
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
+
+@inject IRepository<UserAppSettings> SettingsRepo
+@inject ISnackbar Snackbar
+
+<PageTitle>Настройки</PageTitle>
+
+<MudPaper Class="pa-4" Elevation="1">
+    <MudText Typo="Typo.h5">Настройки приложения</MudText>
+    <MudDivider Class="my-3" />
+
+    <MudForm>
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudNumericField Label="Время начала дня (часы, 0–23)"
+                      @bind-Value="StartHour"
+                      Min="0" Max="23"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.AccessTime"
+                      Immediate="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudNumericField Label="Макс. часов в день" 
+                      @bind-Value="_settings.DailyHoursLimit"
+                      Min="0" Max="24" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudNumericField Label="Макс. сложности в день" 
+                      @bind-Value="_settings.DailyComplexityLimit"
+                      Min="0" Max="1000" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSwitch T="bool" Label="Пересчёт при добавлении задачи" 
+                      @bind-Checked="_settings.AutoRecalculateOnAdd" />
+            </MudItem>
+        </MudGrid>
+
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Class="mt-3" OnClick="Save" StartIcon="@Icons.Material.Filled.Save">
+            Сохранить настройки
+        </MudButton>
+    </MudForm>
+</MudPaper>
+
+@code {
+    private UserAppSettings _settings = new();
+
+    protected override void OnInitialized()
+    {
+        _settings = SettingsRepo.GetAll().First();
+    }
+
+    int StartHour
+    {
+        get => (int)_settings.DayStartTime.TotalHours;
+        set => _settings.DayStartTime = TimeSpan.FromHours(value);
+    }
+
+    void Save()
+    {
+        SettingsRepo.Update(_settings);
+        SettingsRepo.SaveChanges();
+        Snackbar.Add("Настройки сохранены.", Severity.Success);
+    }
+}

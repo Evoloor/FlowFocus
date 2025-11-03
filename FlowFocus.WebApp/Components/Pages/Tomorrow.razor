@@ -1,0 +1,46 @@
+@page "/tomorrow"
+@using FlowFocus.Core.Models
+@using FlowFocus.Data
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
+
+@inject ITaskRepository TaskRepo
+
+<PageTitle>Завтра</PageTitle>
+
+<MudPaper Class="pa-4" Elevation="1">
+    <MudText Typo="Typo.h5" Class="mb-2">Задачи на завтра</MudText>
+    <MudDivider Class="my-2" />
+
+    @if (TomorrowTasks.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+            Нет задач на завтра 🎉
+        </MudAlert>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var task in TomorrowTasks)
+            {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard Class="mb-2">
+                        <MudCardContent>
+                            <MudText Typo="Typo.subtitle1">@task.Title</MudText>
+                            <MudText Typo="Typo.body2">@task.Description</MudText>
+                            <MudStack Row="true" Spacing="1" Class="mt-2">
+                                <MudChip T="double" Color="Color.Info" Variant="Variant.Outlined" Size="Size.Small">Инт: @task.Interest</MudChip>
+                                <MudChip T="double" Color="Color.Secondary" Variant="Variant.Outlined" Size="Size.Small">Слож: @task.Complexity</MudChip>
+                                <MudChip T="double" Color="Color.Tertiary" Variant="Variant.Outlined" Size="Size.Small">⏱ @task.Hours ч</MudChip>
+                            </MudStack>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</MudPaper>
+
+@code {
+    private List<TaskItem> TomorrowTasks => TaskRepo.GetByDate(DateTime.Now.StartOfToday());
+}
