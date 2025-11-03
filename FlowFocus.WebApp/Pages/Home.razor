@@ -98,7 +98,7 @@
         task.AssignedDate = DateTime.Now.StartOfTomorrow();
         TaskRepo.Update(task);
         TaskRepo.SaveChanges();
-        Snackbar.Add($"Задача '{task.Title}' перенесена на завтра.", Severity.Normal);
+        Snackbar.Add($"Задача '{task.Title}' перенесена на завтра.");
         StateHasChanged();
     }
 
@@ -139,9 +139,9 @@
             Snackbar.Add("Нет подходящих задач для фокуса.", Severity.Warning);
     }
 
-    string GetTaskSummary(TaskItem task)
+    static string GetTaskSummary(TaskItem task)
         => task.Deadline.HasValue ? $"Дедлайн: {task.Deadline.Value:dd.MM}" : "Без дедлайна";
 
-    double GetTaskProgress(TaskItem task)
+    static double GetTaskProgress(TaskItem task)
         => task.Status == TodoTaskStatus.Completed ? 100 : 0;
 }
