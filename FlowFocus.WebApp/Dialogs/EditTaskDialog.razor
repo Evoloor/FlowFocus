@@ -1,0 +1,44 @@
+@using FlowFocus.Core.Models
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Редактировать задачу</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="Task.Title" Label="Название" Required="true" />
+        <MudTextField @bind-Value="Task.Description" Label="Описание" Lines="3" Class="mt-3" />
+        
+        <MudGrid Class="mt-3">
+            <MudItem xs="12" sm="4">
+                <MudNumericField Label="Интересность (1–10)" @bind-Value="Task.Interest" Min="1" Max="10" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudNumericField Label="Сложность (1–100)" @bind-Value="Task.Complexity" Min="1" Max="100" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudNumericField Label="Часы" @bind-Value="Task.Hours" Min="0" Max="1000" />
+            </MudItem>
+        </MudGrid>
+
+        <MudDatePicker Label="Дедлайн" @bind-Date="Task.Deadline" Class="mt-3" />
+        
+        <MudSelect Label="Статус" @bind-Value="Task.Status" T="TodoTaskStatus" Class="mt-3">
+            @foreach (var status in Enum.GetValues<TodoTaskStatus>())
+            {
+                <MudSelectItem T="TodoTaskStatus" Value="@status">@status</MudSelectItem>
+            }
+        </MudSelect>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Отмена</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save">Сохранить</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public TaskItem Task { get; set; } = new();
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+    private void Cancel() => MudDialog.Cancel();
+    void Save() => MudDialog.Close(DialogResult.Ok(true));
+}

@@ -4,36 +4,19 @@
 @using FlowFocus.WebApp.Components
 
 @inject ITaskRepository TaskRepo
-@inject ISnackbar Snackbar
-@inject NavigationManager Nav
-@inject IRepository<UserAppSettings> SettingsRepo
 
 <PageTitle>Ненастроенные задачи</PageTitle>
 <TasksView Tasks="@UnconfiguredTasks" 
           Title="Ненастроенные задачи"
           ShowFilters="false"
-          ShowViewToggle="false"
           ShowCounter="false"
-          ShowPagination="false"
           ShowFavoriteAction="false"
           ShowEditAction="false"
           ShowDeleteAction="false"
           ShowConfirmAction="true"
           DefaultStatusFilter="TodoTaskStatus.Unconfigured"
-          EmptyMessage="Все задачи настроены 👌"
-          OnConfirm="ConfirmTask" />
+          EmptyMessage="Все задачи настроены 👌"/>
 
 @code {
     private List<TaskItem> UnconfiguredTasks => TaskRepo.GetUnconfigured();
-
-    void ConfirmTask(TaskItem task)
-    {
-        var settings = SettingsRepo.GetAll().First();
-        task.Status = TodoTaskStatus.Planned;
-        //task.Deadline = DateTime.Now.StartOfTomorrow(settings.DayStartTime);
-        TaskRepo.Update(task);
-        TaskRepo.SaveChanges();
-        Snackbar.Add($"Задача '{task.Title}' запланирована на завтра.", Severity.Success);
-        Nav.NavigateTo("/unconfigured", forceLoad: true);
-    }
 }

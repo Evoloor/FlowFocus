@@ -5,23 +5,17 @@
 
 @inject ITaskRepository TaskRepo
 @inject IRepository<UserAppSettings> SettingsRepo
-@inject ISnackbar Snackbar
 
 <PageTitle>Сегодня</PageTitle>
 <TasksView Tasks="@TodayTasks"
           Title="Сегодня"
           ShowFilters="false"
-          ShowViewToggle="false"
           ShowCounter="false"
-          ShowPagination="false"
           ShowFavoriteAction="false"
           ShowEditAction="false"
           ShowDeleteAction="false"
           ShowCompleteAction="true"
-          ShowPostponeAction="true"
-          DefaultViewMode="grid"
-          OnComplete="CompleteTask"
-          OnPostpone="PostponeTask"/>
+          ShowPostponeAction="true"/>
 
 @code {
     private DateTime _currentDay = DateTime.Now.StartOfToday();
@@ -34,23 +28,4 @@
     }
 
     List<TaskItem> TodayTasks => TaskRepo.GetByDate(_currentDay, _settings.DayStartTime);
-
-    void CompleteTask(TaskItem task)
-    {
-        task.Status = TodoTaskStatus.Completed;
-        TaskRepo.Update(task);
-        TaskRepo.SaveChanges();
-        Snackbar.Add($"Задача '{task.Title}' завершена.", Severity.Success);
-        StateHasChanged();
-    }
-
-    void PostponeTask(TaskItem task)
-    {
-        task.Deadline = DateTime.Now.StartOfTomorrow();
-        TaskRepo.Update(task);
-        TaskRepo.SaveChanges();
-        Snackbar.Add($"Задача '{task.Title}' перенесена на завтра.");
-        StateHasChanged();
-    }
-
 }

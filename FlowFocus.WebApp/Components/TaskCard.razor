@@ -1,190 +1,193 @@
 @using FlowFocus.Core.Models
 @using FlowFocus.Data
-@inject ITaskRepository TaskRepo
-@inject ISnackbar Snackbar
+@using FlowFocus.WebApp.Dialogs
 @inject IDialogService DialogService
-<MudPaper Class="pa-3" Elevation="@Elevation" Style="@Style">
-    <MudStack Spacing="2">
-        <!-- Заголовок и описание -->
-        <MudStack Spacing="1">
-            <MudText Typo="Typo.h6"
-                     Class="@(string.IsNullOrEmpty(Task.Description) ? "mb-2" : "")">@Task.Title</MudText>
-            @if (!string.IsNullOrEmpty(Task.Description))
-            {
-                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">@Task.Description</MudText>
-            }
-        </MudStack>
+@inject ISnackbar Snackbar
+@inject ITaskRepository TaskRepo
 
-        <!-- Теги -->
-        @if (Task.Tags.Any())
-        {
-            <MudStack Row="true" Spacing="1">
-                @foreach (var tag in Task.Tags.Take(3))
+<MudCard Elevation="2" Class="my-2">
+    <MudCardContent>
+        <div class="d-flex align-start">
+            <div class="flex-grow-1">
+                <MudText Typo="Typo.h6" Class="mb-1">@TaskItem.Title</MudText>
+                @if (!string.IsNullOrWhiteSpace(TaskItem.Description))
                 {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled">@tag</MudChip>
-                }
-                @if (Task.Tags.Count > 3)
-                {
-                    <MudChip T="string" Size="Size.Small" Color="Color.Tertiary" Variant="Variant.Outlined">
-                        +@(Task.Tags.Count - 3)</MudChip>
-                }
-            </MudStack>
-        }
-
-        <!-- Метрики задачи -->
-        <MudStack Row="true" Spacing="1">
-            <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
-                Инт: @Task.Interest
-            </MudChip>
-            <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined">
-                Слож: @Task.Complexity
-            </MudChip>
-            <MudChip T="string" Size="Size.Small" Color="Color.Tertiary" Variant="Variant.Outlined">
-                ⏱ @Task.Hours ч
-            </MudChip>
-        </MudStack>
-
-        <!-- Прогресс (для активных/завершенных задач) -->
-        @if (ShowProgress)
-        {
-            <MudProgressLinear Value="@GetTaskProgress(Task)" Color="Color.Primary" Height="4px"/>
-        }
-
-        <!-- Дедлайн -->
-        @if (Task.Deadline.HasValue)
-        {
-            var isOverdue = Task.Deadline.Value.Date < DateTime.Today && Task.Status != TodoTaskStatus.Completed;
-            <MudText Typo="Typo.caption" Color="@(isOverdue ? Color.Error : Color.Tertiary)">
-                Дедлайн: @Task.Deadline.Value.ToString("dd.MM.yyyy")
-                @if (isOverdue)
-                {
-                    <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small"/>
-                }
-            </MudText>
-        }
-
-        <!-- Действия -->
-                <!-- Действия -->
-        @if (ShowActions)
-        {
-            <MudStack Row="true" Spacing="2" Justify="Justify.FlexStart">
-                @if (ShowFavoriteAction)
-                {
-                    <MudIconButton Icon="@Icons.Material.Filled.Favorite" 
-                                  Color="@(Task.IsFavorite ? Color.Warning : Color.Default)" 
-                                  Size="Size.Small"
-                                  OnClick="async () => await OnFavoriteToggle.InvokeAsync(Task)" />
+                    <MudText Typo="Typo.body2" Color="Color.Tertiary" Class="mb-2">
+                        @TaskItem.Description
+                    </MudText>
                 }
                 
+                <div class="d-flex align-center flex-wrap gap-2">
+                    <MudChip T="string" Size="Size.Small" Color="Color.Primary">Интерес: @TaskItem.Interest/10</MudChip>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary">Сложность: @TaskItem.Complexity</MudChip>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Tertiary">Часы: @TaskItem.Hours</MudChip>
+                    @if (TaskItem.Deadline.HasValue)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning">
+                            @TaskItem.Deadline.Value.ToString("dd.MM.yyyy HH:mm")
+                        </MudChip>
+                    }
+                    <MudChip T="string" Size="Size.Small" Color="GetStatusColor(TaskItem.Status)">
+                        @TaskItem.Status
+                    </MudChip>
+                </div>
+
+                @if (TaskItem.Tags?.Any() == true)
+                {
+                    <div class="mt-2">
+                        @foreach (var tag in TaskItem.Tags)
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="mr-1 mb-1">@tag</MudChip>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="d-flex flex-column ml-2">
+                @if (ShowFavoriteAction)
+                {
+                    <MudIconButton Icon="@(TaskItem.IsFavorite ? Icons.Material.Filled.Star : Icons.Material.Filled.StarBorder)" 
+                                  Color="Color.Warning" 
+                                  OnClick="@ToggleFavorite" 
+                                  Size="Size.Small" />
+                }
                 @if (ShowEditAction)
                 {
                     <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                  Color="Color.Primary" 
+                                  OnClick="@EditTask" 
                                   Size="Size.Small"
-                                  OnClick="async () => await OnEdit.InvokeAsync(Task)" />
+                                  Class="mt-1" />
                 }
-                
                 @if (ShowDeleteAction)
                 {
                     <MudIconButton Icon="@Icons.Material.Filled.Delete" 
                                   Color="Color.Error" 
+                                  OnClick="@DeleteTask" 
                                   Size="Size.Small"
-                                  OnClick="async () => await OnDelete.InvokeAsync(Task)" />
+                                  Class="mt-1" />
                 }
-                
                 @if (ShowCompleteAction)
                 {
-                    <MudButton Variant="Variant.Outlined" Color="Color.Success" Size="Size.Small"
-                              OnClick="async () => await OnComplete.InvokeAsync(Task)">
-                        Готово
-                    </MudButton>
+                    <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" 
+                                  Color="Color.Success" 
+                                  OnClick="@CompleteTask" 
+                                  Size="Size.Small"
+                                  Class="mt-1" />
                 }
-                
                 @if (ShowPostponeAction)
                 {
-                    <MudButton Variant="Variant.Text" Color="Color.Warning" Size="Size.Small"
-                              OnClick="async () => await OnPostpone.InvokeAsync(Task)">
-                        Отложить
-                    </MudButton>
+                    <MudIconButton Icon="@Icons.Material.Filled.Schedule" 
+                                  Color="Color.Warning" 
+                                  OnClick="@PostponeTask" 
+                                  Size="Size.Small"
+                                  Class="mt-1" />
                 }
-                
                 @if (ShowConfirmAction)
                 {
-                    <MudButton Color="Color.Success" Variant="Variant.Filled" Size="Size.Small"
-                              OnClick="async () => await OnConfirm.InvokeAsync(Task)" 
-                              StartIcon="@Icons.Material.Filled.Check">
-                        Подтвердить
-                    </MudButton>
+                    <MudIconButton Icon="@Icons.Material.Filled.ThumbUp" 
+                                  Color="Color.Success" 
+                                  OnClick="@ConfirmTask" 
+                                  Size="Size.Small"
+                                  Class="mt-1" />
                 }
-
-                <!-- Кастомные действия -->
-                @ChildContent
-            </MudStack>
-        }
-    </MudStack>
-</MudPaper>
+            </div>
+        </div>
+    </MudCardContent>
+</MudCard>
 
 @code {
-    [Parameter] public required TaskItem Task { get; set; }
-
-    [Parameter] public int Elevation { get; set; } = 1;
-
-    [Parameter] public string? Style { get; set; }
-
-    [Parameter] public bool ShowProgress { get; set; }
-
-    [Parameter] public bool ShowActions { get; set; } = true;
-
-    [Parameter] public bool ShowFavoriteAction { get; set; } = true;
-
-    [Parameter] public bool ShowEditAction { get; set; } = true;
-
-    [Parameter] public bool ShowDeleteAction { get; set; } = true;
-
+    [Parameter] public TaskItem TaskItem { get; set; } = new();
+    [Parameter] public bool ShowFavoriteAction { get; set; }
+    [Parameter] public bool ShowEditAction { get; set; }
+    [Parameter] public bool ShowDeleteAction { get; set; }
     [Parameter] public bool ShowCompleteAction { get; set; }
-
     [Parameter] public bool ShowPostponeAction { get; set; }
-
     [Parameter] public bool ShowConfirmAction { get; set; }
+    [Parameter] public EventCallback OnTaskDeleted { get; set; }
 
-    [Parameter] public EventCallback<TaskItem> OnFavoriteToggle { get; set; }
-
-    [Parameter] public EventCallback<TaskItem> OnEdit { get; set; }
-
-    [Parameter] public EventCallback<TaskItem> OnDelete { get; set; }
-
-    [Parameter] public EventCallback<TaskItem> OnComplete { get; set; }
-
-    [Parameter] public EventCallback<TaskItem> OnPostpone { get; set; }
-
-    [Parameter] public EventCallback<TaskItem> OnConfirm { get; set; }
-
-    [Parameter] public RenderFragment? ChildContent { get; set; }
-
-    private static double GetTaskProgress(TaskItem task)
+    private static Color GetStatusColor(TodoTaskStatus status) => status switch
     {
-        return task.Status == TodoTaskStatus.Completed ? 100 : 0;
+        TodoTaskStatus.Completed => Color.Success,
+        TodoTaskStatus.Active => Color.Primary,
+        TodoTaskStatus.Planned => Color.Info,
+        TodoTaskStatus.Unconfigured => Color.Warning,
+        _ => Color.Default
+    };
+
+    private async Task ToggleFavorite()
+    {
+        TaskItem.IsFavorite = !TaskItem.IsFavorite;
+        TaskRepo.Update(TaskItem);
+        TaskRepo.SaveChanges();
+        Snackbar.Add($"Задача {(TaskItem.IsFavorite ? "добавлена в" : "удалена из")} избранного", Severity.Info);
+        await InvokeAsync(StateHasChanged);
     }
 
-    private async Task DeleteTask(TaskItem task)
+    private async Task EditTask()
     {
         var parameters = new DialogParameters
         {
-            ["ContentText"] = $"Вы уверены, что хотите удалить задачу '{task.Title}'?",
-            ["ButtonText"] = "Удалить",
-            ["Color"] = Color.Error
+            ["Task"] = TaskItem
         };
 
-        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
-
-        var dialog = await DialogService.ShowAsync<MudDialog>("Подтверждение удаления", parameters, options);
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = DialogService.Show<EditTaskDialog>("Редактировать задачу", parameters, options);
         var result = await dialog.Result;
-
-        if (result is { Canceled: false })
+        
+        if (!result.Canceled)
         {
-            TaskRepo.Delete(task.Id);
+            TaskRepo.Update(TaskItem);
             TaskRepo.SaveChanges();
-            Snackbar.Add($"Задача '{task.Title}' удалена", Severity.Success);
-            StateHasChanged();
+            Snackbar.Add($"Задача '{TaskItem.Title}' обновлена", Severity.Success);
+            await InvokeAsync(StateHasChanged);
         }
+    }
+
+    private async Task DeleteTask()
+    {
+        var parameters = new DialogParameters
+        {
+            ["TaskTitle"] = TaskItem.Title
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = DialogService.Show<DeleteTaskDialog>("Удалить задачу", parameters, options);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+        {
+            TaskRepo.Delete(TaskItem.Id);
+            TaskRepo.SaveChanges();
+            Snackbar.Add($"Задача '{TaskItem.Title}' удалена", Severity.Success);
+            await OnTaskDeleted.InvokeAsync();
+        }
+    }
+
+    private async Task CompleteTask()
+    {
+        TaskItem.Status = TodoTaskStatus.Completed;
+        TaskRepo.Update(TaskItem);
+        TaskRepo.SaveChanges();
+        Snackbar.Add($"Задача '{TaskItem.Title}' завершена", Severity.Success);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task PostponeTask()
+    {
+        TaskItem.Deadline = DateTime.Now.StartOfTomorrow();
+        TaskRepo.Update(TaskItem);
+        TaskRepo.SaveChanges();
+        Snackbar.Add($"Задача '{TaskItem.Title}' перенесена на завтра", Severity.Info);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ConfirmTask()
+    {
+        TaskItem.Status = TodoTaskStatus.Planned;
+        TaskRepo.Update(TaskItem);
+        TaskRepo.SaveChanges();
+        Snackbar.Add($"Задача '{TaskItem.Title}' запланирована", Severity.Success);
+        await InvokeAsync(StateHasChanged);
     }
 }
