@@ -1,6 +1,7 @@
 @page "/unconfigured"
 @using FlowFocus.Core.Models
 @using FlowFocus.Data
+@using FlowFocus.WebApp.Components
 
 @inject ITaskRepository TaskRepo
 @inject ISnackbar Snackbar
@@ -25,22 +26,14 @@
             @foreach (var task in UnconfiguredTasks)
             {
                 <MudItem xs="12" sm="6" md="4">
-                    <MudPaper Class="pa-3" Elevation="1">
-                        <MudStack Spacing="2">
-                            <MudText Typo="Typo.h6">@task.Title</MudText>
-                            <MudText Typo="Typo.body2">@task.Description</MudText>
-                            
-                            <MudStack Row="true" Spacing="1">
-                                <MudChip T="double" Color="Color.Info" Variant="Variant.Outlined" Size="Size.Small">Инт: @task.Interest</MudChip>
-                                <MudChip T="double" Color="Color.Secondary" Variant="Variant.Outlined" Size="Size.Small">Слож: @task.Complexity</MudChip>
-                                <MudChip T="double" Color="Color.Tertiary" Variant="Variant.Outlined" Size="Size.Small">⏱ @task.Hours ч</MudChip>
-                            </MudStack>
-
-                            <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="() => ConfirmTask(task)" StartIcon="@Icons.Material.Filled.Check">
-                                Подтвердить и запланировать
-                            </MudButton>
-                        </MudStack>
-                    </MudPaper>
+                    <TaskCard Task="@task" 
+                              ShowFavoriteAction="false"
+                              ShowEditAction="false"
+                              ShowDeleteAction="false"
+                              ShowCompleteAction="false"
+                              ShowPostponeAction="false"
+                              ShowConfirmAction="true"
+                              OnConfirm="ConfirmTask" />
                 </MudItem>
             }
         </MudGrid>
