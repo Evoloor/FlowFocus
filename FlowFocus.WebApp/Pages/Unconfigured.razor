@@ -9,36 +9,19 @@
 @inject IRepository<UserAppSettings> SettingsRepo
 
 <PageTitle>Ненастроенные задачи</PageTitle>
-
-<MudPaper Class="pa-4" Elevation="1">
-    <MudText Typo="Typo.h5">Ненастроенные задачи</MudText>
-    <MudDivider Class="my-2" />
-
-    @if (UnconfiguredTasks.Count == 0)
-    {
-        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
-            Все задачи настроены 👌
-        </MudAlert>
-    }
-    else
-    {
-        <MudGrid>
-            @foreach (var task in UnconfiguredTasks)
-            {
-                <MudItem xs="12" sm="6" md="4">
-                    <TaskCard Task="@task" 
-                              ShowFavoriteAction="false"
-                              ShowEditAction="false"
-                              ShowDeleteAction="false"
-                              ShowCompleteAction="false"
-                              ShowPostponeAction="false"
-                              ShowConfirmAction="true"
-                              OnConfirm="ConfirmTask" />
-                </MudItem>
-            }
-        </MudGrid>
-    }
-</MudPaper>
+<TasksView Tasks="@UnconfiguredTasks" 
+          Title="Ненастроенные задачи"
+          ShowFilters="false"
+          ShowViewToggle="false"
+          ShowCounter="false"
+          ShowPagination="false"
+          ShowFavoriteAction="false"
+          ShowEditAction="false"
+          ShowDeleteAction="false"
+          ShowConfirmAction="true"
+          DefaultStatusFilter="TodoTaskStatus.Unconfigured"
+          EmptyMessage="Все задачи настроены 👌"
+          OnConfirm="ConfirmTask" />
 
 @code {
     private List<TaskItem> UnconfiguredTasks => TaskRepo.GetUnconfigured();

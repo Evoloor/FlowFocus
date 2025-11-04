@@ -7,176 +7,19 @@
 
 <PageTitle>Все задачи</PageTitle>
 
-<MudPaper Class="pa-4" Elevation="1">
-    <MudStack Spacing="2">
-        <MudText Typo="Typo.h5">Все задачи</MudText>
-
-        <MudTextField @bind-Value="_filter"
-                      Placeholder="Поиск по названию, описанию или тегам..."
-                      Adornment="Adornment.Start"
-                      AdornmentIcon="@Icons.Material.Filled.Search"
-                      Immediate="true"/>
-
-        <MudDivider/>
-
-        <MudGrid>
-            <MudItem xs="12" sm="6" md="3">
-                <MudSelect T="TodoTaskStatus?" @bind-Value="_statusFilter" Label="Статус" Variant="Variant.Outlined">
-                    <MudSelectItem T="TodoTaskStatus?" Value="null">Все</MudSelectItem>
-                    <MudSelectItem T="TodoTaskStatus?" Value="@TodoTaskStatus.Unconfigured">Ненастроенные
-                    </MudSelectItem>
-                    <MudSelectItem T="TodoTaskStatus?" Value="@TodoTaskStatus.Planned">Запланированные</MudSelectItem>
-                    <MudSelectItem T="TodoTaskStatus?" Value="@TodoTaskStatus.Active">Активные</MudSelectItem>
-                    <MudSelectItem T="TodoTaskStatus?" Value="@TodoTaskStatus.Completed">Завершенные</MudSelectItem>
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" sm="6" md="3">
-                <MudSelect T="string" @bind-Value="_sortBy" Label="Сортировка" Variant="Variant.Outlined">
-                    <MudSelectItem T="string" Value="@("date")">По дате</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("interest")">По интересу</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("complexity")">По сложности</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("hours")">По времени</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("title")">По названию</MudSelectItem>
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" sm="6" md="3">
-                <MudSwitch T="bool" @bind-Checked="_showOnlyFavorites" Label="Только избранные"/>
-            </MudItem>
-            <MudItem xs="12" sm="6" md="3">
-                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="@ClearFilters"
-                           StartIcon="@Icons.Material.Filled.Clear">
-                    Сбросить фильтры
-                </MudButton>
-            </MudItem>
-        </MudGrid>
-
-        <MudDivider/>
-
-        <!-- Статус и счетчик -->
-        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-            <MudText Typo="Typo.body2" Color="Color.Tertiary">
-                Найдено задач: @FilteredTasks.Count
-            </MudText>
-            <MudSelect T="string" @bind-Value="_viewMode" Variant="Variant.Outlined" Size="Size.Small">
-                <MudSelectItem T="string" Value="@("grid")">Сетка</MudSelectItem>
-                <MudSelectItem T="string" Value="@("list")">Список</MudSelectItem>
-            </MudSelect>
-        </MudStack>
-
-        @if (FilteredTasks.Count == 0)
-        {
-            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
-                Задачи не найдены
-            </MudAlert>
-        }
-        else if (_viewMode == "grid")
-        {
-            <!-- Режим сетки -->
-            <MudGrid>
-                @foreach (var task in FilteredTasks)
-                {
-                    <MudItem xs="12" sm="6" md="4" lg="3">
-                        <TaskCard
-                            Task="@task"
-                            ShowProgress="true"
-                            ShowFavoriteAction="true"
-                            ShowEditAction="true"
-                            ShowDeleteAction="true"
-                            ShowCompleteAction="false"
-                            ShowPostponeAction="false"
-                            ShowConfirmAction="false"
-                            OnFavoriteToggle="ToggleFavorite"/>
-                    </MudItem>
-                }
-            </MudGrid>
-        }
-        else
-        {
-            <!-- Режим списка -->
-            <MudStack Spacing="2">
-                @foreach (var task in FilteredTasks)
-                {
-                    <TaskCard
-                        Task="@task"
-                        Elevation="2"
-                        ShowProgress="true"
-                        ShowFavoriteAction="true"
-                        ShowEditAction="true"
-                        ShowDeleteAction="true"
-                        ShowCompleteAction="false"
-                        ShowPostponeAction="false"
-                        ShowConfirmAction="false"
-                        OnFavoriteToggle="ToggleFavorite"/>
-                }
-            </MudStack>
-        }
-
-        <!-- Пагинация -->
-        @if (FilteredTasks.Count > 0)
-        {
-            <MudStack Justify="Justify.Center" Class="mt-4">
-                <MudPagination Count="@_totalPages" Selected="@_currentPage" BoundaryCount="1"
-                               OnSelected="OnPageChanged"/>
-            </MudStack>
-        }
-    </MudStack>
-</MudPaper>
+<TasksView Tasks="@AllTasksList" 
+          Title="Все задачи"
+          ShowFilters="true"
+          ShowViewToggle="true"
+          ShowCounter="true"
+          ShowPagination="true"
+          ShowFavoriteAction="true"
+          ShowEditAction="true"
+          ShowDeleteAction="true"
+          OnFavoriteToggle="ToggleFavorite"/>
 
 @code {
-    private string _filter = "";
-    private TodoTaskStatus? _statusFilter;
-    private string _sortBy = "date";
-    private bool _showOnlyFavorites;
-    private string _viewMode = "grid";
-    private int _currentPage = 1;
-    private readonly int _pageSize = 12;
-    private int _totalPages = 1;
-
     private List<TaskItem> AllTasksList => TaskRepo.GetAll();
-
-    private List<TaskItem> FilteredTasks
-    {
-        get
-        {
-            var query = AllTasksList.AsEnumerable();
-
-            // Фильтр по поиску
-            if (!string.IsNullOrWhiteSpace(_filter))
-            {
-                query = query.Where(t => t.Title.Contains(_filter, StringComparison.OrdinalIgnoreCase) ||
-                                         (t.Description ?? "").Contains(_filter, StringComparison.OrdinalIgnoreCase) ||
-                                         t.Tags.Any(tag => tag.Contains(_filter, StringComparison.OrdinalIgnoreCase)));
-            }
-
-            // Фильтр по статусу
-            if (_statusFilter.HasValue)
-            {
-                query = query.Where(t => t.Status == _statusFilter.Value);
-            }
-
-            // Фильтр по избранному
-            if (_showOnlyFavorites)
-            {
-                query = query.Where(t => t.IsFavorite);
-            }
-
-            // Сортировка
-            query = _sortBy switch
-            {
-                "interest" => query.OrderByDescending(t => t.Interest),
-                "complexity" => query.OrderByDescending(t => t.Complexity),
-                "hours" => query.OrderByDescending(t => t.Hours),
-                "title" => query.OrderBy(t => t.Title),
-                _ => query.OrderBy(t => t.Deadline)
-            };
-
-            var result = query.ToList();
-            _totalPages = (int)Math.Ceiling((double)result.Count / _pageSize);
-
-            // Пагинация
-            return result.Skip((_currentPage - 1) * _pageSize).Take(_pageSize).ToList();
-        }
-    }
 
     private void ToggleFavorite(TaskItem task)
     {
@@ -184,17 +27,5 @@
         TaskRepo.Update(task);
         TaskRepo.SaveChanges();
         Snackbar.Add($"Задача {(task.IsFavorite ? "добавлена в" : "удалена из")} избранного", Severity.Info);
-        StateHasChanged();
     }
-
-    private void ClearFilters()
-    {
-        _filter = "";
-        _statusFilter = null;
-        _sortBy = "date";
-        _showOnlyFavorites = false;
-        _currentPage = 1;
-        StateHasChanged();
-    }
-
 }

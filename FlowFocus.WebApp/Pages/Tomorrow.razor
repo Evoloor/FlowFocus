@@ -7,30 +7,13 @@
 @inject ITaskRepository TaskRepo
 
 <PageTitle>Завтра</PageTitle>
-
-<MudPaper Class="pa-4" Elevation="1">
-    <MudText Typo="Typo.h5" Class="mb-2">Задачи на завтра</MudText>
-    <MudDivider Class="my-2" />
-
-    @if (TomorrowTasks.Count == 0)
-    {
-        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
-            Нет задач на завтра 🎉
-        </MudAlert>
-    }
-    else
-    {
-        <MudGrid>
-            @foreach (var task in TomorrowTasks)
-            {
-                <MudItem xs="12" sm="6" md="4">
-                    <TaskCard Task="@task" 
-                              ShowActions="false" />
-                </MudItem>
-            }
-        </MudGrid>
-    }
-</MudPaper>
+<TasksView Tasks="@TomorrowTasks" 
+          Title="Задачи на завтра"
+          ShowFilters="false"
+          ShowViewToggle="false"
+          ShowCounter="false"
+          ShowPagination="false"
+          EmptyMessage="Нет задач на завтра 🎉" />
 
 @code {
     private UserAppSettings _settings = new();

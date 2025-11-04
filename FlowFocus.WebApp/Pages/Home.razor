@@ -8,57 +8,20 @@
 @inject ISnackbar Snackbar
 
 <PageTitle>Сегодня</PageTitle>
-
-<MudPaper Class="pa-4" Elevation="1">
-    <MudStack Spacing="2" AlignItems="AlignItems.Center" JustifyContent="Justify.SpaceBetween">
-        <MudText Typo="Typo.h5">Сегодня — @_currentDay.ToString("dd.MM.yyyy")</MudText>
-
-        <MudStack Row="true" Spacing="2">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@RecalculateToday" Disabled="true">
-                <MudIcon Icon="@Icons.Material.Filled.Refresh"/>
-                Пересчитать день
-            </MudButton>
-
-            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="@StartNewDay">
-                <MudIcon Icon="@Icons.Material.Filled.WbSunny"/>
-                Новый день
-            </MudButton>
-
-            <MudButton Variant="Variant.Outlined" Color="Color.Info" OnClick="@SuggestAntiProcrastinationTask">
-                <MudIcon Icon="@Icons.Material.Filled.Psychology"/>
-                Прокрастинирую
-            </MudButton>
-        </MudStack>
-    </MudStack>
-
-    <MudDivider Class="my-3"/>
-
-    @if (TodayTasks.Count == 0)
-    {
-        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
-            Сегодня нет задач.
-        </MudAlert>
-    }
-    else
-    {
-        <MudGrid>
-            @foreach (var task in TodayTasks)
-            {
-                <MudItem xs="12" sm="6" md="4">
-                    <TaskCard Task="@task"
-                              ShowProgress="true"
-                              ShowCompleteAction="true"
-                              ShowPostponeAction="true"
-                              ShowFavoriteAction="false"
-                              ShowEditAction="false"
-                              ShowDeleteAction="false"
-                              OnComplete="CompleteTask"
-                              OnPostpone="PostponeTask"/>
-                </MudItem>
-            }
-        </MudGrid>
-    }
-</MudPaper>
+<TasksView Tasks="@TodayTasks"
+          Title="Сегодня"
+          ShowFilters="false"
+          ShowViewToggle="false"
+          ShowCounter="false"
+          ShowPagination="false"
+          ShowFavoriteAction="false"
+          ShowEditAction="false"
+          ShowDeleteAction="false"
+          ShowCompleteAction="true"
+          ShowPostponeAction="true"
+          DefaultViewMode="grid"
+          OnComplete="CompleteTask"
+          OnPostpone="PostponeTask"/>
 
 @code {
     private DateTime _currentDay = DateTime.Now.StartOfToday();
@@ -89,48 +52,5 @@
         Snackbar.Add($"Задача '{task.Title}' перенесена на завтра.");
         StateHasChanged();
     }
-
-    void RecalculateToday()
-    {
-        throw new NotImplementedException();
-    }
-
-    void StartNewDay()
-    {
-        var now = DateTime.Now.TimeOfDay;
-        var start = _settings.DayStartTime;
-        var minStart = start.Add(TimeSpan.FromHours(-5));
-        var maxStart = start.Add(TimeSpan.FromHours(5));
-
-        if (now < minStart || now > maxStart)
-        {
-            Snackbar.Add("Нельзя начать новый день вне допустимого времени.", Severity.Warning);
-            return;
-        }
-
-        _currentDay = DateTime.Now.StartOfToday();
-        Snackbar.Add("Новый день начат.", Severity.Info);
-        StateHasChanged();
-    }
-
-    void SuggestAntiProcrastinationTask()
-    {
-        var candidate = TaskRepo.GetAll()
-            .FindAll(t => t is { Interest: >= 7, Status: TodoTaskStatus.Planned })
-            .OrderBy(t => t.Deadline)
-            .ThenByDescending(t => t.Interest)
-            .FirstOrDefault();
-
-        if (candidate != null)
-            Snackbar.Add($"Попробуй: {candidate.Title}", Severity.Info);
-        else
-            Snackbar.Add("Нет подходящих задач для фокуса.", Severity.Warning);
-    }
-
-    static string GetTaskSummary(TaskItem task)
-        => task.Deadline.HasValue ? $"Дедлайн: {task.Deadline.Value:dd.MM}" : "Без дедлайна";
-
-    static double GetTaskProgress(TaskItem task)
-        => task.Status == TodoTaskStatus.Completed ? 100 : 0;
 
 }
