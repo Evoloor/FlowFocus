@@ -1,8 +1,7 @@
 @page "/all"
 @using FlowFocus.Core.Models
 @using FlowFocus.Data
-
-@inject IDialogService _dialogService
+@inject IDialogService DialogService
 @inject ITaskRepository TaskRepo
 @inject ISnackbar Snackbar
 
@@ -158,9 +157,9 @@
 
 @code {
     private string _filter = "";
-    private TodoTaskStatus? _statusFilter = null;
+    private TodoTaskStatus? _statusFilter;
     private string _sortBy = "date";
-    private bool _showOnlyFavorites = false;
+    private bool _showOnlyFavorites;
 
     private List<TaskItem> AllTasksList => TaskRepo.GetAll();
 
@@ -204,7 +203,7 @@
         }
     }
 
-    private Color GetStatusColor(TodoTaskStatus status)
+    private static Color GetStatusColor(TodoTaskStatus status)
     {
         return status switch
         {
@@ -216,7 +215,7 @@
         };
     }
 
-    private string GetStatusText(TodoTaskStatus status)
+    private static string GetStatusText(TodoTaskStatus status)
     {
         return status switch
         {
@@ -243,7 +242,7 @@
         Snackbar.Add($"Редактирование задачи '{task.Title}'", Severity.Info);
     }
 
-    private async void DeleteTask(TaskItem task)
+    private async Task DeleteTask(TaskItem task)
     {
         var parameters = new DialogParameters
         {
@@ -254,10 +253,10 @@
 
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
 
-        var dialog = await _dialogService.ShowAsync<MudDialog>("Подтверждение удаления", parameters, options);
+        var dialog = await DialogService.ShowAsync<MudDialog>("Подтверждение удаления", parameters, options);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             TaskRepo.Delete(task.Id);
             TaskRepo.SaveChanges();

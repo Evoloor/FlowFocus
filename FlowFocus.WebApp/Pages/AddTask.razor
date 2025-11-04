@@ -1,7 +1,6 @@
 @page "/add"
 @using FlowFocus.Core.Models
 @using FlowFocus.Data
-
 @inject ITaskRepository TaskRepo
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
@@ -12,7 +11,7 @@
     <MudText Typo="Typo.h5">Новая задача</MudText>
     <MudDivider Class="my-3" />
 
-    <MudForm @ref="_form">
+    <MudForm>
         <MudTextField @bind-Value="_task.Title" Label="Название" Required="true" />
         <MudTextField @bind-Value="_task.Description" Label="Описание" Lines="3" />
         
@@ -37,7 +36,6 @@
 </MudPaper>
 
 @code {
-    private MudForm _form = default!;
     private TaskItem _task = new();
 
     void Save()

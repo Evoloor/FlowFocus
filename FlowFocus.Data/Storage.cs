@@ -7,24 +7,24 @@ namespace FlowFocus.Data;
 public abstract class CachedRepository<T>(StorageContext context) : IRepository<T>
     where T : AuditEntity
 {
-    protected List<T>? _cache;
-    protected bool _isDirty = true;
-    protected readonly object _cacheLock = new();
+    protected List<T>? Cache;
+    protected bool IsDirty = true;
+    protected readonly object CacheLock = new();
 
     protected abstract DbSet<T> GetDbSet();
     protected virtual IQueryable<T> GetBaseQuery() => GetDbSet().AsQueryable();
 
     public virtual List<T> GetAll()
     {
-        lock (_cacheLock)
+        lock (CacheLock)
         {
-            if (_isDirty || _cache == null)
+            if (IsDirty || Cache == null)
             {
-                _cache = GetBaseQuery().ToList();
-                _isDirty = false;
+                Cache = GetBaseQuery().ToList();
+                IsDirty = false;
             }
 
-            return _cache.ToList(); // Возвращаем копию для безопасности
+            return Cache.ToList(); // Возвращаем копию для безопасности
         }
     }
 
@@ -35,7 +35,7 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
 
     public virtual void Add(T entity)
     {
-        lock (_cacheLock)
+        lock (CacheLock)
         {
             if (entity.Id == 0)
             {
@@ -51,7 +51,7 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
 
     public virtual void Update(T entity)
     {
-        lock (_cacheLock)
+        lock (CacheLock)
         {
             entity.LastChange = DateTime.Now;
             GetDbSet().Update(entity);
@@ -61,7 +61,7 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
 
     public virtual void Delete(int id)
     {
-        lock (_cacheLock)
+        lock (CacheLock)
         {
             var entity = GetById(id);
             if (entity == null) return;
@@ -72,7 +72,7 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
 
     public virtual void SaveChanges()
     {
-        lock (_cacheLock)
+        lock (CacheLock)
         {
             context.SaveChanges();
             MarkDirty();
@@ -81,16 +81,16 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
 
     private void MarkDirty()
     {
-        _isDirty = true;
+        IsDirty = true;
     }
 
     // Метод для принудительного обновления кеша
     public virtual void RefreshCache()
     {
-        lock (_cacheLock)
+        lock (CacheLock)
         {
-            _isDirty = true;
-            _cache = null;
+            IsDirty = true;
+            Cache = null;
         }
     }
 }
@@ -116,10 +116,11 @@ public interface ITaskRepository : IRepository<TaskItem>
 // Обновлённый TaskRepository с наследованием от CachedRepository
 public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>(context), ITaskRepository
 {
-    protected override DbSet<TaskItem> GetDbSet() => context.Tasks;
+    private readonly StorageContext _context = context;
+    protected override DbSet<TaskItem> GetDbSet() => _context.Tasks;
 
     protected override IQueryable<TaskItem> GetBaseQuery() =>
-        context.Tasks.Include(t => t.Blockers).OrderBy(t => t.Deadline);
+        _context.Tasks.Include(t => t.Blockers).OrderBy(t => t.Deadline);
 
     // Специфичные методы
     public List<TaskItem> GetByStatus(TodoTaskStatus status)
@@ -129,23 +130,24 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
     {
         var dateStart = date.StartOfToday(dayStartTime);
         var nextDayStart = dateStart.AddDays(1);
-    
-        return GetAll().Where(t => 
+
+        return GetAll().Where(t =>
             t.Deadline.HasValue && IsTaskInDateRange(t.Deadline.Value, date, dateStart, nextDayStart)
         ).ToList();
+
+        static bool IsTaskInDateRange(DateTime taskDate, DateTime targetDate, DateTime dateStart, DateTime nextDayStart)
+        {
+            // Задачи на целый день (время = 00:00:00)
+            if (taskDate.TimeOfDay == TimeSpan.Zero)
+            {
+                return taskDate.Date == targetDate.Date;
+            }
+
+            // Задачи с конкретным временем
+            return taskDate >= dateStart && taskDate < nextDayStart;
+        }
     }
 
-    private bool IsTaskInDateRange(DateTime taskDate, DateTime targetDate, DateTime dayStart, DateTime nextDayStart)
-    {
-        // Задачи на целый день (время = 00:00:00)
-        if (taskDate.TimeOfDay == TimeSpan.Zero)
-        {
-            return taskDate.Date == targetDate.Date;
-        }
-    
-        // Задачи с конкретным временем
-        return taskDate >= dayStart && taskDate < nextDayStart;
-    }
 
     public List<TaskItem> GetUnconfigured()
         => GetByStatus(TodoTaskStatus.Unconfigured);
@@ -154,27 +156,28 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
 // Обновлённый SettingsRepository с наследованием от CachedRepository
 public class SettingsRepository(StorageContext context) : CachedRepository<UserAppSettings>(context)
 {
-    protected override DbSet<UserAppSettings> GetDbSet() => context.Settings;
+    private readonly StorageContext _context = context;
+    protected override DbSet<UserAppSettings> GetDbSet() => _context.Settings;
 
     public override List<UserAppSettings> GetAll()
     {
-        lock (_cacheLock)
+        lock (CacheLock)
         {
-            if (_isDirty || _cache == null)
+            if (IsDirty || Cache == null)
             {
-                var settings = context.Settings.FirstOrDefault();
+                var settings = _context.Settings.FirstOrDefault();
                 if (settings == null)
                 {
                     settings = new UserAppSettings();
-                    context.Settings.Add(settings);
-                    context.SaveChanges();
+                    _context.Settings.Add(settings);
+                    _context.SaveChanges();
                 }
 
-                _cache = [settings];
-                _isDirty = false;
+                Cache = [settings];
+                IsDirty = false;
             }
 
-            return _cache.ToList();
+            return Cache.ToList();
         }
     }
 
@@ -202,7 +205,8 @@ public class SettingsRepository(StorageContext context) : CachedRepository<UserA
 // Дополнительный репозиторий для TaskBlocker
 public class TaskBlockerRepository(StorageContext context) : CachedRepository<TaskBlocker>(context)
 {
-    protected override DbSet<TaskBlocker> GetDbSet() => context.TaskBlockers;
+    private readonly StorageContext _context = context;
+    protected override DbSet<TaskBlocker> GetDbSet() => _context.TaskBlockers;
 
     // Специфичные методы для блокеров
     public List<TaskBlocker> GetByParentTaskId(int parentTaskId)

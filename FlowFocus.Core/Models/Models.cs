@@ -32,20 +32,17 @@ public class TaskItem : AuditEntity
 {
     public string Title { get; set; } = "";
     public string? Description { get; set; }
-
     public List<string> Tags { get; set; } = [];
-
     public int Interest { get; set; } // 1–10
     public int Complexity { get; set; } // 1–100
     public double Hours { get; set; } // up to 1000
     public DateTime? Deadline { get; set; }
-
     public TodoTaskStatus Status { get; set; } = TodoTaskStatus.Unconfigured;
     public bool IsFavorite { get; set; } = false;
-
     public RepeatInfo? Repeat { get; set; }
+    public List<TaskBlocker> Blockers { get; set; } = []; 
+    public bool IsTimedTask => Deadline.HasValue && Deadline.Value.TimeOfDay > TimeSpan.Zero;
 
-    public List<TaskBlocker> Blockers { get; set; } = [];
 }
 
 public class TaskBlocker : AuditEntity

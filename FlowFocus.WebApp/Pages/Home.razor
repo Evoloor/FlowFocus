@@ -13,21 +13,24 @@
         <MudText Typo="Typo.h5">Сегодня — @_currentDay.ToString("dd.MM.yyyy")</MudText>
 
         <MudStack Row="true" Spacing="2">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="RecalculateToday">
-                <MudIcon Icon="@Icons.Material.Filled.Refresh" /> Пересчитать день
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@RecalculateToday" Disabled="true">
+                <MudIcon Icon="@Icons.Material.Filled.Refresh"/>
+                Пересчитать день
             </MudButton>
 
-            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="StartNewDay">
-                <MudIcon Icon="@Icons.Material.Filled.WbSunny" /> Новый день
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="@StartNewDay">
+                <MudIcon Icon="@Icons.Material.Filled.WbSunny"/>
+                Новый день
             </MudButton>
 
-            <MudButton Variant="Variant.Outlined" Color="Color.Info" OnClick="SuggestAntiProcrastinationTask">
-                <MudIcon Icon="@Icons.Material.Filled.Psychology" /> Прокрастинирую
+            <MudButton Variant="Variant.Outlined" Color="Color.Info" OnClick="@SuggestAntiProcrastinationTask">
+                <MudIcon Icon="@Icons.Material.Filled.Psychology"/>
+                Прокрастинирую
             </MudButton>
         </MudStack>
     </MudStack>
 
-    <MudDivider Class="my-3" />
+    <MudDivider Class="my-3"/>
 
     @if (TodayTasks.Count == 0)
     {
@@ -46,19 +49,24 @@
                             <MudText Typo="Typo.h6">@task.Title</MudText>
                             <MudText Typo="Typo.body2">@GetTaskSummary(task)</MudText>
 
-                            <MudProgressLinear Value="@GetTaskProgress(task)" Color="Color.Primary" Height="4px" />
+                            <MudProgressLinear Value="@GetTaskProgress(task)" Color="Color.Primary" Height="4px"/>
 
                             <MudStack Row="true" Spacing="1">
-                                <MudChip T="double" Color="Color.Info" Variant="Variant.Outlined">Инт: @task.Interest</MudChip>
-                                <MudChip T="double" Color="Color.Secondary" Variant="Variant.Outlined">Слож: @task.Complexity</MudChip>
-                                <MudChip T="double" Color="Color.Tertiary" Variant="Variant.Outlined">⏱ @task.Hours ч</MudChip>
+                                <MudChip T="double" Color="Color.Info" Variant="Variant.Outlined">
+                                    Инт: @task.Interest</MudChip>
+                                <MudChip T="double" Color="Color.Secondary" Variant="Variant.Outlined">
+                                    Слож: @task.Complexity</MudChip>
+                                <MudChip T="double" Color="Color.Tertiary" Variant="Variant.Outlined">⏱ @task.Hours ч
+                                </MudChip>
                             </MudStack>
 
                             <MudStack Row="true" Spacing="2">
-                                <MudButton Variant="Variant.Outlined" Color="Color.Success" Size="Size.Small" OnClick="() => CompleteTask(task)">
+                                <MudButton Variant="Variant.Outlined" Color="Color.Success" Size="Size.Small"
+                                           OnClick="() => CompleteTask(task)">
                                     Готово
                                 </MudButton>
-                                <MudButton Variant="Variant.Text" Color="Color.Warning" Size="Size.Small" OnClick="() => PostponeTask(task)">
+                                <MudButton Variant="Variant.Text" Color="Color.Warning" Size="Size.Small"
+                                           OnClick="@() => PostponeTask(task)">
                                     Отложить
                                 </MudButton>
                             </MudStack>
@@ -102,8 +110,7 @@
 
     void RecalculateToday()
     {
-        // TODO: логика перерасчета
-        Snackbar.Add("Пересчёт задач на сегодня выполнен.", Severity.Success);
+        throw new NotImplementedException();
     }
 
     void StartNewDay()
@@ -128,7 +135,8 @@
     {
         var candidate = TaskRepo.GetAll()
             .FindAll(t => t is { Interest: >= 7, Status: TodoTaskStatus.Planned })
-            .OrderByDescending(t => t.Interest)
+            .OrderBy(t => t.Deadline)
+            .ThenByDescending(t => t.Interest)
             .FirstOrDefault();
 
         if (candidate != null)
@@ -142,4 +150,5 @@
 
     static double GetTaskProgress(TaskItem task)
         => task.Status == TodoTaskStatus.Completed ? 100 : 0;
+
 }
