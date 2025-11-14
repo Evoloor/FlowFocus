@@ -1,0 +1,112 @@
+// Dialogs/SettingsDialog.razor
+@inject ISettingsRepository SettingsRepo
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Настройки приложения</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12">
+                <MudText Typo="Typo.subtitle1" Class="mb-3">Основные настройки</MudText>
+            </MudItem>
+            
+            <MudItem xs="12" sm="6">
+                <MudNumericField @bind-Value="Settings.DayStartHour" 
+                                     Label="Время начала дня (0-23)" 
+                                     Min="0" 
+                                     Max="23"
+                                     Variant="Variant.Outlined" />
+            </MudItem>
+            
+            <MudItem xs="12" sm="6">
+                <MudNumericField @bind-Value="Settings.DailyTimeLimit" 
+                                        Label="Дневной лимит времени (часы)" 
+                                        Min="1" 
+                                        Max="24"
+                                        Step="0.5"
+                                        Variant="Variant.Outlined" />
+            </MudItem>
+            
+            <MudItem xs="12" sm="6">
+                <MudNumericField @bind-Value="Settings.DailyComplexityLimit" 
+                                     Label="Дневной лимит сложности" 
+                                     Min="10" 
+                                     Max="200"
+                                     Variant="Variant.Outlined" />
+            </MudItem>
+            
+            <MudItem xs="12">
+                <MudText Typo="Typo.subtitle1" Class="mb-3 mt-4">Автоматизация</MudText>
+            </MudItem>
+            
+            <MudItem xs="12">
+                <MudSwitch @bind-Checked="Settings.AutoRecalculateOnAdd" 
+                          Color="Color.Primary">
+                    Автоматический пересчет при добавлении задач
+                </MudSwitch>
+            </MudItem>
+            
+            <MudItem xs="12">
+                <MudSwitch @bind-Checked="Settings.ShowFavorites" 
+                          Color="Color.Warning">
+                    Показывать избранные задачи
+                </MudSwitch>
+            </MudItem>
+            
+            <MudItem xs="12">
+                <MudText Typo="Typo.subtitle1" Class="mb-3 mt-4">Расширенные настройки</MudText>
+            </MudItem>
+            
+            <MudItem xs="12">
+                <MudTextField @bind-Value="Settings.PriorityBoostDates"
+                             Label="Даты повышения приоритета (через запятую)"
+                             HelperText="Формат: ДД.ММ, ДД.ММ"
+                             Variant="Variant.Outlined" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" 
+                  OnClick="Cancel"
+                  Color="Color.Default">
+            Отмена
+        </MudButton>
+        <MudButton Variant="Variant.Filled" 
+                  Color="Color.Primary" 
+                  OnClick="SaveSettings">
+            Сохранить
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private UserSettings Settings { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Settings = await SettingsRepo.GetUserSettingsAsync();
+    }
+
+    private async Task SaveSettings()
+    {
+        try
+        {
+            await SettingsRepo.UpdateAsync(Settings);
+            Snackbar.Add("Настройки сохранены", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(Settings));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

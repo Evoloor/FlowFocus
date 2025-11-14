@@ -1,0 +1,127 @@
+@inject ITaskRepository TaskRepo
+@inject IDependencyRepository DependencyRepo
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Добавить зависимость</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12">
+                <MudSelect T="TaskItem" @bind-Value="SelectedTask" 
+                          Label="Выберите задачу"
+                          Variant="Variant.Outlined"
+                          ToStringFunc="(task) => task?.Title ?? string.Empty"
+                          SearchFunc="SearchTasks"
+                          Clearable="true">
+                    @if (AvailableTasks != null)
+                    {
+                        @foreach (var task in AvailableTasks)
+                        {
+                            <MudSelectItem Value="task">@task.Title</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+            </MudItem>
+            
+            <MudItem xs="12">
+                <MudSelect @bind-Value="DependencyType" 
+                          Label="Тип зависимости"
+                          Variant="Variant.Outlined">
+                    <MudSelectItem Value="DependencyType.Blocking">Блокирующая</MudSelectItem>
+                    <MudSelectItem Value="DependencyType.Related">Связанная</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            
+            <MudItem xs="12">
+                <MudSelect @bind-Value="DependencyLogic" 
+                          Label="Логика выполнения"
+                          Variant="Variant.Outlined">
+                    <MudSelectItem Value="DependencyLogic.AND">AND (И)</MudSelectItem>
+                    <MudSelectItem Value="DependencyLogic.OR">OR (ИЛИ)</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" 
+                  OnClick="Cancel"
+                  Color="Color.Default">
+            Отмена
+        </MudButton>
+        <MudButton Variant="Variant.Filled" 
+                  Color="Color.Primary" 
+                  OnClick="AddDependency"
+                  Disabled="@(SelectedTask == null)">
+            Добавить
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public TaskItem SourceTask { get; set; } = null!;
+
+    private List<TaskItem> AvailableTasks = new();
+    private TaskItem? SelectedTask;
+    private DependencyType DependencyType = DependencyType.Blocking;
+    private DependencyLogic DependencyLogic = DependencyLogic.AND;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load all tasks except the current one
+        var allTasks = await TaskRepo.GetAllAsync();
+        AvailableTasks = allTasks.Where(t => t.Id != SourceTask.Id).ToList();
+    }
+
+    private async Task<IEnumerable<TaskItem>> SearchTasks(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return AvailableTasks;
+
+        return await Task.Run(() => 
+            AvailableTasks.Where(t => 
+                t.Title.Contains(value, StringComparison.OrdinalIgnoreCase) ||
+                (t.Description?.Contains(value, StringComparison.OrdinalIgnoreCase) == true)
+            ).ToList()
+        );
+    }
+
+    private async Task AddDependency()
+    {
+        if (SelectedTask == null)
+            return;
+
+        try
+        {
+            // Check for circular dependency
+            if (await DependencyRepo.HasCircularDependencyAsync(SourceTask.Id, SelectedTask.Id))
+            {
+                Snackbar.Add("Обнаружена циклическая зависимость!", Severity.Error);
+                return;
+            }
+
+            var dependency = new Dependency
+            {
+                SourceTaskId = SourceTask.Id,
+                TargetTaskId = SelectedTask.Id,
+                Type = DependencyType,
+                Logic = DependencyLogic
+            };
+
+            await DependencyRepo.AddAsync(dependency);
+            Snackbar.Add("Зависимость добавлена", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

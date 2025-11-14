@@ -1,0 +1,62 @@
+@inject ITaskRepository TaskRepo
+@inject ISnackbar Snackbar
+
+<MudPaper Class="pa-4 quick-add-task" Elevation="1">
+    <div class="d-flex align-center gap-2">
+        <MudTextField @bind-Value="NewTaskTitle" 
+                      Label="Быстрое добавление задачи" 
+                      Variant="Variant.Outlined"
+                      Placeholder="Введите название задачи..."
+                      OnKeyDown="HandleKeyDown"
+                      Class="flex-grow-1" />
+        
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="AddQuickTask" Disabled="@string.IsNullOrWhiteSpace(NewTaskTitle)"
+                   StartIcon="Icons.Material.Filled.Add">
+            Добавить
+        </MudButton>
+        
+        <MudIconButton Icon="Icons.Material.Filled.Tune" 
+                       OnClick="ShowFullCreateDialog" />
+    </div>
+</MudPaper>
+
+@code {
+    private string NewTaskTitle = string.Empty;
+
+    private async Task AddQuickTask()
+    {
+        if (string.IsNullOrWhiteSpace(NewTaskTitle))
+            return;
+
+        var newTask = new TaskItem
+        {
+            Title = NewTaskTitle.Trim(),
+            Status = Core.Enums.TaskStatus.NotConfigured,
+            UserPriority = 5,
+            Interest = 5,
+            Complexity = 5,
+            EstimatedHours = 1.0
+        };
+
+        await TaskRepo.AddAsync(newTask);
+        Snackbar.Add("Задача добавлена в ненастроенные", Severity.Success);
+        
+        NewTaskTitle = string.Empty;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await AddQuickTask();
+        }
+    }
+
+    private void ShowFullCreateDialog()
+    {
+        // This would open the full task creation dialog
+        // Implementation depends on parent component
+    }
+}

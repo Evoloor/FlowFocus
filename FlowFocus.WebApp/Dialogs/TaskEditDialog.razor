@@ -1,0 +1,205 @@
+@inject ITaskRepository TaskRepo
+@inject IDependencyRepository DependencyRepo
+@inject IPlannerService PlannerService
+@inject ISettingsRepository SettingsRepo
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(IsEdit ? "Редактировать задачу" : "Новая задача")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="Task.Title" 
+                             Label="Название" 
+                             Required="true"
+                             Variant="Variant.Outlined" />
+            </MudItem>
+            
+            <MudItem xs="12">
+                <MudTextField @bind-Value="Task.Description" 
+                             Label="Описание" 
+                             Lines="3"
+                             Variant="Variant.Outlined" />
+            </MudItem>
+            
+            <MudItem xs="12" sm="6">
+                <MudSelect @bind-Value="Task.UserPriority" 
+                          Label="Приоритет"
+                          Variant="Variant.Outlined">
+                    @foreach (var priority in PriorityOptions)
+                    {
+                        <MudSelectItem Value="priority.Value">@priority.Text</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            
+            <MudItem xs="12" sm="6">
+                <MudSelect @bind-Value="Task.Status" 
+                          Label="Статус"
+                          Variant="Variant.Outlined">
+                    @foreach (var status in Enum.GetValues<TaskStatus>())
+                    {
+                        <MudSelectItem Value="status">@status.ToString()</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            
+            <MudItem xs="12" sm="4">
+                <MudNumericField @bind-Value="Task.Interest" 
+                                        Label="Интересность" 
+                                        Min="1" 
+                                        Max="10"
+                                        Variant="Variant.Outlined" />
+            </MudItem>
+            
+            <MudItem xs="12" sm="4">
+                <MudNumericField @bind-Value="Task.Complexity" 
+                                     Label="Сложность" 
+                                     Min="1" 
+                                     Max="100"
+                                     Variant="Variant.Outlined" />
+            </MudItem>
+            
+            <MudItem xs="12" sm="4">
+                <MudNumericField @bind-Value="Task.EstimatedHours" 
+                                        Label="Время выполнения (часы)" 
+                                        Min="0.5" 
+                                        Max="24" 
+                                        Step="0.5"
+                                        Variant="Variant.Outlined" />
+            </MudItem>
+            
+            <MudItem xs="12" sm="6">
+                <MudDatePicker @bind-Date="Task.Deadline"
+                              Label="Срок выполнения"
+                              Variant="Variant.Outlined" />
+            </MudItem>
+            
+            <MudItem xs="12" sm="6">
+                <MudSelect @bind-Value="Task.DisplayType"
+                          Label="Тип отображения"
+                          Variant="Variant.Outlined">
+                    <MudSelectItem Value="DisplayType.Independent">Самостоятельное</MudSelectItem>
+                    <MudSelectItem Value="DisplayType.Nested">Вложенное</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            
+            <MudItem xs="12">
+                <MudSwitch @bind-Checked="Task.IsFavorite" 
+                          Color="Color.Warning">
+                    Избранное
+                </MudSwitch>
+            </MudItem>
+            
+            <MudItem xs="12">
+                <MudSwitch @bind-Checked="Task.IsRecurring" 
+                          Color="Color.Info">
+                    Повторяющаяся задача
+                </MudSwitch>
+            </MudItem>
+            
+            @if (IsEdit)
+            {
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Зависимости</MudText>
+                    <DependencyManager Task="Task" />
+                </MudItem>
+            }
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" 
+                  OnClick="Cancel"
+                  Color="Color.Default">
+            Отмена
+        </MudButton>
+        <MudButton Variant="Variant.Filled" 
+                  Color="Color.Primary" 
+                  OnClick="SaveTask"
+                  Disabled="@string.IsNullOrWhiteSpace(Task.Title)">
+            @(IsEdit ? "Сохранить" : "Создать")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public TaskItem? ExistingTask { get; set; }
+
+    private TaskItem Task { get; set; } = new();
+    private bool IsEdit => ExistingTask != null;
+
+    private readonly List<(int Value, string Text)> PriorityOptions = new()
+    {
+        (0, "0 - Гарантированные"),
+        (1, "1 - Неотложные"), 
+        (3, "3 - Срочные"),
+        (5, "5 - Важные"),
+        (8, "8 - Среднесрочные"),
+        (13, "13 - Долгосрочные"),
+        (21, "21 - Саморазвитие"),
+        (34, "34 - Мечты")
+    };
+
+    protected override void OnParametersSet()
+    {
+        if (ExistingTask != null)
+        {
+            // Create a copy to avoid direct mutation
+            Task = new TaskItem
+            {
+                Id = ExistingTask.Id,
+                Title = ExistingTask.Title,
+                Description = ExistingTask.Description,
+                UserPriority = ExistingTask.UserPriority,
+                Status = ExistingTask.Status,
+                Interest = ExistingTask.Interest,
+                Complexity = ExistingTask.Complexity,
+                EstimatedHours = ExistingTask.EstimatedHours,
+                Deadline = ExistingTask.Deadline,
+                DisplayType = ExistingTask.DisplayType,
+                IsFavorite = ExistingTask.IsFavorite,
+                IsRecurring = ExistingTask.IsRecurring,
+                Tags = new List<string>(ExistingTask.Tags),
+                CreatedDate = ExistingTask.CreatedDate
+            };
+        }
+    }
+
+    private async Task SaveTask()
+    {
+        try
+        {
+            if (IsEdit)
+            {
+                await TaskRepo.UpdateAsync(Task);
+                Snackbar.Add("Задача обновлена", Severity.Success);
+            }
+            else
+            {
+                await TaskRepo.AddAsync(Task);
+                Snackbar.Add("Задача создана", Severity.Success);
+                
+                var settings = await SettingsRepo.GetUserSettingsAsync();
+                if (settings.AutoRecalculateOnAdd)
+                {
+                    await PlannerService.RecalculatePrioritiesAsync();
+                    Snackbar.Add("Приоритеты пересчитаны", Severity.Info);
+                }
+            }
+
+            MudDialog.Close(DialogResult.Ok(Task));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

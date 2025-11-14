@@ -1,283 +1,190 @@
-using System.Text.Json;
+using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
+using FlowFocus.Core;
 using FlowFocus.Core.Models;
 using Microsoft.EntityFrameworkCore;
-
+using Microsoft.Extensions.DependencyInjection;
 namespace FlowFocus.Data;
-
-public abstract class CachedRepository<T>(StorageContext context) : IRepository<T>
-    where T : AuditEntity
+public class AppDbContext : DbContext
 {
-    protected List<T>? Cache;
-    protected bool IsDirty = true;
-    protected readonly object CacheLock = new();
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
-    protected abstract DbSet<T> GetDbSet();
-    protected virtual IQueryable<T> GetBaseQuery() => GetDbSet().AsQueryable();
-
-    public virtual List<T> GetAll()
-    {
-        lock (CacheLock)
-        {
-            if (IsDirty || Cache == null)
-            {
-                Cache = GetBaseQuery().ToList();
-                IsDirty = false;
-            }
-
-            return Cache.ToList(); // Возвращаем копию для безопасности
-        }
-    }
-
-    public virtual T? GetById(int id)
-    {
-        return GetAll().FirstOrDefault(e => e.Id == id);
-    }
-
-    public virtual void Add(T entity)
-    {
-        lock (CacheLock)
-        {
-            if (entity.Id == 0)
-            {
-                var allEntities = GetAll();
-                entity.Id = allEntities.Count > 0 ? allEntities.Max(e => e.Id) + 1 : 1;
-            }
-
-            entity.LastChange = DateTime.Now;
-            GetDbSet().Add(entity);
-            MarkDirty();
-        }
-    }
-
-    public virtual void Update(T entity)
-    {
-        lock (CacheLock)
-        {
-            entity.LastChange = DateTime.Now;
-            GetDbSet().Update(entity);
-            MarkDirty();
-        }
-    }
-
-    public virtual void Delete(int id)
-    {
-        lock (CacheLock)
-        {
-            var entity = GetById(id);
-            if (entity == null) return;
-            GetDbSet().Remove(entity);
-            MarkDirty();
-        }
-    }
-
-    public virtual void SaveChanges()
-    {
-        lock (CacheLock)
-        {
-            context.SaveChanges();
-            MarkDirty();
-        }
-    }
-
-    private void MarkDirty()
-    {
-        IsDirty = true;
-    }
-
-    // Метод для принудительного обновления кеша
-    public virtual void RefreshCache()
-    {
-        lock (CacheLock)
-        {
-            IsDirty = true;
-            Cache = null;
-        }
-    }
-}
-
-// Обновлённые интерфейсы с наследованием от EntityBase
-public interface IRepository<T> where T : AuditEntity
-{
-    List<T> GetAll();
-    T? GetById(int id);
-    void Add(T entity);
-    void Update(T entity);
-    void Delete(int id);
-    void SaveChanges();
-}
-
-public interface ITaskRepository : IRepository<TaskItem>
-{
-    List<TaskItem> GetByStatus(TodoTaskStatus status);
-    List<TaskItem> GetByDate(DateTime date, TimeSpan? dayStartTime = null);
-    List<TaskItem> GetUnconfigured();
-}
-
-// Обновлённый TaskRepository с наследованием от CachedRepository
-public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>(context), ITaskRepository
-{
-    private readonly StorageContext _context = context;
-    protected override DbSet<TaskItem> GetDbSet() => _context.Tasks;
-
-    protected override IQueryable<TaskItem> GetBaseQuery() =>
-        _context.Tasks.Include(t => t.Blockers).OrderBy(t => t.Deadline);
-
-    // Специфичные методы
-    public List<TaskItem> GetByStatus(TodoTaskStatus status)
-        => GetAll().Where(t => t.Status == status).ToList();
-
-    public List<TaskItem> GetByDate(DateTime date, TimeSpan? dayStartTime = null)
-    {
-        var dateStart = date.StartOfToday(dayStartTime);
-        var nextDayStart = dateStart.AddDays(1);
-
-        return GetAll().Where(t =>
-            t.Deadline.HasValue && IsTaskInDateRange(t.Deadline.Value, date, dateStart, nextDayStart)
-        ).ToList();
-
-        static bool IsTaskInDateRange(DateTime taskDate, DateTime targetDate, DateTime dateStart, DateTime nextDayStart)
-        {
-            // Задачи на целый день (время = 00:00:00)
-            if (taskDate.TimeOfDay == TimeSpan.Zero)
-            {
-                return taskDate.Date == targetDate.Date;
-            }
-
-            // Задачи с конкретным временем
-            return taskDate >= dateStart && taskDate < nextDayStart;
-        }
-    }
-
-
-    public List<TaskItem> GetUnconfigured()
-        => GetByStatus(TodoTaskStatus.Unconfigured);
-}
-
-// Обновлённый SettingsRepository с наследованием от CachedRepository
-public class SettingsRepository(StorageContext context) : CachedRepository<UserAppSettings>(context)
-{
-    private readonly StorageContext _context = context;
-    protected override DbSet<UserAppSettings> GetDbSet() => _context.Settings;
-
-    public override List<UserAppSettings> GetAll()
-    {
-        lock (CacheLock)
-        {
-            if (IsDirty || Cache == null)
-            {
-                var settings = _context.Settings.FirstOrDefault();
-                if (settings == null)
-                {
-                    settings = new UserAppSettings();
-                    _context.Settings.Add(settings);
-                    _context.SaveChanges();
-                }
-
-                Cache = [settings];
-                IsDirty = false;
-            }
-
-            return Cache.ToList();
-        }
-    }
-
-    public override UserAppSettings? GetById(int id) => GetAll().FirstOrDefault();
-
-    // Для настроек переопределяем методы, т.к. у нас всегда одна запись
-    public override void Add(UserAppSettings entity)
-    {
-        // Для настроек используем Update вместо Add
-        Update(entity);
-    }
-
-    public override void Delete(int id)
-    {
-        // Для настроек не разрешаем удаление, только сброс
-        var settings = GetById(id);
-        if (settings != null)
-        {
-            settings.ResetToDefaults();
-            Update(settings);
-        }
-    }
-}
-
-// Дополнительный репозиторий для TaskBlocker
-public class TaskBlockerRepository(StorageContext context) : CachedRepository<TaskBlocker>(context)
-{
-    private readonly StorageContext _context = context;
-    protected override DbSet<TaskBlocker> GetDbSet() => _context.TaskBlockers;
-
-    // Специфичные методы для блокеров
-    public List<TaskBlocker> GetByParentTaskId(int parentTaskId)
-        => GetAll().Where(b => b.ParentTaskId == parentTaskId).ToList();
-
-    public List<TaskBlocker> GetByBlockerTaskId(int blockerTaskId)
-        => GetAll().Where(b => b.BlockerTaskId == blockerTaskId).ToList();
-}
-
-// Обновлённый StorageContext (без изменений, оставляем для полноты)
-public class StorageContext : DbContext
-{
-    private readonly string _dbPath;
-
-    public StorageContext(string? dbPath = null)
-    {
-        var folder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        if (string.IsNullOrWhiteSpace(folder))
-            folder = ".";
-        _dbPath = Path.Combine(folder, dbPath ?? "flowfocus.db");
-    }
-
-    public DbSet<TaskItem> Tasks => Set<TaskItem>();
-    public DbSet<TaskBlocker> TaskBlockers => Set<TaskBlocker>();
-    public DbSet<UserAppSettings> Settings => Set<UserAppSettings>();
-
-    protected override void OnConfiguring(DbContextOptionsBuilder options)
-        => options.UseSqlite($"Data Source={_dbPath}");
+    public DbSet<TaskItem> Tasks { get; set; }
+    public DbSet<Dependency> Dependencies { get; set; }
+    public DbSet<UserSettings> UserSettings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // TaskItem
+        // TaskItem configuration
         modelBuilder.Entity<TaskItem>(entity =>
         {
-            entity.HasKey(e => e.Id);
-
-            entity.Property(e => e.Tags)
-                .HasConversion(
-                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                    v => JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions?)null) ?? new List<string>()
-                );
-
-            entity.Property(e => e.Repeat)
-                .HasConversion(
-                    v => v == null ? null : JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                    v => string.IsNullOrEmpty(v)
-                        ? null
-                        : JsonSerializer.Deserialize<RepeatInfo>(v, (JsonSerializerOptions?)null)
-                );
-
-            entity.HasIndex(e => e.Status);
-            entity.HasIndex(e => e.Deadline);
-            entity.HasIndex(e => e.IsFavorite);
-        });
-
-        // TaskBlocker
-        modelBuilder.Entity<TaskBlocker>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.ParentTaskId);
-            entity.HasIndex(e => e.BlockerTaskId);
-        });
-
-        // UserAppSettings
-        modelBuilder.Entity<UserAppSettings>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.DayStartTime).HasConversion(
-                v => v.Ticks,
-                v => TimeSpan.FromTicks(v)
+            entity.HasKey(t => t.Id);
+            entity.Property(t => t.Title).IsRequired().HasMaxLength(500);
+            entity.Property(t => t.Description).HasMaxLength(2000);
+            entity.Property(t => t.Tags).HasConversion(
+                v => string.Join(',', v),
+                v => v.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList()
             );
+            entity.Property(t => t.Status).HasConversion<string>();
+            entity.Property(t => t.DisplayType).HasConversion<string>();
+            
+            // Indexes for performance
+            entity.HasIndex(t => t.Status);
+            entity.HasIndex(t => t.PlannedDate);
+            entity.HasIndex(t => t.UserPriority);
         });
+
+        // Dependency configuration
+        modelBuilder.Entity<Dependency>(entity =>
+        {
+            entity.HasKey(d => d.Id);
+            entity.Property(d => d.Type).HasConversion<string>();
+            entity.Property(d => d.Logic).HasConversion<string>();
+            
+            // Relationships
+            entity.HasOne(d => d.SourceTask)
+                  .WithMany(t => t.Dependencies)
+                  .HasForeignKey(d => d.SourceTaskId)
+                  .OnDelete(DeleteBehavior.Cascade);
+                  
+            entity.HasOne(d => d.TargetTask)
+                  .WithMany(t => t.DependentTasks)
+                  .HasForeignKey(d => d.TargetTaskId)
+                  .OnDelete(DeleteBehavior.Restrict);
+            
+            // Prevent self-references
+            entity.HasCheckConstraint("CK_Dependency_SelfReference", "SourceTaskId != TargetTaskId");
+        });
+
+        // UserSettings configuration
+        modelBuilder.Entity<UserSettings>(entity =>
+        {
+            entity.HasKey(s => s.Id);
+            entity.HasData(new UserSettings { Id = Guid.NewGuid() });
+        });
+    }
+}
+public abstract class BaseRepository<T> : IRepository<T> where T : class
+{
+    protected readonly AppDbContext _context;
+    protected readonly DbSet<T> _dbSet;
+
+    protected BaseRepository(AppDbContext context)
+    {
+        _context = context;
+        _dbSet = context.Set<T>();
+    }
+
+    public virtual async Task<T?> GetByIdAsync(Guid id) => await _dbSet.FindAsync(id);
+    public virtual async Task<IEnumerable<T>> GetAllAsync() => await _dbSet.ToListAsync();
+    public virtual async Task AddAsync(T entity) => await _dbSet.AddAsync(entity);
+    public virtual Task UpdateAsync(T entity) => Task.FromResult(_dbSet.Update(entity));
+    public virtual Task DeleteAsync(Guid id) => Task.Run(async () => 
+    {
+        var entity = await GetByIdAsync(id);
+        if (entity != null) _dbSet.Remove(entity);
+    });
+    public virtual async Task<bool> ExistsAsync(Guid id) => await _dbSet.FindAsync(id) != null;
+}
+public class DependencyRepository : BaseRepository<Dependency>, IDependencyRepository
+{
+    public DependencyRepository(AppDbContext context) : base(context) { }
+
+    public async Task<IEnumerable<Dependency>> GetDependenciesForTaskAsync(Guid taskId)
+        => await _dbSet.Where(d => d.SourceTaskId == taskId)
+                       .Include(d => d.TargetTask)
+                       .ToListAsync();
+
+    public async Task<IEnumerable<Dependency>> GetDependentTasksAsync(Guid taskId)
+        => await _dbSet.Where(d => d.TargetTaskId == taskId)
+                       .Include(d => d.SourceTask)
+                       .ToListAsync();
+
+    public async Task<bool> HasCircularDependencyAsync(Guid sourceTaskId, Guid targetTaskId)
+    {
+        // Simple implementation - can be enhanced with graph traversal
+        return await _dbSet.AnyAsync(d => 
+            d.SourceTaskId == targetTaskId && d.TargetTaskId == sourceTaskId);
+    }
+
+    public async Task RemoveDependenciesForTaskAsync(Guid taskId)
+    {
+        var dependencies = await GetDependenciesForTaskAsync(taskId);
+        _dbSet.RemoveRange(dependencies);
+        await _context.SaveChangesAsync();
+    }
+}
+public class SettingsRepository : BaseRepository<UserSettings>, ISettingsRepository
+{
+    public SettingsRepository(AppDbContext context) : base(context) { }
+
+    public async Task<UserSettings> GetUserSettingsAsync()
+    {
+        var settings = await _dbSet.FirstOrDefaultAsync();
+        if (settings == null)
+        {
+            settings = new UserSettings();
+            await AddAsync(settings);
+            await _context.SaveChangesAsync();
+        }
+        return settings;
+    }
+}
+
+public static class ServiceExtensions
+{
+    public static IServiceCollection AddDataLayer(this IServiceCollection services, string connectionString)
+    {
+        services.AddDbContextFactory<AppDbContext>(options =>
+            options.UseSqlite(connectionString));
+            
+        services.AddScoped<ITaskRepository, TaskRepository>();
+        services.AddScoped<IDependencyRepository, DependencyRepository>();
+        services.AddScoped<ISettingsRepository, SettingsRepository>();
+        
+        return services;
+    }
+}
+public class TaskRepository : BaseRepository<TaskItem>, ITaskRepository
+{
+    public TaskRepository(AppDbContext context) : base(context) { }
+
+    public async Task<IEnumerable<TaskItem>> GetByStatusAsync(TaskStatus status)
+        => await _dbSet.Where(t => t.Status == status).ToListAsync();
+
+    public async Task<IEnumerable<TaskItem>> GetByDateAsync(DateTime date)
+        => await _dbSet.Where(t => t.PlannedDate.HasValue && 
+                              t.PlannedDate.Value.Date == date.Date).ToListAsync();
+
+    public async Task<IEnumerable<TaskItem>> GetByPriorityRangeAsync(int minPriority, int maxPriority)
+        => await _dbSet.Where(t => t.UserPriority >= minPriority && t.UserPriority <= maxPriority).ToListAsync();
+
+    public async Task<IEnumerable<TaskItem>> GetWithDependenciesAsync()
+        => await _dbSet.Include(t => t.Dependencies).ThenInclude(d => d.TargetTask).ToListAsync();
+
+    public async Task<IEnumerable<TaskItem>> GetNotConfiguredAsync()
+        => await _dbSet.Where(t => t.Status == TaskStatus.NotConfigured).ToListAsync();
+
+    public async Task UpdateStatusAsync(Guid taskId, TaskStatus status)
+    {
+        var task = await GetByIdAsync(taskId);
+        if (task != null)
+        {
+            task.Status = status;
+            await _context.SaveChangesAsync();
+        }
+    }
+}
+public class AppDbContextFactory : IDbContextFactory<AppDbContext>
+{
+    private readonly IServiceProvider _serviceProvider;
+
+    public AppDbContextFactory(IServiceProvider serviceProvider)
+    {
+        _serviceProvider = serviceProvider;
+    }
+
+    public AppDbContext CreateDbContext()
+    {
+        return _serviceProvider.GetRequiredService<AppDbContext>();
     }
 }

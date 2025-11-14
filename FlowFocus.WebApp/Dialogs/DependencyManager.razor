@@ -1,0 +1,109 @@
+@inject ITaskRepository TaskRepo
+@inject IDependencyRepository DependencyRepo
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudPaper Class="pa-3" Elevation="0" Outlined="true">
+    <div class="d-flex justify-space-between align-center mb-3">
+        <MudText Typo="Typo.subtitle2">Зависимости задачи</MudText>
+        <MudButton Variant="Variant.Outlined" 
+                  Size="Size.Small"
+                  StartIcon="Icons.Material.Filled.AddLink"
+                  OnClick="ShowAddDependencyDialog">
+            Добавить зависимость
+        </MudButton>
+    </div>
+
+    @if (Dependencies?.Any() == true)
+    {
+        <MudList>
+            @foreach (var dependency in Dependencies)
+            {
+                <MudListItem>
+                    <MudChip Size="Size.Small" 
+                            Color="GetDependencyColor(dependency.Type)" 
+                            Class="mr-2">
+                        @dependency.Type
+                    </MudChip>
+                    <MudText Class="flex-grow-1">@dependency.TargetTask?.Title</MudText>
+                    <MudIconButton Icon="Icons.Material.Filled.Delete" 
+                                  Size="Size.Small"
+                                  Color="Color.Error"
+                                  OnClick="() => RemoveDependency(dependency)" />
+                </MudListItem>
+            }
+        </MudList>
+    }
+    else
+    {
+        <MudText Color="Color.Secondary" Class="text-center">Зависимости не добавлены</MudText>
+    }
+</MudPaper>
+
+@code {
+    [Parameter] public TaskItem Task { get; set; } = null!;
+    
+    private List<Dependency> Dependencies = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadDependencies();
+    }
+
+    private async Task LoadDependencies()
+    {
+        if (Task != null)
+        {
+            Dependencies = (await DependencyRepo.GetDependenciesForTaskAsync(Task.Id)).ToList();
+            StateHasChanged();
+        }
+    }
+
+    private Color GetDependencyColor(DependencyType type)
+    {
+        return type switch
+        {
+            DependencyType.Blocking => Color.Error,
+            DependencyType.Related => Color.Info,
+            _ => Color.Default
+        };
+    }
+
+    private async Task ShowAddDependencyDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(AddDependencyDialog.SourceTask)] = Task
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = DialogService.Show<AddDependencyDialog>("Добавить зависимость", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadDependencies();
+        }
+    }
+
+    private async Task RemoveDependency(Dependency dependency)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(ConfirmDialog.Title)] = "Удаление зависимости",
+            [nameof(ConfirmDialog.Content)] = $"Удалить зависимость с задачей \"{dependency.TargetTask?.Title}\"?",
+            [nameof(ConfirmDialog.ConfirmText)] = "Удалить"
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = DialogService.Show<ConfirmDialog>("Подтверждение", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await DependencyRepo.DeleteAsync(dependency.Id);
+            await LoadDependencies();
+            Snackbar.Add("Зависимость удалена", Severity.Success);
+        }
+    }
+}

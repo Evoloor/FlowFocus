@@ -1,0 +1,179 @@
+@page "/not-configured"
+@using FlowFocus.WebApp.Dialogs
+@inject ITaskRepository TaskRepo
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>FlowFocus - Ненастроенные</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudGrid>
+        <MudItem xs="12" Class="mb-4">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudText Typo="Typo.h4" Class="mb-1">Ненастроенные задачи</MudText>
+                    <MudText Color="Color.Secondary">Задачи, требующие подтверждения и настройки</MudText>
+                </div>
+                <MudButton Variant="Variant.Outlined" 
+                          Color="Color.Error"
+                          StartIcon="Icons.Material.Filled.ClearAll"
+                          OnClick="MarkAllAsIrrelevant"
+                          Disabled="@(!NotConfiguredTasks.Any())"
+                          Size="Size.Small">
+                    Отметить все неактуальными
+                </MudButton>
+            </div>
+        </MudItem>
+
+        <MudItem xs="12">
+            @if (IsLoading)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+            }
+            else if (!NotConfiguredTasks.Any())
+            {
+                <MudPaper Class="py-12 text-center">
+                    <MudIcon Icon="Icons.Material.Filled.DoneAll" 
+                            Color="Color.Success" 
+                            Size="Size.Large" 
+                            Class="mb-3" />
+                    <MudText Typo="Typo.h6" Color="Color.Secondary">Все задачи настроены!</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+                        Новые ненастроенные задачи появятся здесь после быстрого добавления
+                    </MudText>
+                </MudPaper>
+            }
+            else
+            {
+                <MudGrid>
+                    @foreach (var task in NotConfiguredTasks)
+                    {
+                        <MudItem xs="12" md="6" lg="4">
+                            <MudCard Class="h-100">
+                                <MudCardContent>
+                                    <MudText Typo="Typo.h6" Class="mb-2">@task.Title</MudText>
+                                    @if (!string.IsNullOrEmpty(task.Description))
+                                    {
+                                        <MudText Typo="Typo.body2" Class="mb-3">@task.Description</MudText>
+                                    }
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        Создано: @task.CreatedDate.ToString("dd.MM.yyyy HH:mm")
+                                    </MudText>
+                                </MudCardContent>
+                                <MudCardActions>
+                                    <MudButton Variant="Variant.Filled" 
+                                              Color="Color.Primary"
+                                              Size="Size.Small"
+                                              OnClick="() => ConfigureTask(task)">
+                                        Настроить
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Text" 
+                                              Color="Color.Default"
+                                              Size="Size.Small"
+                                              OnClick="() => MarkAsIrrelevant(task)">
+                                        Неактуально
+                                    </MudButton>
+                                </MudCardActions>
+                            </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code {
+    private List<TaskItem> NotConfiguredTasks = new();
+    private bool IsLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadNotConfiguredTasks();
+    }
+
+    private async Task LoadNotConfiguredTasks()
+    {
+        IsLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            NotConfiguredTasks = (await TaskRepo.GetNotConfiguredAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка загрузки задач: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ConfigureTask(TaskItem task)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(TaskEditDialog.ExistingTask)] = task
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = DialogService.Show<TaskEditDialog>("Настройка задачи", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadNotConfiguredTasks();
+        }
+    }
+
+    private async Task MarkAsIrrelevant(TaskItem task)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(ConfirmDialog.Title)] = "Отметка как неактуальной",
+            [nameof(ConfirmDialog.Content)] = $"Отметить задачу \"{task.Title}\" как неактуальную?",
+            [nameof(ConfirmDialog.ConfirmText)] = "Отметить"
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = DialogService.Show<ConfirmDialog>("Подтверждение", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            task.Status = TaskStatus.Irrelevant;
+            await TaskRepo.UpdateAsync(task);
+            Snackbar.Add("Задача отмечена как неактуальная", Severity.Info);
+            await LoadNotConfiguredTasks();
+        }
+    }
+
+    private async Task MarkAllAsIrrelevant()
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(ConfirmDialog.Title)] = "Массовое действие",
+            [nameof(ConfirmDialog.Content)] = $"Отметить все {NotConfiguredTasks.Count} задач как неактуальные?",
+            [nameof(ConfirmDialog.ConfirmText)] = "Отметить все"
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = DialogService.Show<ConfirmDialog>("Подтверждение", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            foreach (var task in NotConfiguredTasks)
+            {
+                task.Status = TaskStatus.Irrelevant;
+                await TaskRepo.UpdateAsync(task);
+            }
+
+            Snackbar.Add($"Все задачи отмечены как неактуальные", Severity.Info);
+            await LoadNotConfiguredTasks();
+        }
+    }
+}

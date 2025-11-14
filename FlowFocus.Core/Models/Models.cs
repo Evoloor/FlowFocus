@@ -1,81 +1,59 @@
+using System.ComponentModel.DataAnnotations;
+using FlowFocus.Core.Enums;
+using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 namespace FlowFocus.Core.Models;
-
-public enum TodoTaskStatus
+public class TaskItem
 {
-    Unconfigured,
-    Planned,
-    Active,
-    Completed
-}
-
-public enum RepeatType
-{
-    None,
-    EveryNHours,
-    EveryNDays,
-    WeeklyDays
-}
-
-public enum BlockerType
-{
-    And,
-    Or
-}
-
-public abstract class AuditEntity
-{
-    public int Id { get; set; }
-    public DateTime LastChange { get; set; } = DateTime.Now;
-}
-
-public class TaskItem : AuditEntity
-{
-    public string Title { get; set; } = "";
+    public Guid Id { get; set; } = Guid.NewGuid();
+    
+    [Required]
+    [MaxLength(500)]
+    public string Title { get; set; } = string.Empty;
+    
     public string? Description { get; set; }
-    public List<string> Tags { get; set; } = [];
-    public int Interest { get; set; } // 1–10
-    public int Complexity { get; set; } // 1–100
-    public double Hours { get; set; } // up to 1000
+    public List<string> Tags { get; set; } = new();
+    
+    public TaskStatus Status { get; set; } = TaskStatus.NotConfigured;
+    public int UserPriority { get; set; } = 5;
+    public int CalculatedPriority { get; set; }
+    
+    public int Interest { get; set; } = 5;
+    public int Complexity { get; set; } = 5;
+    public double EstimatedHours { get; set; } = 1.0;
+    
     public DateTime? Deadline { get; set; }
-    public TodoTaskStatus Status { get; set; } = TodoTaskStatus.Unconfigured;
-    public bool IsFavorite { get; set; } = false;
-    public RepeatInfo? Repeat { get; set; }
-    public List<TaskBlocker> Blockers { get; set; } = []; 
-    public bool IsTimedTask => Deadline.HasValue && Deadline.Value.TimeOfDay > TimeSpan.Zero;
-
+    public DateTime? PlannedDate { get; set; }
+    public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
+    
+    public bool IsFavorite { get; set; }
+    public bool IsRecurring { get; set; }
+    
+    public DisplayType DisplayType { get; set; } = DisplayType.Independent;
+    
+    public List<Dependency> Dependencies { get; set; } = new();
+    public List<Dependency> DependentTasks { get; set; } = new();
 }
-
-public class TaskBlocker : AuditEntity
+public class Dependency
 {
-    public int ParentTaskId { get; set; }
-    public int BlockerTaskId { get; set; }
-    public BlockerType Type { get; set; } = BlockerType.And;
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid SourceTaskId { get; set; }
+    public Guid TargetTaskId { get; set; }
+    
+    public DependencyType Type { get; set; }
+    public DependencyLogic Logic { get; set; } = DependencyLogic.AND;
+    public string? ConditionParameters { get; set; }
+    
+    // Navigation properties
+    public TaskItem? SourceTask { get; set; }
+    public TaskItem? TargetTask { get; set; }
 }
-
-public class RepeatInfo : AuditEntity
+public class UserSettings
 {
-    public RepeatType Type { get; set; } = RepeatType.None;
-    public int Interval { get; set; } = 0; // N hours/days
-    public List<DayOfWeek>? DaysOfWeek { get; set; } // for weekly repeats
-    public List<int>? DaysOfMonth { get; set; } // for monthly repeats
-}
-
-public class UserAppSettings : AuditEntity
-{
-    private static readonly TimeSpan DefaultDayStartTime = new(5, 0, 0);
-    public TimeSpan DayStartTime { get; set; } = DefaultDayStartTime;
-    private static readonly double DefaultDailyHoursLimit = 8.0;
-    public double DailyHoursLimit { get; set; } = DefaultDailyHoursLimit;
-    private static readonly int DefaultDailyComplexityLimit = 300;
-    public int DailyComplexityLimit { get; set; } = DefaultDailyComplexityLimit;
-    public static readonly bool DefaultAutoRecalculateOnAdd = true;
-    public bool AutoRecalculateOnAdd { get; set; } = DefaultAutoRecalculateOnAdd;
-
-    public void ResetToDefaults()
-    {
-        DayStartTime = DefaultDayStartTime;
-        DailyHoursLimit = DefaultDailyHoursLimit;
-        DailyComplexityLimit = DefaultDailyComplexityLimit;
-        AutoRecalculateOnAdd = DefaultAutoRecalculateOnAdd;
-    }
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public int DayStartHour { get; set; } = 6;
+    public double DailyTimeLimit { get; set; } = 8.0;
+    public int DailyComplexityLimit { get; set; } = 50;
+    public bool AutoRecalculateOnAdd { get; set; } = true;
+    public bool ShowFavorites { get; set; } = true;
+    public string? PriorityBoostDates { get; set; }
 }

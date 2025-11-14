@@ -1,31 +1,181 @@
 ﻿@page "/"
-@using FlowFocus.Core.Models
-@using FlowFocus.Data
 @using FlowFocus.WebApp.Components
-
+@using FlowFocus.WebApp.Dialogs
 @inject ITaskRepository TaskRepo
-@inject IRepository<UserAppSettings> SettingsRepo
+@inject IPlannerService PlannerService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject ISettingsRepository SettingsRepo
 
-<PageTitle>Сегодня</PageTitle>
-<TasksView Tasks="@TodayTasks"
-          Title="Сегодня"
-          ShowFilters="false"
-          ShowCounter="false"
-          ShowFavoriteAction="false"
-          ShowEditAction="false"
-          ShowDeleteAction="false"
-          ShowCompleteAction="true"
-          ShowPostponeAction="true"/>
+<PageTitle>FlowFocus - Сегодня</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudGrid>
+        <MudItem xs="12" Class="mb-4">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudText Typo="Typo.h4" Class="mb-1">Задачи на сегодня</MudText>
+                    <MudText Color="Color.Secondary">@DateTime.Now.ToString("dd MMMM yyyy")</MudText>
+                </div>
+                <div class="d-flex gap-2">
+                    <MudButton Variant="Variant.Outlined" 
+                              Color="Color.Primary"
+                              StartIcon="Icons.Material.Filled.Refresh"
+                              OnClick="RecalculatePriorities"
+                              Size="Size.Small">
+                        Пересчитать
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                              StartIcon="Icons.Material.Filled.Settings"
+                              OnClick="ShowSettings"
+                              Size="Size.Small">
+                        Настройки
+                    </MudButton>
+                </div>
+            </div>
+        </MudItem>
+
+        <MudItem xs="12" Class="mb-4">
+            <QuickAddTask OnTaskAdded="LoadTodayTasks" />
+        </MudItem>
+
+        <MudItem xs="12" md="8">
+            @if (IsLoading)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+            }
+            else if (!TodayTasks.Any())
+            {
+                <MudPaper Class="py-12 text-center">
+                    <MudIcon Icon="Icons.Material.Filled.CheckCircle" 
+                            Color="Color.Success" 
+                            Size="Size.Large" 
+                            Class="mb-3" />
+                    <MudText Typo="Typo.h6" Color="Color.Secondary">Все задачи выполнены!</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+                        Добавьте новые задачи или проверьте планировщик
+                    </MudText>
+                </MudPaper>
+            }
+            else
+            {
+                <MudGrid>
+                    @foreach (var task in TodayTasks)
+                    {
+                        <MudItem xs="12" Class="mb-3">
+                            <TaskCard Task="task" 
+                                     OnTaskUpdated="HandleTaskUpdated"
+                                     OnTaskDeleted="HandleTaskDeleted" />
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4 sticky-sidebar">
+                <MudText Typo="Typo.h6" Class="mb-3">Статистика дня</MudText>
+                
+                <div class="mb-4">
+                    <MudText Typo="Typo.body2">Всего задач: <MudText Color="Color.Primary" Typo="Typo.body1">@TodayTasks.Count</MudText></MudText>
+                    <MudText Typo="Typo.body2">Завершено: <MudText Color="Color.Success" Typo="Typo.body1">@CompletedCount</MudText></MudText>
+                    <MudText Typo="Typo.body2">Активных: <MudText Color="Color.Warning" Typo="Typo.body1">@ActiveCount</MudText></MudText>
+                </div>
+
+                <MudProgressLinear Color="Color.Success" 
+                                  Value="@CompletionPercent" 
+                                  Class="mb-2" />
+                <MudText Typo="Typo.caption">Прогресс: @CompletionPercent.ToString("0")%</MudText>
+
+                <div class="mt-4">
+                    <MudText Typo="Typo.body2">Общее время: <MudText Color="Color.Info" Typo="Typo.body1">@TotalHours.ToString("0.0") ч</MudText></MudText>
+                    <MudText Typo="Typo.body2">Общая сложность: <MudText Color="Color.Info" Typo="Typo.body1">@TotalComplexity</MudText></MudText>
+                </div>
+
+                @if (HasOverload)
+                {
+                    <MudAlert Severity="Severity.Warning" Class="mt-3">
+                        <MudText>Превышены дневные лимиты!</MudText>
+                    </MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
 
 @code {
-    private DateTime _currentDay = DateTime.Now.StartOfToday();
-    private UserAppSettings _settings = new();
+    private List<TaskItem> TodayTasks = new();
+    private bool IsLoading = true;
+    private UserSettings Settings = new();
 
-    protected override void OnInitialized()
+    private int CompletedCount => TodayTasks.Count(t => t.Status == TaskStatus.Completed);
+    private int ActiveCount => TodayTasks.Count(t => t.Status == TaskStatus.Active);
+    private double CompletionPercent => TodayTasks.Any() ? (CompletedCount * 100.0) / TodayTasks.Count : 0;
+    private double TotalHours => TodayTasks.Sum(t => t.EstimatedHours);
+    private int TotalComplexity => TodayTasks.Sum(t => t.Complexity);
+    private bool HasOverload => TotalHours > Settings.DailyTimeLimit || TotalComplexity > Settings.DailyComplexityLimit;
+
+    protected override async Task OnInitializedAsync()
     {
-        _settings = SettingsRepo.GetAll().First();
-        _currentDay = DateTime.Now.StartOfToday(_settings.DayStartTime);
+        Settings = await SettingsRepo.GetUserSettingsAsync();
+        await LoadTodayTasks();
     }
 
-    List<TaskItem> TodayTasks => TaskRepo.GetByDate(_currentDay, _settings.DayStartTime);
+    private async Task LoadTodayTasks()
+    {
+        IsLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var today = DateTime.Today;
+            TodayTasks = (await TaskRepo.GetByDateAsync(today)).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка загрузки задач: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleTaskUpdated(TaskItem task)
+    {
+        await LoadTodayTasks();
+    }
+
+    private async Task HandleTaskDeleted(TaskItem task)
+    {
+        await LoadTodayTasks();
+    }
+
+    private async Task RecalculatePriorities()
+    {
+        try
+        {
+            await PlannerService.RecalculatePrioritiesAsync();
+            Snackbar.Add("Приоритеты пересчитаны", Severity.Success);
+            await LoadTodayTasks();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка пересчета: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ShowSettings()
+    {
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = DialogService.Show<SettingsDialog>("Настройки", options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            Settings = await SettingsRepo.GetUserSettingsAsync();
+            await LoadTodayTasks();
+        }
+    }
 }

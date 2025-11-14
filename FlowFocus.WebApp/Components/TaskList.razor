@@ -1,0 +1,182 @@
+@using FlowFocus.WebApp.Dialogs
+@inject ITaskRepository TaskRepo
+@inject IDialogService DialogService
+
+<MudGrid>
+    <MudItem xs="12" Class="d-flex justify-space-between align-center mb-4">
+        <MudText Typo="Typo.h4">@Title</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                  StartIcon="Icons.Material.Filled.Add"
+                  OnClick="ShowCreateDialog">
+            Новая задача
+        </MudButton>
+    </MudItem>
+
+    <MudItem xs="12" Class="mb-3">
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="3">
+                <MudSelect @bind-Value="SelectedStatus" Label="Статус" Clearable="true">
+                    <MudSelectItem Value="null">Все</MudSelectItem>
+                    @foreach (var status in Enum.GetValues<TaskStatus>())
+                    {
+                        <MudSelectItem Value="status">@status</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudTextField @bind-Value="SearchText" Label="Поиск" Immediate="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudSelect @bind-Value="SortBy" Label="Сортировка">
+                    <MudSelectItem Value="SortField.Priority">По приоритету</MudSelectItem>
+                    <MudSelectItem Value="SortField.Deadline">По сроку</MudSelectItem>
+                    <MudSelectItem Value="SortField.Interest">По интересу</MudSelectItem>
+                    <MudSelectItem Value="SortField.Complexity">По сложности</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3" Class="d-flex align-end">
+                <MudButton Variant="Variant.Outlined" OnClick="LoadTasks" 
+                          Class="ml-auto" Size="Size.Small">
+                    Обновить
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudItem>
+
+    <MudItem xs="12">
+        @if (IsLoading)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+        }
+        else if (!FilteredTasks.Any())
+        {
+            <MudPaper Class="py-12 text-center">
+                <MudText Typo="Typo.h6" Color="Color.Secondary">Задачи не найдены</MudText>
+            </MudPaper>
+        }
+        else
+        {
+            foreach (var task in FilteredTasks)
+            {
+                <TaskCard Task="task" 
+                         OnTaskUpdated="HandleTaskUpdated"
+                         OnTaskDeleted="HandleTaskDeleted" />
+            }
+        }
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Parameter] public string Title { get; set; } = "Задачи";
+    [Parameter] public TaskStatus? FilterStatus { get; set; }
+    [Parameter] public DateTime? FilterDate { get; set; }
+
+    private List<TaskItem> Tasks = new();
+    private List<TaskItem> FilteredTasks => GetFilteredTasks();
+    private bool IsLoading = true;
+
+    private TaskStatus? SelectedStatus;
+    private string SearchText = string.Empty;
+    private SortField SortBy = SortField.Priority;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTasks();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (FilterStatus.HasValue)
+        {
+            SelectedStatus = FilterStatus;
+        }
+        await LoadTasks();
+    }
+
+    private async Task LoadTasks()
+    {
+        IsLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            if (FilterDate.HasValue)
+            {
+                Tasks = (await TaskRepo.GetByDateAsync(FilterDate.Value)).ToList();
+            }
+            else if (FilterStatus.HasValue)
+            {
+                Tasks = (await TaskRepo.GetByStatusAsync(FilterStatus.Value)).ToList();
+            }
+            else
+            {
+                Tasks = (await TaskRepo.GetAllAsync()).ToList();
+            }
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private List<TaskItem> GetFilteredTasks()
+    {
+        var query = Tasks.AsEnumerable();
+
+        if (SelectedStatus.HasValue)
+        {
+            query = query.Where(t => t.Status == SelectedStatus.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(SearchText))
+        {
+            query = query.Where(t => 
+                t.Title.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
+                (t.Description?.Contains(SearchText, StringComparison.OrdinalIgnoreCase) == true) ||
+                t.Tags.Any(tag => tag.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
+            );
+        }
+
+        query = SortBy switch
+        {
+            SortField.Priority => query.OrderBy(t => t.UserPriority),
+            SortField.Deadline => query.OrderBy(t => t.Deadline ?? DateTime.MaxValue),
+            SortField.Interest => query.OrderByDescending(t => t.Interest),
+            SortField.Complexity => query.OrderBy(t => t.Complexity),
+            _ => query
+        };
+
+        return query.ToList();
+    }
+
+    private async void ShowCreateDialog()
+    {
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = DialogService.Show<TaskEditDialog>("Новая задача", options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadTasks();
+        }
+    }
+
+    private async Task HandleTaskUpdated(TaskItem task)
+    {
+        await LoadTasks();
+    }
+
+    private async Task HandleTaskDeleted(TaskItem task)
+    {
+        await LoadTasks();
+    }
+
+    private enum SortField
+    {
+        Priority,
+        Deadline,
+        Interest,
+        Complexity
+    }
+}

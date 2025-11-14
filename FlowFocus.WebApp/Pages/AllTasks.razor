@@ -1,22 +1,24 @@
-@page "/all"
-@using FlowFocus.Core.Models
-@using FlowFocus.Data
+@page "/all-tasks"
 @using FlowFocus.WebApp.Components
-@inject ITaskRepository TaskRepo
 
-<PageTitle>Все задачи</PageTitle>
+<PageTitle>FlowFocus - Все задачи</PageTitle>
 
-<TasksView Tasks="@AllTasksList" 
-           Title="Все задачи"
-           ShowFilters="true"
-           ShowViewToggle="true"
-           ShowCounter="true"
-           ShowFavoriteAction="true"
-           ShowEditAction="true"
-           ShowDeleteAction="true"/>
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudGrid>
+        <MudItem xs="12" Class="mb-4">
+            <MudText Typo="Typo.h4">Все задачи</MudText>
+            <MudText Color="Color.Secondary">Полный список задач с фильтрацией и сортировкой</MudText>
+        </MudItem>
 
+        <MudItem xs="12">
+            <TaskList Title="Все задачи" OnTasksUpdated="StateHasChanged" />
+        </MudItem>
+    </MudGrid>
+</MudContainer>
 
 @code {
-    private List<TaskItem> AllTasksList => TaskRepo.GetAll();
-
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.Yield();
+    }
 }

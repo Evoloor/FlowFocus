@@ -1,66 +1,53 @@
 @page "/settings"
-@using FlowFocus.Core.Models
-@using FlowFocus.Data
+@using FlowFocus.WebApp.Dialogs
+@inject IDialogService DialogService
 
-@inject IRepository<UserAppSettings> SettingsRepo
-@inject ISnackbar Snackbar
+<PageTitle>FlowFocus - Настройки</PageTitle>
 
-<PageTitle>Настройки</PageTitle>
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-4">
+    <MudGrid>
+        <MudItem xs="12" Class="mb-4">
+            <MudText Typo="Typo.h4">Настройки приложения</MudText>
+            <MudText Color="Color.Secondary">Управление параметрами системы</MudText>
+        </MudItem>
 
-<MudPaper Class="pa-4" Elevation="1">
-    <MudText Typo="Typo.h5">Настройки приложения</MudText>
-    <MudDivider Class="my-3" />
-
-    <MudForm>
-        <MudGrid>
-            <MudItem xs="12" sm="6">
-                <MudNumericField Label="Время начала дня (часы, 0–23)"
-                      @bind-Value="StartHour"
-                      Min="0" Max="23"
-                      Adornment="Adornment.Start"
-                      AdornmentIcon="@Icons.Material.Filled.AccessTime"
-                      Immediate="true" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudNumericField Label="Макс. часов в день" 
-                      @bind-Value="_settings.DailyHoursLimit"
-                      Min="0" Max="24" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudNumericField Label="Макс. сложности в день" 
-                      @bind-Value="_settings.DailyComplexityLimit"
-                      Min="0" Max="1000" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudSwitch T="bool" Label="Пересчёт при добавлении задачи" 
-                      @bind-Checked="_settings.AutoRecalculateOnAdd" />
-            </MudItem>
-        </MudGrid>
-
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" Class="mt-3" OnClick="Save" StartIcon="@Icons.Material.Filled.Save">
-            Сохранить настройки
-        </MudButton>
-    </MudForm>
-</MudPaper>
+        <MudItem xs="12">
+            <MudPaper Class="pa-4">
+                <MudList>
+                    <MudListItem Text="Основные настройки" 
+                                 Icon="Icons.Material.Filled.Settings"
+                                 OnClick="ShowSettingsDialog" />
+                    <MudDivider />
+                    <MudListItem Text="Управление данными" 
+                                 Icon="Icons.Material.Filled.Storage"
+                                 OnClick="ShowDataManagement" />
+                    <MudDivider />
+                    <MudListItem Text="О программе" 
+                                 Icon="Icons.Material.Filled.Info"
+                                 OnClick="ShowAbout" />
+                </MudList>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
 
 @code {
-    private UserAppSettings _settings = new();
-
-    protected override void OnInitialized()
+    private async Task ShowSettingsDialog()
     {
-        _settings = SettingsRepo.GetAll().First();
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = DialogService.Show<SettingsDialog>("Настройки", options);
+        await dialog.Result;
     }
 
-    int StartHour
+    private void ShowDataManagement()
     {
-        get => (int)_settings.DayStartTime.TotalHours;
-        set => _settings.DayStartTime = TimeSpan.FromHours(value);
+        // Implementation for data management
+        // TODO: Add data export/import functionality
     }
 
-    void Save()
+    private void ShowAbout()
     {
-        SettingsRepo.Update(_settings);
-        SettingsRepo.SaveChanges();
-        Snackbar.Add("Настройки сохранены.", Severity.Success);
+        // Implementation for about dialog
+        // TODO: Add about information
     }
 }

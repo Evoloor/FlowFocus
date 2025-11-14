@@ -1,28 +1,113 @@
+// Pages/Tomorrow.razor
 @page "/tomorrow"
-@using FlowFocus.Core.Models
-@using FlowFocus.Data
 @using FlowFocus.WebApp.Components
-@inject IRepository<UserAppSettings> SettingsRepo
-
 @inject ITaskRepository TaskRepo
+@inject IPlannerService PlannerService
+@inject ISnackbar Snackbar
 
-<PageTitle>Завтра</PageTitle>
-<TasksView Tasks="@TomorrowTasks" 
-          Title="Задачи на завтра"
-          ShowFilters="false"
-          ShowCounter="false"
-          EmptyMessage="Нет задач на завтра 🎉" />
+<PageTitle>FlowFocus - Завтра</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudGrid>
+        <MudItem xs="12" Class="mb-4">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudText Typo="Typo.h4" Class="mb-1">Задачи на завтра</MudText>
+                    <MudText Color="Color.Secondary">@DateTime.Now.AddDays(1).ToString("dd MMMM yyyy")</MudText>
+                </div>
+                <MudButton Variant="Variant.Outlined" 
+                          Color="Color.Primary"
+                          StartIcon="Icons.Material.Filled.AutoSchedule"
+                          OnClick="PlanTomorrowTasks"
+                          Size="Size.Small">
+                    Запланировать
+                </MudButton>
+            </div>
+        </MudItem>
+
+        <MudItem xs="12">
+            @if (IsLoading)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+            }
+            else if (!TomorrowTasks.Any())
+            {
+                <MudPaper Class="py-12 text-center">
+                    <MudIcon Icon="Icons.Material.Filled.Schedule" 
+                            Color="Color.Secondary" 
+                            Size="Size.Large" 
+                            Class="mb-3" />
+                    <MudText Typo="Typo.h6" Color="Color.Secondary">Задачи не запланированы</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+                        Нажмите "Запланировать" для автоматического распределения задач
+                    </MudText>
+                    <MudButton Variant="Variant.Outlined" 
+                              Color="Color.Primary"
+                              Class="mt-3"
+                              OnClick="PlanTomorrowTasks">
+                        Запланировать задачи
+                    </MudButton>
+                </MudPaper>
+            }
+            else
+            {
+                <TaskList Title="Задачи на завтра" 
+                         FilterDate="@DateTime.Now.AddDays(1)"
+                         OnTasksUpdated="LoadTomorrowTasks" />
+            }
+        </MudItem>
+    </MudGrid>
+</MudContainer>
 
 @code {
-    private UserAppSettings _settings = new();
+    private List<TaskItem> TomorrowTasks = new();
+    private bool IsLoading = true;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        _settings = SettingsRepo.GetAll().First();
+        await LoadTomorrowTasks();
     }
 
-    private List<TaskItem> TomorrowTasks => TaskRepo.GetByDate(
-        DateTime.Now.StartOfToday(_settings.DayStartTime).AddDays(1), 
-        _settings.DayStartTime
-    );
+    private async Task LoadTomorrowTasks()
+    {
+        IsLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var tomorrow = DateTime.Today.AddDays(1);
+            TomorrowTasks = (await TaskRepo.GetByDateAsync(tomorrow)).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка загрузки задач: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task PlanTomorrowTasks()
+    {
+        try
+        {
+            var tomorrow = DateTime.Today.AddDays(1);
+            var plannedTasks = await PlannerService.PlanTasksForDayAsync(tomorrow);
+            
+            foreach (var task in plannedTasks)
+            {
+                task.PlannedDate = tomorrow;
+                await TaskRepo.UpdateAsync(task);
+            }
+
+            Snackbar.Add($"Запланировано {plannedTasks.Count()} задач на завтра", Severity.Success);
+            await LoadTomorrowTasks();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка планирования: {ex.Message}", Severity.Error);
+        }
+    }
 }

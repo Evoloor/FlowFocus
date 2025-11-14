@@ -1,43 +1,49 @@
-using FlowFocus.Core.Models;
+using FlowFocus.Core;
 using FlowFocus.Data;
-using FlowFocus.WebApp;
 using MudBlazor.Services;
-using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddMudServices();
-builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
 
-builder.Services.AddScoped<StorageContext>();
+// Add services to the container.
+builder.Services.AddRazorPages();
+builder.Services.AddServerSideBlazor();
+builder.Services.AddMudServices();
+
+// Data Layer
+builder.Services.AddDataLayer("Data Source=flowfocus.db");
+
+// Business Logic Services
+builder.Services.AddScoped<IPlannerService, BasicPlannerService>();
+
+// Register repositories
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
-builder.Services.AddScoped<IRepository<UserAppSettings>, SettingsRepository>();
+builder.Services.AddScoped<IDependencyRepository, DependencyRepository>();
+builder.Services.AddScoped<ISettingsRepository, SettingsRepository>();
 
 var app = builder.Build();
 
-// Автоматические миграции при запуске
-using (var scope = app.Services.CreateScope())
-{
-    var context = scope.ServiceProvider.GetRequiredService<StorageContext>();
-    context.Database.Migrate(); // Самое главное - применяем миграции
-    
-    // Создаем настройки по умолчанию если их нет
-    if (!context.Settings.Any())
-    {
-        context.Settings.Add(new UserAppSettings());
-        context.SaveChanges();
-    }
-}
-
+// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+    app.UseExceptionHandler("/Error");
     app.UseHsts();
 }
+
 app.UseHttpsRedirection();
-app.UseAntiforgery();
-app.MapStaticAssets();
-app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+app.UseStaticFiles();
+app.UseRouting();
+app.MapBlazorHub();
+app.MapFallbackToPage("/_Host");
+
+// Initialize database
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    context.Database.EnsureCreated();
+    
+    // Ensure default settings exist
+    var settingsRepo = scope.ServiceProvider.GetRequiredService<ISettingsRepository>();
+    await settingsRepo.GetUserSettingsAsync();
+}
+
 app.Run();

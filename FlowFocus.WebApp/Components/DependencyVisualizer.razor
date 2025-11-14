@@ -1,0 +1,49 @@
+@inject IDependencyRepository DependencyRepo
+@inject ITaskRepository TaskRepo
+
+<MudPaper Class="pa-4" Elevation="1">
+    <MudText Typo="Typo.h6" Class="mb-4">Зависимости задачи: @Task?.Title</MudText>
+    
+    @if (Dependencies?.Any() == true)
+    {
+        <MudList>
+            @foreach (var dependency in Dependencies)
+            {
+                <MudListItem>
+                    <MudChip Size="Size.Small" Color="GetDependencyColor(dependency.Type)" Class="mr-2">
+                        @dependency.Type
+                    </MudChip>
+                    <MudText>@dependency.TargetTask?.Title</MudText>
+                </MudListItem>
+            }
+        </MudList>
+    }
+    else
+    {
+        <MudText Color="Color.Secondary">Нет зависимостей</MudText>
+    }
+</MudPaper>
+
+@code {
+    [Parameter] public TaskItem Task { get; set; } = null!;
+    
+    private List<Dependency> Dependencies = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Task != null)
+        {
+            Dependencies = (await DependencyRepo.GetDependenciesForTaskAsync(Task.Id)).ToList();
+        }
+    }
+
+    private Color GetDependencyColor(Core.Enums.DependencyType type)
+    {
+        return type switch
+        {
+            Core.Enums.DependencyType.Blocking => Color.Error,
+            Core.Enums.DependencyType.Related => Color.Info,
+            _ => Color.Default
+        };
+    }
+}
