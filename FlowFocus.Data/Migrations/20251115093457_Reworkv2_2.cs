@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace FlowFocus.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class Reworkv2 : Migration
+    public partial class Reworkv2_2 : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -15,7 +15,8 @@ namespace FlowFocus.Data.Migrations
                 name: "Tasks",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
                     Title = table.Column<string>(type: "TEXT", maxLength: 500, nullable: false),
                     Description = table.Column<string>(type: "TEXT", maxLength: 2000, nullable: true),
                     Tags = table.Column<string>(type: "TEXT", nullable: false),
@@ -41,7 +42,8 @@ namespace FlowFocus.Data.Migrations
                 name: "UserSettings",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
                     DayStartHour = table.Column<int>(type: "INTEGER", nullable: false),
                     DailyTimeLimit = table.Column<double>(type: "REAL", nullable: false),
                     DailyComplexityLimit = table.Column<int>(type: "INTEGER", nullable: false),
@@ -58,9 +60,10 @@ namespace FlowFocus.Data.Migrations
                 name: "Dependencies",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
-                    SourceTaskId = table.Column<Guid>(type: "TEXT", nullable: false),
-                    TargetTaskId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    SourceTaskId = table.Column<int>(type: "INTEGER", nullable: false),
+                    TargetTaskId = table.Column<int>(type: "INTEGER", nullable: false),
                     Type = table.Column<string>(type: "TEXT", nullable: false),
                     Logic = table.Column<string>(type: "TEXT", nullable: false),
                     ConditionParameters = table.Column<string>(type: "TEXT", nullable: true)
@@ -86,7 +89,7 @@ namespace FlowFocus.Data.Migrations
             migrationBuilder.InsertData(
                 table: "UserSettings",
                 columns: new[] { "Id", "AutoRecalculateOnAdd", "DailyComplexityLimit", "DailyTimeLimit", "DayStartHour", "PriorityBoostDates", "ShowFavorites" },
-                values: new object[] { new Guid("d4763540-2c96-4a9b-be69-eeb84be25a87"), true, 50, 8.0, 6, null, true });
+                values: new object[] { 1, true, 50, 8.0, 6, null, true });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Dependencies_SourceTaskId",

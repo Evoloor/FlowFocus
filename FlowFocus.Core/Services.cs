@@ -4,12 +4,12 @@ using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 namespace FlowFocus.Core;
 public interface IRepository<T> where T : class
 {
-    Task<T?> GetByIdAsync(Guid id);
+    Task<T?> GetByIdAsync(int id);
     Task<IEnumerable<T>> GetAllAsync();
     Task AddAsync(T entity);
     Task UpdateAsync(T entity);
-    Task DeleteAsync(Guid id);
-    Task<bool> ExistsAsync(Guid id);
+    Task DeleteAsync(int id);
+    Task<bool> ExistsAsync(int id);
 }
 
 public interface ITaskRepository : IRepository<TaskItem>
@@ -19,14 +19,14 @@ public interface ITaskRepository : IRepository<TaskItem>
     Task<IEnumerable<TaskItem>> GetByPriorityRangeAsync(int minPriority, int maxPriority);
     Task<IEnumerable<TaskItem>> GetWithDependenciesAsync();
     Task<IEnumerable<TaskItem>> GetNotConfiguredAsync();
-    Task UpdateStatusAsync(Guid taskId, TaskStatus status);
+    Task UpdateStatusAsync(int taskId, TaskStatus status);
 }
 public interface IDependencyRepository : IRepository<Dependency>
 {
-    Task<IEnumerable<Dependency>> GetDependenciesForTaskAsync(Guid taskId);
-    Task<IEnumerable<Dependency>> GetDependentTasksAsync(Guid taskId);
-    Task<bool> HasCircularDependencyAsync(Guid sourceTaskId, Guid targetTaskId);
-    Task RemoveDependenciesForTaskAsync(Guid taskId);
+    Task<IEnumerable<Dependency>> GetDependenciesForTaskAsync(int taskId);
+    Task<IEnumerable<Dependency>> GetDependentTasksAsync(int taskId);
+    Task<bool> HasCircularDependencyAsync(int sourceTaskId, int targetTaskId);
+    Task RemoveDependenciesForTaskAsync(int taskId);
 }
 public interface ISettingsRepository : IRepository<UserSettings>
 {
@@ -36,7 +36,7 @@ public interface IPlannerService
 {
     Task<IEnumerable<TaskItem>> PlanTasksForDayAsync(DateTime date);
     Task RecalculatePrioritiesAsync();
-    Task<bool> ValidateDependenciesAsync(Guid taskId);
+    Task<bool> ValidateDependenciesAsync(int taskId);
     Task<double> CalculateDailyLoadAsync(DateTime date);
 }
 public abstract class BasePlannerService(
@@ -51,7 +51,7 @@ public abstract class BasePlannerService(
     public abstract Task<IEnumerable<TaskItem>> PlanTasksForDayAsync(DateTime date);
     public abstract Task RecalculatePrioritiesAsync();
     
-    public virtual async Task<bool> ValidateDependenciesAsync(Guid taskId)
+    public virtual async Task<bool> ValidateDependenciesAsync(int taskId)
     {
         return !await HasCircularDependency(taskId, []);
     }
@@ -62,7 +62,7 @@ public abstract class BasePlannerService(
         return tasks.Sum(t => t.EstimatedHours);
     }
     
-    private async Task<bool> HasCircularDependency(Guid taskId, HashSet<Guid> visited)
+    private async Task<bool> HasCircularDependency(int taskId, HashSet<int> visited)
     {
         if (!visited.Add(taskId))
             return true;

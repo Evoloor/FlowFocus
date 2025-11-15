@@ -1,22 +1,17 @@
 using FlowFocus.Core;
 using FlowFocus.Data;
+using FlowFocus.WebApp;
 using MudBlazor.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddRazorPages();
-builder.Services.AddServerSideBlazor();
 builder.Services.AddMudServices();
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
 
-// Data Layer - правильная регистрация DbContext и фабрики
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite("Data Source=flowfocus.db"));
-
-// Регистрируем фабрику DbContext для репозиториев
-builder.Services.AddDbContextFactory<AppDbContext>(options =>
-    options.UseSqlite("Data Source=flowfocus.db"));
+builder.Services.AddDbContext<AppDbContext>();
 
 // Business Logic Services
 builder.Services.AddScoped<IPlannerService, BasicPlannerService>();
@@ -32,14 +27,16 @@ var app = builder.Build();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
+    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
+
 app.UseHttpsRedirection();
-app.UseStaticFiles();
-app.UseRouting();
-app.MapBlazorHub();
-app.MapFallbackToPage("/_Host");
+app.UseAntiforgery();
+app.MapStaticAssets();
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
 
 // Initialize database
 using (var scope = app.Services.CreateScope())

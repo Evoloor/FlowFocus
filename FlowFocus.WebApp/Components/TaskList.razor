@@ -67,6 +67,8 @@
 </MudGrid>
 
 @code {
+    [Parameter]
+    public EventCallback OnTasksUpdated { get; set; }
     [Parameter] public string Title { get; set; } = "Задачи";
     [Parameter] public TaskStatus? FilterStatus { get; set; }
     [Parameter] public DateTime? FilterDate { get; set; }

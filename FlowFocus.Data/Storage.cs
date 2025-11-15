@@ -4,18 +4,31 @@ using FlowFocus.Core.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 namespace FlowFocus.Data;
-public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+
+public class AppDbContext : DbContext
 {
+    public AppDbContext() { }  // Пустой конструктор для миграций
+
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+
     public DbSet<TaskItem> Tasks { get; set; }
     public DbSet<Dependency> Dependencies { get; set; }
     public DbSet<UserSettings> UserSettings { get; set; }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        if (!optionsBuilder.IsConfigured)
+        {
+            // Используется только для миграций - SQLite
+            optionsBuilder.UseSqlite("Data Source=flowfocus.db");
+        }
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // TaskItem configuration
         modelBuilder.Entity<TaskItem>(entity =>
         {
-            entity.HasKey(t => t.Id);
             entity.Property(t => t.Title).IsRequired().HasMaxLength(500);
             entity.Property(t => t.Description).HasMaxLength(2000);
             entity.Property(t => t.Tags).HasConversion(
@@ -34,7 +47,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         // Dependency configuration
         modelBuilder.Entity<Dependency>(entity =>
         {
-            entity.HasKey(d => d.Id);
             entity.Property(d => d.Type).HasConversion<string>();
             entity.Property(d => d.Logic).HasConversion<string>();
             
@@ -56,15 +68,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         // UserSettings configuration
         modelBuilder.Entity<UserSettings>(entity =>
         {
-            entity.HasKey(s => s.Id);
-            entity.HasData(new UserSettings { Id = Guid.NewGuid() });
+            entity.HasData(new UserSettings {Id = 1});
         });
     }
 }
 public abstract class BaseRepository<T>(AppDbContext context) : IRepository<T>
     where T : class
 {
-    public virtual async Task<T?> GetByIdAsync(Guid id)
+    public virtual async Task<T?> GetByIdAsync(int id)
     {
         return await context.Set<T>().FindAsync(id);
     }
@@ -86,7 +97,7 @@ public abstract class BaseRepository<T>(AppDbContext context) : IRepository<T>
         await context.SaveChangesAsync();
     }
 
-    public virtual async Task DeleteAsync(Guid id)
+    public virtual async Task DeleteAsync(int id)
     {
         var entity = await GetByIdAsync(id);
         if (entity != null)
@@ -96,7 +107,7 @@ public abstract class BaseRepository<T>(AppDbContext context) : IRepository<T>
         }
     }
 
-    public virtual async Task<bool> ExistsAsync(Guid id)
+    public virtual async Task<bool> ExistsAsync(int id)
     {
         return await context.Set<T>().FindAsync(id) != null;
     }
@@ -105,7 +116,7 @@ public class DependencyRepository(AppDbContext context) : BaseRepository<Depende
 {
     private readonly AppDbContext _context = context;
 
-    public async Task<IEnumerable<Dependency>> GetDependenciesForTaskAsync(Guid taskId)
+    public async Task<IEnumerable<Dependency>> GetDependenciesForTaskAsync(int taskId)
     {
         return await _context.Dependencies
             .Where(d => d.SourceTaskId == taskId)
@@ -113,7 +124,7 @@ public class DependencyRepository(AppDbContext context) : BaseRepository<Depende
             .ToListAsync();
     }
 
-    public async Task<IEnumerable<Dependency>> GetDependentTasksAsync(Guid taskId)
+    public async Task<IEnumerable<Dependency>> GetDependentTasksAsync(int taskId)
     {
         return await _context.Dependencies
             .Where(d => d.TargetTaskId == taskId)
@@ -121,13 +132,13 @@ public class DependencyRepository(AppDbContext context) : BaseRepository<Depende
             .ToListAsync();
     }
 
-    public async Task<bool> HasCircularDependencyAsync(Guid sourceTaskId, Guid targetTaskId)
+    public async Task<bool> HasCircularDependencyAsync(int sourceTaskId, int targetTaskId)
     {
         return await _context.Dependencies.AnyAsync(d => 
             d.SourceTaskId == targetTaskId && d.TargetTaskId == sourceTaskId);
     }
 
-    public async Task RemoveDependenciesForTaskAsync(Guid taskId)
+    public async Task RemoveDependenciesForTaskAsync(int taskId)
     {
         var dependencies = await _context.Dependencies
             .Where(d => d.SourceTaskId == taskId)
@@ -213,7 +224,7 @@ public class TaskRepository(AppDbContext context) : BaseRepository<TaskItem>(con
             .ToListAsync();
     }
 
-    public async Task UpdateStatusAsync(Guid taskId, TaskStatus status)
+    public async Task UpdateStatusAsync(int taskId, TaskStatus status)
     {
         var task = await _context.Tasks.FindAsync(taskId);
         if (task != null)
@@ -221,12 +232,5 @@ public class TaskRepository(AppDbContext context) : BaseRepository<TaskItem>(con
             task.Status = status;
             await _context.SaveChangesAsync();
         }
-    }
-}
-public class AppDbContextFactory(IServiceProvider serviceProvider) : IDbContextFactory<AppDbContext>
-{
-    public AppDbContext CreateDbContext()
-    {
-        return serviceProvider.GetRequiredService<AppDbContext>();
     }
 }

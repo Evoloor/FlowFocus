@@ -19,9 +19,9 @@ namespace FlowFocus.Data.Migrations
 
             modelBuilder.Entity("FlowFocus.Core.Models.Dependency", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ConditionParameters")
                         .HasColumnType("TEXT");
@@ -30,11 +30,11 @@ namespace FlowFocus.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid>("SourceTaskId")
-                        .HasColumnType("TEXT");
+                    b.Property<int>("SourceTaskId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<Guid>("TargetTaskId")
-                        .HasColumnType("TEXT");
+                    b.Property<int>("TargetTaskId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Type")
                         .IsRequired()
@@ -54,9 +54,9 @@ namespace FlowFocus.Data.Migrations
 
             modelBuilder.Entity("FlowFocus.Core.Models.TaskItem", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("CalculatedPriority")
                         .HasColumnType("INTEGER");
@@ -122,9 +122,9 @@ namespace FlowFocus.Data.Migrations
 
             modelBuilder.Entity("FlowFocus.Core.Models.UserSettings", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("AutoRecalculateOnAdd")
                         .HasColumnType("INTEGER");
@@ -151,7 +151,7 @@ namespace FlowFocus.Data.Migrations
                     b.HasData(
                         new
                         {
-                            Id = new Guid("d4763540-2c96-4a9b-be69-eeb84be25a87"),
+                            Id = 1,
                             AutoRecalculateOnAdd = true,
                             DailyComplexityLimit = 50,
                             DailyTimeLimit = 8.0,

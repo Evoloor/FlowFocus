@@ -7,21 +7,22 @@
                       Label="Быстрое добавление задачи" 
                       Variant="Variant.Outlined"
                       Placeholder="Введите название задачи..."
-                      OnKeyDown="HandleKeyDown"
+                      OnKeyDown="@HandleKeyDown"
                       Class="flex-grow-1" />
         
         <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                   OnClick="AddQuickTask" Disabled="@string.IsNullOrWhiteSpace(_newTaskTitle)"
+                   OnClick="@AddQuickTask" Disabled="@string.IsNullOrWhiteSpace(_newTaskTitle)"
                    StartIcon="Icons.Material.Filled.Add">
             Добавить
         </MudButton>
         
         <MudIconButton Icon="Icons.Material.Filled.Tune" 
-                       OnClick="ShowFullCreateDialog" />
+                       OnClick="@ShowFullCreateDialog" />
     </div>
 </MudPaper>
 
 @code {
+    [Parameter] public EventCallback? OnTaskAdded { get; set; }
     private string _newTaskTitle = string.Empty;
 
     private async Task AddQuickTask()

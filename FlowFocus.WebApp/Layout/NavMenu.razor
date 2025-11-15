@@ -8,11 +8,11 @@
         Завтра
     </MudNavLink>
 
-    <MudNavLink Href="/all" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ViewList">
+    <MudNavLink Href="/all-tasks" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ViewList">
         Все задачи
     </MudNavLink>
 
-    <MudNavLink Href="/unconfigured" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.BuildCircle">
+    <MudNavLink Href="/not-configured" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.BuildCircle">
         Ненастроенные
     </MudNavLink>
 
@@ -27,10 +27,40 @@
 </MudNavMenu>
 
 <!-- Плавающая кнопка добавления задачи -->
-<MudFab Color="Color.Primary" Icon="@Icons.Material.Filled.Add"
+<MudFab Color="Color.Primary" 
+        Icon="@Icons.Material.Filled.Add"
         Size="Size.Large"
         Class="fab-add"
-        OnClick="@(() => NavigationManager.NavigateTo("/add"))" />
+        OnClick="ShowQuickAddDialog" />
+
+@if (_showQuickAdd)
+{
+    <MudDialog @bind-IsVisible="_showQuickAdd" Options="@_dialogOptions">
+        <TitleContent>
+            <MudText Typo="Typo.h6">Быстрое добавление задачи</MudText>
+        </TitleContent>
+        <DialogContent>
+            <MudTextField @bind-Value="_quickTaskTitle"
+                         Label="Название задачи"
+                         Placeholder="Введите название..."
+                         Variant="Variant.Outlined"
+                         OnKeyDown="HandleQuickAddKeyDown" />
+        </DialogContent>
+        <DialogActions>
+            <MudButton Variant="Variant.Text" 
+                      OnClick="CloseQuickAdd"
+                      Color="Color.Default">
+                Отмена
+            </MudButton>
+            <MudButton Variant="Variant.Filled" 
+                      Color="Color.Primary" 
+                      OnClick="AddQuickTask"
+                      Disabled="@string.IsNullOrWhiteSpace(_quickTaskTitle)">
+                Добавить
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+}
 
 <style>
     .fab-add {
@@ -38,8 +68,70 @@
         bottom: 24px;
         right: 24px;
         z-index: 1000;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     }
 </style>
+
 @code {
-    [Inject] NavigationManager NavigationManager { get; set; } = null!;
+    [Inject] private NavigationManager NavigationManager { get; set; } = null!;
+    [Inject] private IDialogService DialogService { get; set; } = null!;
+    [Inject] private ITaskRepository TaskRepo { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+
+    private bool _showQuickAdd = false;
+    private string _quickTaskTitle = string.Empty;
+    private DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true };
+
+    private void ShowQuickAddDialog()
+    {
+        _quickTaskTitle = string.Empty;
+        _showQuickAdd = true;
+        StateHasChanged();
+    }
+
+    private void CloseQuickAdd()
+    {
+        _showQuickAdd = false;
+        _quickTaskTitle = string.Empty;
+        StateHasChanged();
+    }
+
+    private async Task AddQuickTask()
+    {
+        if (string.IsNullOrWhiteSpace(_quickTaskTitle))
+            return;
+
+        var newTask = new TaskItem
+        {
+            Title = _quickTaskTitle.Trim(),
+            Status = TaskStatus.NotConfigured,
+            UserPriority = 5,
+            Interest = 5,
+            Complexity = 5,
+            EstimatedHours = 1.0
+        };
+
+        await TaskRepo.AddAsync(newTask);
+        Snackbar.Add("Задача добавлена в ненастроенные", Severity.Success);
+        
+        CloseQuickAdd();
+        
+        // Если мы на странице ненастроенных задач, обновим ее
+        if (NavigationManager.Uri.Contains("not-configured"))
+        {
+            NavigationManager.NavigateTo(NavigationManager.Uri, forceLoad: true);
+        }
+    }
+
+    private async Task HandleQuickAddKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await AddQuickTask();
+        }
+        else if (e.Key == "Escape")
+        {
+            CloseQuickAdd();
+        }
+    }
 }

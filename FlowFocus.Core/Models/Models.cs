@@ -4,7 +4,7 @@ using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 namespace FlowFocus.Core.Models;
 public class TaskItem
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public int Id { get; set; }
     
     [Required]
     [MaxLength(500)]
@@ -35,9 +35,9 @@ public class TaskItem
 }
 public class Dependency
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid SourceTaskId { get; set; }
-    public Guid TargetTaskId { get; set; }
+    public int Id { get; set; }
+    public int SourceTaskId { get; set; }
+    public int TargetTaskId { get; set; }
     
     public DependencyType Type { get; set; }
     public DependencyLogic Logic { get; set; } = DependencyLogic.And;
@@ -49,7 +49,7 @@ public class Dependency
 }
 public class UserSettings
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public int Id { get; set; }
     public int DayStartHour { get; set; } = 6;
     public double DailyTimeLimit { get; set; } = 8.0;
     public int DailyComplexityLimit { get; set; } = 50;
