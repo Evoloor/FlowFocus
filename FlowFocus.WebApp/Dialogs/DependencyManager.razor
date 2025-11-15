@@ -14,10 +14,10 @@
         </MudButton>
     </div>
 
-    @if (Dependencies?.Any() == true)
+    @if (_dependencies?.Any() == true)
     {
         <MudList T="string">
-            @foreach (var dependency in Dependencies)
+            @foreach (var dependency in _dependencies)
             {
                 <MudListItem T="string">
                     <MudChip T="string" Size="Size.Small" 
@@ -43,7 +43,7 @@
 @code {
     [Parameter] public TaskItem Task { get; set; } = null!;
     
-    private List<Dependency> Dependencies = new();
+    private List<Dependency> _dependencies = [];
 
     protected override async Task OnParametersSetAsync()
     {
@@ -54,7 +54,7 @@
     {
         if (Task != null)
         {
-            Dependencies = (await DependencyRepo.GetDependenciesForTaskAsync(Task.Id)).ToList();
+            _dependencies = (await DependencyRepo.GetDependenciesForTaskAsync(Task.Id)).ToList();
             StateHasChanged();
         }
     }
@@ -77,7 +77,7 @@
         };
 
         var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
-        var dialog = DialogService.Show<AddDependencyDialog>("Добавить зависимость", parameters, options);
+        var dialog = await DialogService.ShowAsync<AddDependencyDialog>("Добавить зависимость", parameters, options);
         var result = await dialog.Result;
 
         if (!result.Canceled)
@@ -96,7 +96,7 @@
         };
 
         var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall };
-        var dialog = DialogService.Show<ConfirmDialog>("Подтверждение", parameters, options);
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Подтверждение", parameters, options);
         var result = await dialog.Result;
 
         if (!result.Canceled)

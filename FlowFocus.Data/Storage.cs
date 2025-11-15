@@ -4,10 +4,8 @@ using FlowFocus.Core.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 namespace FlowFocus.Data;
-public class AppDbContext : DbContext
+public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
-
     public DbSet<TaskItem> Tasks { get; set; }
     public DbSet<Dependency> Dependencies { get; set; }
     public DbSet<UserSettings> UserSettings { get; set; }
@@ -63,80 +61,102 @@ public class AppDbContext : DbContext
         });
     }
 }
-public abstract class BaseRepository<T> : IRepository<T> where T : class
+public abstract class BaseRepository<T>(AppDbContext context) : IRepository<T>
+    where T : class
 {
-    protected readonly AppDbContext _context;
-    protected readonly DbSet<T> _dbSet;
-
-    protected BaseRepository(AppDbContext context)
+    public virtual async Task<T?> GetByIdAsync(Guid id)
     {
-        _context = context;
-        _dbSet = context.Set<T>();
+        return await context.Set<T>().FindAsync(id);
     }
 
-    public virtual async Task<T?> GetByIdAsync(Guid id) => await _dbSet.FindAsync(id);
-    public virtual async Task<IEnumerable<T>> GetAllAsync() => await _dbSet.ToListAsync();
-    public virtual async Task AddAsync(T entity) => await _dbSet.AddAsync(entity);
-    public virtual Task UpdateAsync(T entity) => Task.FromResult(_dbSet.Update(entity));
-    public virtual Task DeleteAsync(Guid id) => Task.Run(async () => 
+    public virtual async Task<IEnumerable<T>> GetAllAsync()
+    {
+        return await context.Set<T>().ToListAsync();
+    }
+
+    public virtual async Task AddAsync(T entity)
+    {
+        await context.Set<T>().AddAsync(entity);
+        await context.SaveChangesAsync();
+    }
+
+    public virtual async Task UpdateAsync(T entity)
+    {
+        context.Set<T>().Update(entity);
+        await context.SaveChangesAsync();
+    }
+
+    public virtual async Task DeleteAsync(Guid id)
     {
         var entity = await GetByIdAsync(id);
-        if (entity != null) _dbSet.Remove(entity);
-    });
-    public virtual async Task<bool> ExistsAsync(Guid id) => await _dbSet.FindAsync(id) != null;
+        if (entity != null)
+        {
+            context.Set<T>().Remove(entity);
+            await context.SaveChangesAsync();
+        }
+    }
+
+    public virtual async Task<bool> ExistsAsync(Guid id)
+    {
+        return await context.Set<T>().FindAsync(id) != null;
+    }
 }
-public class DependencyRepository : BaseRepository<Dependency>, IDependencyRepository
+public class DependencyRepository(AppDbContext context) : BaseRepository<Dependency>(context), IDependencyRepository
 {
-    public DependencyRepository(AppDbContext context) : base(context) { }
+    private readonly AppDbContext _context = context;
 
     public async Task<IEnumerable<Dependency>> GetDependenciesForTaskAsync(Guid taskId)
-        => await _dbSet.Where(d => d.SourceTaskId == taskId)
-                       .Include(d => d.TargetTask)
-                       .ToListAsync();
+    {
+        return await _context.Dependencies
+            .Where(d => d.SourceTaskId == taskId)
+            .Include(d => d.TargetTask)
+            .ToListAsync();
+    }
 
     public async Task<IEnumerable<Dependency>> GetDependentTasksAsync(Guid taskId)
-        => await _dbSet.Where(d => d.TargetTaskId == taskId)
-                       .Include(d => d.SourceTask)
-                       .ToListAsync();
+    {
+        return await _context.Dependencies
+            .Where(d => d.TargetTaskId == taskId)
+            .Include(d => d.SourceTask)
+            .ToListAsync();
+    }
 
     public async Task<bool> HasCircularDependencyAsync(Guid sourceTaskId, Guid targetTaskId)
     {
-        // Simple implementation - can be enhanced with graph traversal
-        return await _dbSet.AnyAsync(d => 
+        return await _context.Dependencies.AnyAsync(d => 
             d.SourceTaskId == targetTaskId && d.TargetTaskId == sourceTaskId);
     }
 
     public async Task RemoveDependenciesForTaskAsync(Guid taskId)
     {
-        var dependencies = await GetDependenciesForTaskAsync(taskId);
-        _dbSet.RemoveRange(dependencies);
+        var dependencies = await _context.Dependencies
+            .Where(d => d.SourceTaskId == taskId)
+            .ToListAsync();
+            
+        _context.Dependencies.RemoveRange(dependencies);
         await _context.SaveChangesAsync();
     }
 }
-public class SettingsRepository : BaseRepository<UserSettings>, ISettingsRepository
+public class SettingsRepository(AppDbContext context) : BaseRepository<UserSettings>(context), ISettingsRepository
 {
-    public SettingsRepository(AppDbContext context) : base(context) { }
+    private readonly AppDbContext _context = context;
 
     public async Task<UserSettings> GetUserSettingsAsync()
     {
-        var settings = await _dbSet.FirstOrDefaultAsync();
+        var settings = await _context.UserSettings.FirstOrDefaultAsync();
         if (settings == null)
         {
             settings = new UserSettings();
-            await AddAsync(settings);
+            await _context.UserSettings.AddAsync(settings);
             await _context.SaveChangesAsync();
         }
         return settings;
     }
 }
-
 public static class ServiceExtensions
 {
-    public static IServiceCollection AddDataLayer(this IServiceCollection services, string connectionString)
+    public static IServiceCollection AddDataLayer(this IServiceCollection services)
     {
-        services.AddDbContextFactory<AppDbContext>(options =>
-            options.UseSqlite(connectionString));
-            
         services.AddScoped<ITaskRepository, TaskRepository>();
         services.AddScoped<IDependencyRepository, DependencyRepository>();
         services.AddScoped<ISettingsRepository, SettingsRepository>();
@@ -144,29 +164,58 @@ public static class ServiceExtensions
         return services;
     }
 }
-public class TaskRepository : BaseRepository<TaskItem>, ITaskRepository
+public class TaskRepository(AppDbContext context) : BaseRepository<TaskItem>(context), ITaskRepository
 {
-    public TaskRepository(AppDbContext context) : base(context) { }
+    private readonly AppDbContext _context = context;
 
     public async Task<IEnumerable<TaskItem>> GetByStatusAsync(TaskStatus status)
-        => await _dbSet.Where(t => t.Status == status).ToListAsync();
+    {
+        return await _context.Tasks
+            .Where(t => t.Status == status)
+            .Include(t => t.Dependencies)
+            .ThenInclude(d => d.TargetTask)
+            .ToListAsync();
+    }
 
     public async Task<IEnumerable<TaskItem>> GetByDateAsync(DateTime date)
-        => await _dbSet.Where(t => t.PlannedDate.HasValue && 
-                              t.PlannedDate.Value.Date == date.Date).ToListAsync();
+    {
+        return await _context.Tasks
+            .Where(t => t.PlannedDate.HasValue && 
+                       t.PlannedDate.Value.Date == date.Date)
+            .Include(t => t.Dependencies)
+            .ThenInclude(d => d.TargetTask)
+            .ToListAsync();
+    }
 
     public async Task<IEnumerable<TaskItem>> GetByPriorityRangeAsync(int minPriority, int maxPriority)
-        => await _dbSet.Where(t => t.UserPriority >= minPriority && t.UserPriority <= maxPriority).ToListAsync();
+    {
+        return await _context.Tasks
+            .Where(t => t.UserPriority >= minPriority && t.UserPriority <= maxPriority)
+            .Include(t => t.Dependencies)
+            .ThenInclude(d => d.TargetTask)
+            .ToListAsync();
+    }
 
     public async Task<IEnumerable<TaskItem>> GetWithDependenciesAsync()
-        => await _dbSet.Include(t => t.Dependencies).ThenInclude(d => d.TargetTask).ToListAsync();
+    {
+        return await _context.Tasks
+            .Include(t => t.Dependencies)
+            .ThenInclude(d => d.TargetTask)
+            .ToListAsync();
+    }
 
     public async Task<IEnumerable<TaskItem>> GetNotConfiguredAsync()
-        => await _dbSet.Where(t => t.Status == TaskStatus.NotConfigured).ToListAsync();
+    {
+        return await _context.Tasks
+            .Where(t => t.Status == TaskStatus.NotConfigured)
+            .Include(t => t.Dependencies)
+            .ThenInclude(d => d.TargetTask)
+            .ToListAsync();
+    }
 
     public async Task UpdateStatusAsync(Guid taskId, TaskStatus status)
     {
-        var task = await GetByIdAsync(taskId);
+        var task = await _context.Tasks.FindAsync(taskId);
         if (task != null)
         {
             task.Status = status;
@@ -174,17 +223,10 @@ public class TaskRepository : BaseRepository<TaskItem>, ITaskRepository
         }
     }
 }
-public class AppDbContextFactory : IDbContextFactory<AppDbContext>
+public class AppDbContextFactory(IServiceProvider serviceProvider) : IDbContextFactory<AppDbContext>
 {
-    private readonly IServiceProvider _serviceProvider;
-
-    public AppDbContextFactory(IServiceProvider serviceProvider)
-    {
-        _serviceProvider = serviceProvider;
-    }
-
     public AppDbContext CreateDbContext()
     {
-        return _serviceProvider.GetRequiredService<AppDbContext>();
+        return serviceProvider.GetRequiredService<AppDbContext>();
     }
 }

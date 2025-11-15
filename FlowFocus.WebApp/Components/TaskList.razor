@@ -15,7 +15,7 @@
     <MudItem xs="12" Class="mb-3">
         <MudGrid>
             <MudItem xs="12" sm="6" md="3">
-                <MudSelect T="TaskStatus?" @bind-Value="SelectedStatus" Label="Статус" Clearable="true">
+                <MudSelect T="TaskStatus?" @bind-Value="_selectedStatus" Label="Статус" Clearable="true">
                     <MudSelectItem T="TaskStatus?" Value="null">Все</MudSelectItem>
                     @foreach (var status in Enum.GetValues<TaskStatus>())
                     {
@@ -24,10 +24,10 @@
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
-                <MudTextField @bind-Value="SearchText" Label="Поиск" Immediate="true" />
+                <MudTextField @bind-Value="_searchText" Label="Поиск" Immediate="true" />
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
-                <MudSelect T="SortField" @bind-Value="SortBy" Label="Сортировка">
+                <MudSelect T="SortField" @bind-Value="_sortBy" Label="Сортировка">
                     <MudSelectItem T="SortField" Value="SortField.Priority">По приоритету</MudSelectItem>
                     <MudSelectItem T="SortField" Value="SortField.Deadline">По сроку</MudSelectItem>
                     <MudSelectItem T="SortField" Value="SortField.Interest">По интересу</MudSelectItem>
@@ -44,7 +44,7 @@
     </MudItem>
 
     <MudItem xs="12">
-        @if (IsLoading)
+        @if (_isLoading)
         {
             <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
         }
@@ -71,13 +71,13 @@
     [Parameter] public TaskStatus? FilterStatus { get; set; }
     [Parameter] public DateTime? FilterDate { get; set; }
 
-    private List<TaskItem> Tasks = new();
+    private List<TaskItem> _tasks = [];
     private List<TaskItem> FilteredTasks => GetFilteredTasks();
-    private bool IsLoading = true;
+    private bool _isLoading = true;
 
-    private TaskStatus? SelectedStatus;
-    private string SearchText = string.Empty;
-    private SortField SortBy = SortField.Priority;
+    private TaskStatus? _selectedStatus;
+    private string _searchText = string.Empty;
+    private SortField _sortBy = SortField.Priority;
 
     protected override async Task OnInitializedAsync()
     {
@@ -88,57 +88,57 @@
     {
         if (FilterStatus.HasValue)
         {
-            SelectedStatus = FilterStatus;
+            _selectedStatus = FilterStatus;
         }
         await LoadTasks();
     }
 
     private async Task LoadTasks()
     {
-        IsLoading = true;
+        _isLoading = true;
         StateHasChanged();
 
         try
         {
             if (FilterDate.HasValue)
             {
-                Tasks = (await TaskRepo.GetByDateAsync(FilterDate.Value)).ToList();
+                _tasks = (await TaskRepo.GetByDateAsync(FilterDate.Value)).ToList();
             }
             else if (FilterStatus.HasValue)
             {
-                Tasks = (await TaskRepo.GetByStatusAsync(FilterStatus.Value)).ToList();
+                _tasks = (await TaskRepo.GetByStatusAsync(FilterStatus.Value)).ToList();
             }
             else
             {
-                Tasks = (await TaskRepo.GetAllAsync()).ToList();
+                _tasks = (await TaskRepo.GetAllAsync()).ToList();
             }
         }
         finally
         {
-            IsLoading = false;
+            _isLoading = false;
             StateHasChanged();
         }
     }
 
     private List<TaskItem> GetFilteredTasks()
     {
-        var query = Tasks.AsEnumerable();
+        var query = _tasks.AsEnumerable();
 
-        if (SelectedStatus.HasValue)
+        if (_selectedStatus.HasValue)
         {
-            query = query.Where(t => t.Status == SelectedStatus.Value);
+            query = query.Where(t => t.Status == _selectedStatus.Value);
         }
 
-        if (!string.IsNullOrWhiteSpace(SearchText))
+        if (!string.IsNullOrWhiteSpace(_searchText))
         {
             query = query.Where(t => 
-                t.Title.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
-                (t.Description?.Contains(SearchText, StringComparison.OrdinalIgnoreCase) == true) ||
-                t.Tags.Any(tag => tag.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
+                t.Title.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+                (t.Description?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) == true) ||
+                t.Tags.Any(tag => tag.Contains(_searchText, StringComparison.OrdinalIgnoreCase))
             );
         }
 
-        query = SortBy switch
+        query = _sortBy switch
         {
             SortField.Priority => query.OrderBy(t => t.UserPriority),
             SortField.Deadline => query.OrderBy(t => t.Deadline ?? DateTime.MaxValue),
@@ -153,7 +153,7 @@
     private async void ShowCreateDialog()
     {
         var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
-        var dialog = DialogService.Show<TaskEditDialog>("Новая задача", options);
+        var dialog = await DialogService.ShowAsync<TaskEditDialog>("Новая задача", options);
         var result = await dialog.Result;
 
         if (!result.Canceled)

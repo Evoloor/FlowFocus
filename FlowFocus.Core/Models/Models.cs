@@ -11,7 +11,7 @@ public class TaskItem
     public string Title { get; set; } = string.Empty;
     
     public string? Description { get; set; }
-    public List<string> Tags { get; set; } = new();
+    public List<string> Tags { get; set; } = [];
     
     public TaskStatus Status { get; set; } = TaskStatus.NotConfigured;
     public int UserPriority { get; set; } = 5;
@@ -30,8 +30,8 @@ public class TaskItem
     
     public DisplayType DisplayType { get; set; } = DisplayType.Independent;
     
-    public List<Dependency> Dependencies { get; set; } = new();
-    public List<Dependency> DependentTasks { get; set; } = new();
+    public List<Dependency> Dependencies { get; set; } = [];
+    public List<Dependency> DependentTasks { get; set; } = [];
 }
 public class Dependency
 {
@@ -40,7 +40,7 @@ public class Dependency
     public Guid TargetTaskId { get; set; }
     
     public DependencyType Type { get; set; }
-    public DependencyLogic Logic { get; set; } = DependencyLogic.AND;
+    public DependencyLogic Logic { get; set; } = DependencyLogic.And;
     public string? ConditionParameters { get; set; }
     
     // Navigation properties

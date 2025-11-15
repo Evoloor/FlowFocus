@@ -9,15 +9,15 @@
     <DialogContent>
         <MudGrid>
             <MudItem xs="12">
-                <MudSelect T="TaskItem" @bind-Value="SelectedTask" 
+                <MudSelect T="TaskItem" @bind-Value="_selectedTask" 
                           Label="Выберите задачу"
                           Variant="Variant.Outlined"
                           ToStringFunc="(task) => task?.Title ?? string.Empty"
                           SearchFunc="SearchTasks"
                           Clearable="true">
-                    @if (AvailableTasks != null)
+                    @if (_availableTasks != null)
                     {
-                        @foreach (var task in AvailableTasks)
+                        @foreach (var task in _availableTasks)
                         {
                             <MudSelectItem T="TaskItem" Value="task">@task.Title</MudSelectItem>
                         }
@@ -26,7 +26,7 @@
             </MudItem>
             
             <MudItem xs="12">
-                <MudSelect T="DependencyType" @bind-Value="DependencyType" 
+                <MudSelect T="DependencyType" @bind-Value="_dependencyType" 
                           Label="Тип зависимости"
                           Variant="Variant.Outlined">
                     <MudSelectItem T="DependencyType" Value="DependencyType.Blocking">Блокирующая</MudSelectItem>
@@ -35,11 +35,11 @@
             </MudItem>
             
             <MudItem xs="12">
-                <MudSelect T="DependencyLogic" @bind-Value="DependencyLogic" 
+                <MudSelect T="DependencyLogic" @bind-Value="_dependencyLogic" 
                           Label="Логика выполнения"
                           Variant="Variant.Outlined">
-                    <MudSelectItem T="DependencyLogic" Value="DependencyLogic.AND">AND (И)</MudSelectItem>
-                    <MudSelectItem T="DependencyLogic" Value="DependencyLogic.OR">OR (ИЛИ)</MudSelectItem>
+                    <MudSelectItem T="DependencyLogic" Value="DependencyLogic.And">AND (И)</MudSelectItem>
+                    <MudSelectItem T="DependencyLogic" Value="DependencyLogic.Or">OR (ИЛИ)</MudSelectItem>
                 </MudSelect>
             </MudItem>
         </MudGrid>
@@ -53,7 +53,7 @@
         <MudButton Variant="Variant.Filled" 
                   Color="Color.Primary" 
                   OnClick="AddDependency"
-                  Disabled="@(SelectedTask == null)">
+                  Disabled="@(_selectedTask == null)">
             Добавить
         </MudButton>
     </DialogActions>
@@ -63,25 +63,25 @@
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter] public TaskItem SourceTask { get; set; } = null!;
 
-    private List<TaskItem> AvailableTasks = new();
-    private TaskItem? SelectedTask;
-    private DependencyType DependencyType = DependencyType.Blocking;
-    private DependencyLogic DependencyLogic = DependencyLogic.AND;
+    private List<TaskItem> _availableTasks = [];
+    private TaskItem? _selectedTask;
+    private DependencyType _dependencyType = DependencyType.Blocking;
+    private DependencyLogic _dependencyLogic = DependencyLogic.And;
 
     protected override async Task OnInitializedAsync()
     {
         // Load all tasks except the current one
         var allTasks = await TaskRepo.GetAllAsync();
-        AvailableTasks = allTasks.Where(t => t.Id != SourceTask.Id).ToList();
+        _availableTasks = allTasks.Where(t => t.Id != SourceTask.Id).ToList();
     }
 
     private async Task<IEnumerable<TaskItem>> SearchTasks(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
-            return AvailableTasks;
+            return _availableTasks;
 
         return await Task.Run(() => 
-            AvailableTasks.Where(t => 
+            _availableTasks.Where(t => 
                 t.Title.Contains(value, StringComparison.OrdinalIgnoreCase) ||
                 (t.Description?.Contains(value, StringComparison.OrdinalIgnoreCase) == true)
             ).ToList()
@@ -90,13 +90,13 @@
 
     private async Task AddDependency()
     {
-        if (SelectedTask == null)
+        if (_selectedTask == null)
             return;
 
         try
         {
             // Check for circular dependency
-            if (await DependencyRepo.HasCircularDependencyAsync(SourceTask.Id, SelectedTask.Id))
+            if (await DependencyRepo.HasCircularDependencyAsync(SourceTask.Id, _selectedTask.Id))
             {
                 Snackbar.Add("Обнаружена циклическая зависимость!", Severity.Error);
                 return;
@@ -105,9 +105,9 @@
             var dependency = new Dependency
             {
                 SourceTaskId = SourceTask.Id,
-                TargetTaskId = SelectedTask.Id,
-                Type = DependencyType,
-                Logic = DependencyLogic
+                TargetTaskId = _selectedTask.Id,
+                Type = _dependencyType,
+                Logic = _dependencyLogic
             };
 
             await DependencyRepo.AddAsync(dependency);

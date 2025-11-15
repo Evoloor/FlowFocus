@@ -105,7 +105,7 @@
         };
 
         var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
-        var dialog = DialogService.Show<TaskEditDialog>("Редактировать задачу", parameters, options);
+        var dialog = await DialogService.ShowAsync<TaskEditDialog>("Редактировать задачу", parameters, options);
         var result = await dialog.Result;
 
         if (!result.Canceled)
@@ -124,7 +124,7 @@
         };
 
         var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall };
-        var dialog = DialogService.Show<ConfirmDialog>("Подтверждение", parameters, options);
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Подтверждение", parameters, options);
         var result = await dialog.Result;
 
         if (!result.Canceled)

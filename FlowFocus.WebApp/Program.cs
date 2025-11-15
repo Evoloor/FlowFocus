@@ -1,6 +1,7 @@
 using FlowFocus.Core;
 using FlowFocus.Data;
 using MudBlazor.Services;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,8 +10,13 @@ builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddMudServices();
 
-// Data Layer
-builder.Services.AddDataLayer("Data Source=flowfocus.db");
+// Data Layer - правильная регистрация DbContext и фабрики
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlite("Data Source=flowfocus.db"));
+
+// Регистрируем фабрику DbContext для репозиториев
+builder.Services.AddDbContextFactory<AppDbContext>(options =>
+    options.UseSqlite("Data Source=flowfocus.db"));
 
 // Business Logic Services
 builder.Services.AddScoped<IPlannerService, BasicPlannerService>();
@@ -39,7 +45,9 @@ app.MapFallbackToPage("/_Host");
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    context.Database.EnsureCreated();
+    
+    // Автоматическое создание БД и применение миграций
+    await context.Database.MigrateAsync();
     
     // Ensure default settings exist
     var settingsRepo = scope.ServiceProvider.GetRequiredService<ISettingsRepository>();

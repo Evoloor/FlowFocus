@@ -15,8 +15,8 @@ public enum DependencyType
 }
 public enum DependencyLogic
 {
-    AND,
-    OR
+    And,
+    Or
 }
 public enum DisplayType
 {

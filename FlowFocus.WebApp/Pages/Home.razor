@@ -40,11 +40,11 @@
         </MudItem>
 
         <MudItem xs="12" md="8">
-            @if (IsLoading)
+            @if (_isLoading)
             {
                 <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
             }
-            else if (!TodayTasks.Any())
+            else if (!_todayTasks.Any())
             {
                 <MudPaper Class="py-12 text-center">
                     <MudIcon Icon="Icons.Material.Filled.CheckCircle" 
@@ -60,7 +60,7 @@
             else
             {
                 <MudGrid>
-                    @foreach (var task in TodayTasks)
+                    @foreach (var task in _todayTasks)
                     {
                         <MudItem xs="12" Class="mb-3">
                             <TaskCard Task="task" 
@@ -77,7 +77,7 @@
                 <MudText Typo="Typo.h6" Class="mb-3">Статистика дня</MudText>
                 
                 <div class="mb-4">
-                    <MudText Typo="Typo.body2">Всего задач: <MudText Color="Color.Primary" Typo="Typo.body1">@TodayTasks.Count</MudText></MudText>
+                    <MudText Typo="Typo.body2">Всего задач: <MudText Color="Color.Primary" Typo="Typo.body1">@_todayTasks.Count</MudText></MudText>
                     <MudText Typo="Typo.body2">Завершено: <MudText Color="Color.Success" Typo="Typo.body1">@CompletedCount</MudText></MudText>
                     <MudText Typo="Typo.body2">Активных: <MudText Color="Color.Warning" Typo="Typo.body1">@ActiveCount</MudText></MudText>
                 </div>
@@ -104,32 +104,32 @@
 </MudContainer>
 
 @code {
-    private List<TaskItem> TodayTasks = new();
-    private bool IsLoading = true;
-    private UserSettings Settings = new();
+    private List<TaskItem> _todayTasks = [];
+    private bool _isLoading = true;
+    private UserSettings _settings = new();
 
-    private int CompletedCount => TodayTasks.Count(t => t.Status == TaskStatus.Completed);
-    private int ActiveCount => TodayTasks.Count(t => t.Status == TaskStatus.Active);
-    private double CompletionPercent => TodayTasks.Any() ? (CompletedCount * 100.0) / TodayTasks.Count : 0;
-    private double TotalHours => TodayTasks.Sum(t => t.EstimatedHours);
-    private int TotalComplexity => TodayTasks.Sum(t => t.Complexity);
-    private bool HasOverload => TotalHours > Settings.DailyTimeLimit || TotalComplexity > Settings.DailyComplexityLimit;
+    private int CompletedCount => _todayTasks.Count(t => t.Status == TaskStatus.Completed);
+    private int ActiveCount => _todayTasks.Count(t => t.Status == TaskStatus.Active);
+    private double CompletionPercent => _todayTasks.Any() ? (CompletedCount * 100.0) / _todayTasks.Count : 0;
+    private double TotalHours => _todayTasks.Sum(t => t.EstimatedHours);
+    private int TotalComplexity => _todayTasks.Sum(t => t.Complexity);
+    private bool HasOverload => TotalHours > _settings.DailyTimeLimit || TotalComplexity > _settings.DailyComplexityLimit;
 
     protected override async Task OnInitializedAsync()
     {
-        Settings = await SettingsRepo.GetUserSettingsAsync();
+        _settings = await SettingsRepo.GetUserSettingsAsync();
         await LoadTodayTasks();
     }
 
     private async Task LoadTodayTasks()
     {
-        IsLoading = true;
+        _isLoading = true;
         StateHasChanged();
 
         try
         {
             var today = DateTime.Today;
-            TodayTasks = (await TaskRepo.GetByDateAsync(today)).ToList();
+            _todayTasks = (await TaskRepo.GetByDateAsync(today)).ToList();
         }
         catch (Exception ex)
         {
@@ -137,7 +137,7 @@
         }
         finally
         {
-            IsLoading = false;
+            _isLoading = false;
             StateHasChanged();
         }
     }
@@ -169,12 +169,12 @@
     private async Task ShowSettings()
     {
         var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
-        var dialog = DialogService.Show<SettingsDialog>("Настройки", options);
+        var dialog = await DialogService.ShowAsync<SettingsDialog>("Настройки", options);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
-            Settings = await SettingsRepo.GetUserSettingsAsync();
+            _settings = await SettingsRepo.GetUserSettingsAsync();
             await LoadTodayTasks();
         }
     }

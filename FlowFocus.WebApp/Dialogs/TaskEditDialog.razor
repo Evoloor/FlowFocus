@@ -28,7 +28,7 @@
                 <MudSelect T="int" @bind-Value="Task.UserPriority" 
                           Label="Приоритет"
                           Variant="Variant.Outlined">
-                    @foreach (var priority in PriorityOptions)
+                    @foreach (var priority in _priorityOptions)
                     {
                         <MudSelectItem T="int" Value="priority.Value">@priority.Text</MudSelectItem>
                     }
@@ -131,17 +131,17 @@
     private TaskItem Task { get; set; } = new();
     private bool IsEdit => ExistingTask != null;
 
-    private readonly List<(int Value, string Text)> PriorityOptions = new()
-    {
+    private readonly List<(int Value, string Text)> _priorityOptions =
+    [
         (0, "0 - Гарантированные"),
-        (1, "1 - Неотложные"), 
+        (1, "1 - Неотложные"),
         (3, "3 - Срочные"),
         (5, "5 - Важные"),
         (8, "8 - Среднесрочные"),
         (13, "13 - Долгосрочные"),
         (21, "21 - Саморазвитие"),
         (34, "34 - Мечты")
-    };
+    ];
 
     protected override void OnParametersSet()
     {
@@ -162,7 +162,7 @@
                 DisplayType = ExistingTask.DisplayType,
                 IsFavorite = ExistingTask.IsFavorite,
                 IsRecurring = ExistingTask.IsRecurring,
-                Tags = new List<string>(ExistingTask.Tags),
+                Tags = [..ExistingTask.Tags],
                 CreatedDate = ExistingTask.CreatedDate
             };
         }

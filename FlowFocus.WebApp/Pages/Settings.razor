@@ -16,15 +16,15 @@
                 <MudList T="string">
                     <MudListItem T="string" Text="Основные настройки" 
                                  Icon="Icons.Material.Filled.Settings"
-                                 OnClick="ShowSettingsDialog" />
+                                 OnClick="@ShowSettingsDialog" />
                     <MudDivider />
                     <MudListItem T="string" Text="Управление данными" 
                                  Icon="Icons.Material.Filled.Storage"
-                                 OnClick="ShowDataManagement" />
+                                 OnClick="@ShowDataManagement" />
                     <MudDivider />
                     <MudListItem T="string" Text="О программе" 
                                  Icon="Icons.Material.Filled.Info"
-                                 OnClick="ShowAbout" />
+                                 OnClick="@ShowAbout" />
                 </MudList>
             </MudPaper>
         </MudItem>
@@ -35,7 +35,7 @@
     private async Task ShowSettingsDialog()
     {
         var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
-        var dialog = DialogService.Show<SettingsDialog>("Настройки", options);
+        var dialog = await DialogService.ShowAsync<SettingsDialog>("Настройки", options);
         await dialog.Result;
     }
 

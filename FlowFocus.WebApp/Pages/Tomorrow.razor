@@ -18,7 +18,7 @@
                 <MudButton Variant="Variant.Outlined" 
                           Color="Color.Primary"
                           StartIcon="Icons.Material.Filled.AutoSchedule"
-                          OnClick="PlanTomorrowTasks"
+                          OnClick="@PlanTomorrowTasks"
                           Size="Size.Small">
                     Запланировать
                 </MudButton>
@@ -26,11 +26,11 @@
         </MudItem>
 
         <MudItem xs="12">
-            @if (IsLoading)
+            @if (_isLoading)
             {
                 <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
             }
-            else if (!TomorrowTasks.Any())
+            else if (!_tomorrowTasks.Any())
             {
                 <MudPaper Class="py-12 text-center">
                     <MudIcon Icon="Icons.Material.Filled.Schedule" 
@@ -44,7 +44,7 @@
                     <MudButton Variant="Variant.Outlined" 
                               Color="Color.Primary"
                               Class="mt-3"
-                              OnClick="PlanTomorrowTasks">
+                              OnClick="@PlanTomorrowTasks">
                         Запланировать задачи
                     </MudButton>
                 </MudPaper>
@@ -60,8 +60,8 @@
 </MudContainer>
 
 @code {
-    private List<TaskItem> TomorrowTasks = new();
-    private bool IsLoading = true;
+    private List<TaskItem> _tomorrowTasks = [];
+    private bool _isLoading = true;
 
     protected override async Task OnInitializedAsync()
     {
@@ -70,13 +70,13 @@
 
     private async Task LoadTomorrowTasks()
     {
-        IsLoading = true;
+        _isLoading = true;
         StateHasChanged();
 
         try
         {
             var tomorrow = DateTime.Today.AddDays(1);
-            TomorrowTasks = (await TaskRepo.GetByDateAsync(tomorrow)).ToList();
+            _tomorrowTasks = (await TaskRepo.GetByDateAsync(tomorrow)).ToList();
         }
         catch (Exception ex)
         {
@@ -84,7 +84,7 @@
         }
         finally
         {
-            IsLoading = false;
+            _isLoading = false;
             StateHasChanged();
         }
     }
@@ -94,7 +94,7 @@
         try
         {
             var tomorrow = DateTime.Today.AddDays(1);
-            var plannedTasks = await PlannerService.PlanTasksForDayAsync(tomorrow);
+            var plannedTasks = (await PlannerService.PlanTasksForDayAsync(tomorrow)).ToArray();
             
             foreach (var task in plannedTasks)
             {
@@ -102,7 +102,7 @@
                 await TaskRepo.UpdateAsync(task);
             }
 
-            Snackbar.Add($"Запланировано {plannedTasks.Count()} задач на завтра", Severity.Success);
+            Snackbar.Add($"Запланировано {plannedTasks.Length} задач на завтра", Severity.Success);
             await LoadTomorrowTasks();
         }
         catch (Exception ex)

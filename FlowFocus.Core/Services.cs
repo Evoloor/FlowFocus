@@ -39,45 +39,35 @@ public interface IPlannerService
     Task<bool> ValidateDependenciesAsync(Guid taskId);
     Task<double> CalculateDailyLoadAsync(DateTime date);
 }
-public abstract class BasePlannerService : IPlannerService
+public abstract class BasePlannerService(
+    ITaskRepository taskRepository,
+    IDependencyRepository dependencyRepository,
+    ISettingsRepository settingsRepository)
+    : IPlannerService
 {
-    protected readonly ITaskRepository _taskRepository;
-    protected readonly IDependencyRepository _dependencyRepository;
-    protected readonly ISettingsRepository _settingsRepository;
-
-    protected BasePlannerService(
-        ITaskRepository taskRepository,
-        IDependencyRepository dependencyRepository,
-        ISettingsRepository settingsRepository)
-    {
-        _taskRepository = taskRepository;
-        _dependencyRepository = dependencyRepository;
-        _settingsRepository = settingsRepository;
-    }
+    protected readonly ITaskRepository TaskRepository = taskRepository;
+    protected readonly ISettingsRepository SettingsRepository = settingsRepository;
 
     public abstract Task<IEnumerable<TaskItem>> PlanTasksForDayAsync(DateTime date);
     public abstract Task RecalculatePrioritiesAsync();
     
     public virtual async Task<bool> ValidateDependenciesAsync(Guid taskId)
     {
-        var dependencies = await _dependencyRepository.GetDependenciesForTaskAsync(taskId);
-        return !await HasCircularDependency(taskId, new HashSet<Guid>());
+        return !await HasCircularDependency(taskId, []);
     }
     
     public virtual async Task<double> CalculateDailyLoadAsync(DateTime date)
     {
-        var tasks = await _taskRepository.GetByDateAsync(date);
+        var tasks = await TaskRepository.GetByDateAsync(date);
         return tasks.Sum(t => t.EstimatedHours);
     }
     
     private async Task<bool> HasCircularDependency(Guid taskId, HashSet<Guid> visited)
     {
-        if (visited.Contains(taskId))
+        if (!visited.Add(taskId))
             return true;
-            
-        visited.Add(taskId);
-        
-        var dependencies = await _dependencyRepository.GetDependenciesForTaskAsync(taskId);
+
+        var dependencies = await dependencyRepository.GetDependenciesForTaskAsync(taskId);
         foreach (var dependency in dependencies.Where(d => d.Type == DependencyType.Blocking))
         {
             if (await HasCircularDependency(dependency.TargetTaskId, visited))
@@ -89,42 +79,36 @@ public abstract class BasePlannerService : IPlannerService
     }
 }
 
-public class BasicPlannerService : BasePlannerService
+public class BasicPlannerService(
+    ITaskRepository taskRepository,
+    IDependencyRepository dependencyRepository,
+    ISettingsRepository settingsRepository)
+    : BasePlannerService(taskRepository, dependencyRepository, settingsRepository)
 {
-    public BasicPlannerService(
-        ITaskRepository taskRepository,
-        IDependencyRepository dependencyRepository,
-        ISettingsRepository settingsRepository)
-        : base(taskRepository, dependencyRepository, settingsRepository)
-    {
-    }
-
     public override async Task<IEnumerable<TaskItem>> PlanTasksForDayAsync(DateTime date)
     {
-        var allTasks = await _taskRepository.GetAllAsync();
-        var settings = await _settingsRepository.GetUserSettingsAsync();
+        var allTasks = await TaskRepository.GetAllAsync();
+        var settings = await SettingsRepository.GetUserSettingsAsync();
         
         var availableTasks = allTasks
-            .Where(t => t.Status == TaskStatus.Planned || t.Status == TaskStatus.NotConfigured)
-            .Where(t => !t.Dependencies.Any(d => d.Type == Enums.DependencyType.Blocking) || 
-                       t.Dependencies.All(d => d.TargetTask?.Status == TaskStatus.Completed))
+            .Where(t => t.Status is TaskStatus.Planned or TaskStatus.NotConfigured)
+            .Where(t => t.Dependencies.All(d => d.Type != DependencyType.Blocking) || 
+                        t.Dependencies.All(d => d.TargetTask?.Status == TaskStatus.Completed))
             .OrderByDescending(t => t.UserPriority)
             .ThenBy(t => t.Complexity)
             .ThenByDescending(t => t.Interest);
 
         var result = new List<TaskItem>();
         double totalTime = 0;
-        int totalComplexity = 0;
+        var totalComplexity = 0;
 
         foreach (var task in availableTasks)
         {
-            if (totalTime + task.EstimatedHours <= settings.DailyTimeLimit &&
-                totalComplexity + task.Complexity <= settings.DailyComplexityLimit)
-            {
-                result.Add(task);
-                totalTime += task.EstimatedHours;
-                totalComplexity += task.Complexity;
-            }
+            if (!(totalTime + task.EstimatedHours <= settings.DailyTimeLimit) ||
+                totalComplexity + task.Complexity > settings.DailyComplexityLimit) continue;
+            result.Add(task);
+            totalTime += task.EstimatedHours;
+            totalComplexity += task.Complexity;
         }
 
         return result;
@@ -132,9 +116,7 @@ public class BasicPlannerService : BasePlannerService
 
     public override async Task RecalculatePrioritiesAsync()
     {
-        var tasks = await _taskRepository.GetAllAsync();
-        var settings = await _settingsRepository.GetUserSettingsAsync();
-
+        var tasks = await TaskRepository.GetAllAsync();
         foreach (var task in tasks)
         {
             // Базовая формула пересчета приоритетов
@@ -144,20 +126,21 @@ public class BasicPlannerService : BasePlannerService
             if (task.Deadline.HasValue)
             {
                 var daysUntilDeadline = (task.Deadline.Value - DateTime.Today).TotalDays;
-                if (daysUntilDeadline <= 1)
-                    calculatedPriority = Math.Min(calculatedPriority, 1);
-                else if (daysUntilDeadline <= 3)
-                    calculatedPriority = Math.Min(calculatedPriority, 3);
-                else if (daysUntilDeadline <= 7)
-                    calculatedPriority = Math.Min(calculatedPriority, 5);
+                calculatedPriority = daysUntilDeadline switch
+                {
+                    <= 1 => Math.Min(calculatedPriority, 1),
+                    <= 3 => Math.Min(calculatedPriority, 3),
+                    <= 7 => Math.Min(calculatedPriority, 5),
+                    _ => calculatedPriority
+                };
             }
 
             // Учет блокировок
             var blockingDependencies = task.Dependencies
-                .Where(d => d.Type == Enums.DependencyType.Blocking)
+                .Where(d => d.Type == DependencyType.Blocking)
                 .ToList();
                 
-            if (blockingDependencies.Any())
+            if (blockingDependencies.Count != 0)
             {
                 var completedBlockers = blockingDependencies
                     .Count(d => d.TargetTask?.Status == TaskStatus.Completed);
@@ -175,7 +158,7 @@ public class BasicPlannerService : BasePlannerService
             }
 
             task.CalculatedPriority = calculatedPriority;
-            await _taskRepository.UpdateAsync(task);
+            await TaskRepository.UpdateAsync(task);
         }
     }
 }

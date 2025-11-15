@@ -3,7 +3,7 @@
 
 <MudPaper Class="pa-4 quick-add-task" Elevation="1">
     <div class="d-flex align-center gap-2">
-        <MudTextField @bind-Value="NewTaskTitle" 
+        <MudTextField @bind-Value="_newTaskTitle" 
                       Label="Быстрое добавление задачи" 
                       Variant="Variant.Outlined"
                       Placeholder="Введите название задачи..."
@@ -11,7 +11,7 @@
                       Class="flex-grow-1" />
         
         <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                   OnClick="AddQuickTask" Disabled="@string.IsNullOrWhiteSpace(NewTaskTitle)"
+                   OnClick="AddQuickTask" Disabled="@string.IsNullOrWhiteSpace(_newTaskTitle)"
                    StartIcon="Icons.Material.Filled.Add">
             Добавить
         </MudButton>
@@ -22,17 +22,17 @@
 </MudPaper>
 
 @code {
-    private string NewTaskTitle = string.Empty;
+    private string _newTaskTitle = string.Empty;
 
     private async Task AddQuickTask()
     {
-        if (string.IsNullOrWhiteSpace(NewTaskTitle))
+        if (string.IsNullOrWhiteSpace(_newTaskTitle))
             return;
 
         var newTask = new TaskItem
         {
-            Title = NewTaskTitle.Trim(),
-            Status = Core.Enums.TaskStatus.NotConfigured,
+            Title = _newTaskTitle.Trim(),
+            Status = TaskStatus.NotConfigured,
             UserPriority = 5,
             Interest = 5,
             Complexity = 5,
@@ -42,7 +42,7 @@
         await TaskRepo.AddAsync(newTask);
         Snackbar.Add("Задача добавлена в ненастроенные", Severity.Success);
         
-        NewTaskTitle = string.Empty;
+        _newTaskTitle = string.Empty;
         await InvokeAsync(StateHasChanged);
     }
 

@@ -17,8 +17,8 @@
                 <MudButton Variant="Variant.Outlined" 
                           Color="Color.Error"
                           StartIcon="Icons.Material.Filled.ClearAll"
-                          OnClick="MarkAllAsIrrelevant"
-                          Disabled="@(!NotConfiguredTasks.Any())"
+                          OnClick="@MarkAllAsIrrelevant"
+                          Disabled="@(!_notConfiguredTasks.Any())"
                           Size="Size.Small">
                     Отметить все неактуальными
                 </MudButton>
@@ -26,11 +26,11 @@
         </MudItem>
 
         <MudItem xs="12">
-            @if (IsLoading)
+            @if (_isLoading)
             {
                 <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
             }
-            else if (!NotConfiguredTasks.Any())
+            else if (!_notConfiguredTasks.Any())
             {
                 <MudPaper Class="py-12 text-center">
                     <MudIcon Icon="Icons.Material.Filled.DoneAll" 
@@ -46,7 +46,7 @@
             else
             {
                 <MudGrid>
-                    @foreach (var task in NotConfiguredTasks)
+                    @foreach (var task in _notConfiguredTasks)
                     {
                         <MudItem xs="12" md="6" lg="4">
                             <MudCard Class="h-100">
@@ -84,8 +84,8 @@
 </MudContainer>
 
 @code {
-    private List<TaskItem> NotConfiguredTasks = new();
-    private bool IsLoading = true;
+    private List<TaskItem> _notConfiguredTasks = [];
+    private bool _isLoading = true;
 
     protected override async Task OnInitializedAsync()
     {
@@ -94,12 +94,12 @@
 
     private async Task LoadNotConfiguredTasks()
     {
-        IsLoading = true;
+        _isLoading = true;
         StateHasChanged();
 
         try
         {
-            NotConfiguredTasks = (await TaskRepo.GetNotConfiguredAsync()).ToList();
+            _notConfiguredTasks = (await TaskRepo.GetNotConfiguredAsync()).ToList();
         }
         catch (Exception ex)
         {
@@ -107,7 +107,7 @@
         }
         finally
         {
-            IsLoading = false;
+            _isLoading = false;
             StateHasChanged();
         }
     }
@@ -120,10 +120,10 @@
         };
 
         var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
-        var dialog = DialogService.Show<TaskEditDialog>("Настройка задачи", parameters, options);
+        var dialog = await DialogService.ShowAsync<TaskEditDialog>("Настройка задачи", parameters, options);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             await LoadNotConfiguredTasks();
         }
@@ -139,10 +139,10 @@
         };
 
         var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall };
-        var dialog = DialogService.Show<ConfirmDialog>("Подтверждение", parameters, options);
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Подтверждение", parameters, options);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             task.Status = TaskStatus.Irrelevant;
             await TaskRepo.UpdateAsync(task);
@@ -156,17 +156,17 @@
         var parameters = new DialogParameters
         {
             [nameof(ConfirmDialog.Title)] = "Массовое действие",
-            [nameof(ConfirmDialog.Content)] = $"Отметить все {NotConfiguredTasks.Count} задач как неактуальные?",
+            [nameof(ConfirmDialog.Content)] = $"Отметить все {_notConfiguredTasks.Count} задач как неактуальные?",
             [nameof(ConfirmDialog.ConfirmText)] = "Отметить все"
         };
 
         var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall };
-        var dialog = DialogService.Show<ConfirmDialog>("Подтверждение", parameters, options);
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Подтверждение", parameters, options);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
-            foreach (var task in NotConfiguredTasks)
+            foreach (var task in _notConfiguredTasks)
             {
                 task.Status = TaskStatus.Irrelevant;
                 await TaskRepo.UpdateAsync(task);
