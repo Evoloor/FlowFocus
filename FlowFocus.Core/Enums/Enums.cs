@@ -8,16 +8,19 @@ public enum TaskStatus
     Completed,
     Irrelevant
 }
+
 public enum DependencyType
 {
     Blocking,
     Related
 }
+
 public enum DependencyLogic
 {
     And,
     Or
 }
+
 public enum DisplayType
 {
     Nested,

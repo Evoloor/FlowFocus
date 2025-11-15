@@ -23,6 +23,12 @@ namespace FlowFocus.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("ConditionGroup")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ConditionOrder")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ConditionParameters")
                         .HasColumnType("TEXT");
 
@@ -90,7 +96,16 @@ namespace FlowFocus.Data.Migrations
                     b.Property<bool>("IsRecurring")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("ParentTaskId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime?>("PlannedDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Recurrence")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("RecurrenceEndDate")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
@@ -111,6 +126,8 @@ namespace FlowFocus.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ParentTaskId");
+
                     b.HasIndex("PlannedDate");
 
                     b.HasIndex("Status");
@@ -124,6 +141,9 @@ namespace FlowFocus.Data.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("AutoCompleteGuaranteed")
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("AutoRecalculateOnAdd")
@@ -141,6 +161,9 @@ namespace FlowFocus.Data.Migrations
                     b.Property<string>("PriorityBoostDates")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("RemoveUrgentIfNotDone")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("ShowFavorites")
                         .HasColumnType("INTEGER");
 
@@ -152,10 +175,12 @@ namespace FlowFocus.Data.Migrations
                         new
                         {
                             Id = 1,
+                            AutoCompleteGuaranteed = true,
                             AutoRecalculateOnAdd = true,
                             DailyComplexityLimit = 50,
                             DailyTimeLimit = 8.0,
                             DayStartHour = 6,
+                            RemoveUrgentIfNotDone = true,
                             ShowFavorites = true
                         });
                 });

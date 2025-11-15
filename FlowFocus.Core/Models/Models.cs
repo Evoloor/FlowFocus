@@ -1,7 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 using FlowFocus.Core.Enums;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
+
 namespace FlowFocus.Core.Models;
+
 public class TaskItem
 {
     public int Id { get; set; }
@@ -27,12 +29,23 @@ public class TaskItem
     
     public bool IsFavorite { get; set; }
     public bool IsRecurring { get; set; }
+    public RecurrencePattern? Recurrence { get; set; }
+    public DateTime? RecurrenceEndDate { get; set; }
+    public int? ParentTaskId { get; set; }
     
     public DisplayType DisplayType { get; set; } = DisplayType.Independent;
     
     public List<Dependency> Dependencies { get; set; } = [];
     public List<Dependency> DependentTasks { get; set; } = [];
+    
+    // Метод для проверки, можно ли выполнить задачу
+    public bool CanBeStarted()
+    {
+        var blockingDeps = Dependencies?.Where(d => d.Type == DependencyType.Blocking) ?? new List<Dependency>();
+        return !blockingDeps.Any() || blockingDeps.All(d => d.TargetTask?.Status == TaskStatus.Completed);
+    }
 }
+
 public class Dependency
 {
     public int Id { get; set; }
@@ -42,18 +55,40 @@ public class Dependency
     public DependencyType Type { get; set; }
     public DependencyLogic Logic { get; set; } = DependencyLogic.And;
     public string? ConditionParameters { get; set; }
+    public string? ConditionGroup { get; set; }
+    public int ConditionOrder { get; set; }
     
     // Navigation properties
     public TaskItem? SourceTask { get; set; }
     public TaskItem? TargetTask { get; set; }
 }
+
 public class UserSettings
 {
-    public int Id { get; set; }
+    public int Id { get; set; } = 1;
     public int DayStartHour { get; set; } = 6;
     public double DailyTimeLimit { get; set; } = 8.0;
     public int DailyComplexityLimit { get; set; } = 50;
     public bool AutoRecalculateOnAdd { get; set; } = true;
     public bool ShowFavorites { get; set; } = true;
     public string? PriorityBoostDates { get; set; }
+    public bool AutoCompleteGuaranteed { get; set; } = true;
+    public bool RemoveUrgentIfNotDone { get; set; } = true;
+}
+
+public class RecurrencePattern
+{
+    public RecurrenceType Type { get; set; }
+    public int Interval { get; set; } = 1;
+    public List<DayOfWeek>? DaysOfWeek { get; set; }
+    public int? DayOfMonth { get; set; }
+    public DateTime StartDate { get; set; } = DateTime.Today;
+}
+
+public enum RecurrenceType
+{
+    Daily,
+    Weekly,
+    Monthly,
+    Yearly
 }

@@ -15,6 +15,8 @@ builder.Services.AddDbContext<AppDbContext>();
 
 // Business Logic Services
 builder.Services.AddScoped<IPlannerService, BasicPlannerService>();
+builder.Services.AddScoped<IRecurringTaskService, RecurringTaskService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 // Register repositories
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();

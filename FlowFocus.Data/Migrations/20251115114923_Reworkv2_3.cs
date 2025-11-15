@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace FlowFocus.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class Reworkv2_2 : Migration
+    public partial class Reworkv2_3 : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -31,6 +31,9 @@ namespace FlowFocus.Data.Migrations
                     CreatedDate = table.Column<DateTime>(type: "TEXT", nullable: false),
                     IsFavorite = table.Column<bool>(type: "INTEGER", nullable: false),
                     IsRecurring = table.Column<bool>(type: "INTEGER", nullable: false),
+                    Recurrence = table.Column<string>(type: "TEXT", nullable: true),
+                    RecurrenceEndDate = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    ParentTaskId = table.Column<int>(type: "INTEGER", nullable: true),
                     DisplayType = table.Column<string>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
@@ -49,7 +52,9 @@ namespace FlowFocus.Data.Migrations
                     DailyComplexityLimit = table.Column<int>(type: "INTEGER", nullable: false),
                     AutoRecalculateOnAdd = table.Column<bool>(type: "INTEGER", nullable: false),
                     ShowFavorites = table.Column<bool>(type: "INTEGER", nullable: false),
-                    PriorityBoostDates = table.Column<string>(type: "TEXT", nullable: true)
+                    PriorityBoostDates = table.Column<string>(type: "TEXT", nullable: true),
+                    AutoCompleteGuaranteed = table.Column<bool>(type: "INTEGER", nullable: false),
+                    RemoveUrgentIfNotDone = table.Column<bool>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -66,7 +71,9 @@ namespace FlowFocus.Data.Migrations
                     TargetTaskId = table.Column<int>(type: "INTEGER", nullable: false),
                     Type = table.Column<string>(type: "TEXT", nullable: false),
                     Logic = table.Column<string>(type: "TEXT", nullable: false),
-                    ConditionParameters = table.Column<string>(type: "TEXT", nullable: true)
+                    ConditionParameters = table.Column<string>(type: "TEXT", nullable: true),
+                    ConditionGroup = table.Column<string>(type: "TEXT", nullable: true),
+                    ConditionOrder = table.Column<int>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -88,8 +95,8 @@ namespace FlowFocus.Data.Migrations
 
             migrationBuilder.InsertData(
                 table: "UserSettings",
-                columns: new[] { "Id", "AutoRecalculateOnAdd", "DailyComplexityLimit", "DailyTimeLimit", "DayStartHour", "PriorityBoostDates", "ShowFavorites" },
-                values: new object[] { 1, true, 50, 8.0, 6, null, true });
+                columns: new[] { "Id", "AutoCompleteGuaranteed", "AutoRecalculateOnAdd", "DailyComplexityLimit", "DailyTimeLimit", "DayStartHour", "PriorityBoostDates", "RemoveUrgentIfNotDone", "ShowFavorites" },
+                values: new object[] { 1, true, true, 50, 8.0, 6, null, true, true });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Dependencies_SourceTaskId",
@@ -100,6 +107,11 @@ namespace FlowFocus.Data.Migrations
                 name: "IX_Dependencies_TargetTaskId",
                 table: "Dependencies",
                 column: "TargetTaskId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Tasks_ParentTaskId",
+                table: "Tasks",
+                column: "ParentTaskId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Tasks_PlannedDate",
