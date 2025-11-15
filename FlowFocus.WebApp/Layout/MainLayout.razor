@@ -16,11 +16,37 @@
         <NavMenu/>
     </MudDrawer>
     <MudMainContent>
-        @Body
-        <MudContainer MaxWidth="MaxWidth.Large" Class="py-2">
-            <QuickAddTask/>
-        </MudContainer>
+        <div class="main-container">
+            <div class="content">
+                @Body
+            </div>
+            <div class="sticky-bottom">
+                <MudContainer MaxWidth="MaxWidth.Large">
+                    <QuickAddTask/>
+                </MudContainer>
+            </div>
+        </div>
     </MudMainContent>
+
+    <style>
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        
+        .content {
+            flex: 1;
+            padding-bottom: 20px; /* Отступ от фиксированного элемента */
+        }
+        
+        .sticky-bottom {
+            position: sticky;
+            bottom: 0;
+            width: 100%;
+            padding: 16px 0;
+        }
+    </style>
 </MudLayout>
 
 

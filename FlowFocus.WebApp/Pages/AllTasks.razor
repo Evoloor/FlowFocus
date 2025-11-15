@@ -3,22 +3,4 @@
 
 <PageTitle>FlowFocus - Все задачи</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
-    <MudGrid>
-        <MudItem xs="12" Class="mb-4">
-            <MudText Typo="Typo.h4">Все задачи</MudText>
-            <MudText Color="Color.Secondary">Полный список задач с фильтрацией и сортировкой</MudText>
-        </MudItem>
-
-        <MudItem xs="12">
-            <TaskList Title="Все задачи" OnTasksUpdated="StateHasChanged" />
-        </MudItem>
-    </MudGrid>
-</MudContainer>
-
-@code {
-    protected override async Task OnInitializedAsync()
-    {
-        await Task.Yield();
-    }
-}
+<TaskList Title="Все задачи" OnTasksUpdated="StateHasChanged" />

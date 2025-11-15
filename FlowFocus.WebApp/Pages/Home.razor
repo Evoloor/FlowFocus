@@ -66,11 +66,6 @@
             </div>
         </MudItem>
 
-        <!-- Быстрое добавление -->
-        <MudItem xs="12" Class="mb-4">
-             <QuickAddTask OnTaskAdded="@EventCallback.Factory.Create(this, LoadTodayTasks)"/>
-        </MudItem>
-
         <!-- Основной контент -->
         <MudItem xs="12" md="8">
             @if (_isLoading)
