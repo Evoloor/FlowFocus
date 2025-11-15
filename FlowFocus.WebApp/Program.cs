@@ -1,8 +1,6 @@
-using FlowFocus.Core;
 using FlowFocus.Data;
 using FlowFocus.WebApp;
 using MudBlazor.Services;
-using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 

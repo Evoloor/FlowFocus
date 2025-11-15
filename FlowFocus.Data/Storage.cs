@@ -345,7 +345,6 @@ public class AppDbContext : DbContext
         // TaskItem configuration
         modelBuilder.Entity<TaskItem>(entity =>
         {
-            entity.HasKey(t => t.Id);
             entity.Property(t => t.Title).IsRequired().HasMaxLength(500);
             entity.Property(t => t.Description).HasMaxLength(2000);
             entity.Property(t => t.Tags).HasConversion(
@@ -377,7 +376,6 @@ public class AppDbContext : DbContext
         // Dependency configuration
         modelBuilder.Entity<Dependency>(entity =>
         {
-            entity.HasKey(d => d.Id);
             entity.Property(d => d.Type).HasConversion<string>();
             entity.Property(d => d.Logic).HasConversion<string>();
 
@@ -398,9 +396,8 @@ public class AppDbContext : DbContext
         // UserSettings configuration
         modelBuilder.Entity<UserSettings>(entity =>
         {
-            entity.HasKey(u => u.Id);
             entity.HasData(new UserSettings { Id = 1 });
-        });
+        }); 
     }
 }
 
