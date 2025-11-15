@@ -19,27 +19,27 @@
                     {
                         @foreach (var task in AvailableTasks)
                         {
-                            <MudSelectItem Value="task">@task.Title</MudSelectItem>
+                            <MudSelectItem T="TaskItem" Value="task">@task.Title</MudSelectItem>
                         }
                     }
                 </MudSelect>
             </MudItem>
             
             <MudItem xs="12">
-                <MudSelect @bind-Value="DependencyType" 
+                <MudSelect T="DependencyType" @bind-Value="DependencyType" 
                           Label="Тип зависимости"
                           Variant="Variant.Outlined">
-                    <MudSelectItem Value="DependencyType.Blocking">Блокирующая</MudSelectItem>
-                    <MudSelectItem Value="DependencyType.Related">Связанная</MudSelectItem>
+                    <MudSelectItem T="DependencyType" Value="DependencyType.Blocking">Блокирующая</MudSelectItem>
+                    <MudSelectItem T="DependencyType" Value="DependencyType.Related">Связанная</MudSelectItem>
                 </MudSelect>
             </MudItem>
             
             <MudItem xs="12">
-                <MudSelect @bind-Value="DependencyLogic" 
+                <MudSelect T="DependencyLogic" @bind-Value="DependencyLogic" 
                           Label="Логика выполнения"
                           Variant="Variant.Outlined">
-                    <MudSelectItem Value="DependencyLogic.AND">AND (И)</MudSelectItem>
-                    <MudSelectItem Value="DependencyLogic.OR">OR (ИЛИ)</MudSelectItem>
+                    <MudSelectItem T="DependencyLogic" Value="DependencyLogic.AND">AND (И)</MudSelectItem>
+                    <MudSelectItem T="DependencyLogic" Value="DependencyLogic.OR">OR (ИЛИ)</MudSelectItem>
                 </MudSelect>
             </MudItem>
         </MudGrid>

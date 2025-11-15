@@ -14,18 +14,18 @@
                 }
 
                 <div class="d-flex align-center gap-2 mt-2">
-                    <MudChip Size="Size.Small" Color="GetPriorityColor(Task.UserPriority)">
+                    <MudChip T="string" Size="Size.Small" Color="GetPriorityColor(Task.UserPriority)">
                         Приоритет: @Task.UserPriority
                     </MudChip>
-                    <MudChip Size="Size.Small" Color="Color.Secondary">
+                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary">
                         Сложность: @Task.Complexity
                     </MudChip>
-                    <MudChip Size="Size.Small" Color="Color.Tertiary">
+                    <MudChip T="string" Size="Size.Small" Color="Color.Tertiary">
                         Интерес: @Task.Interest/10
                     </MudChip>
                     @if (Task.EstimatedHours > 0)
                     {
-                        <MudChip Size="Size.Small" Color="Color.Info">
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info">
                             @Task.EstimatedHours ч
                         </MudChip>
                     }
@@ -36,7 +36,7 @@
                     <div class="mt-2">
                         @foreach (var tag in Task.Tags)
                         {
-                            <MudChip Size="Size.Small" Variant="Variant.Outlined" Class="mr-1">@tag</MudChip>
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="mr-1">@tag</MudChip>
                         }
                     </div>
                 }

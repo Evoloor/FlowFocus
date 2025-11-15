@@ -25,23 +25,23 @@
             </MudItem>
             
             <MudItem xs="12" sm="6">
-                <MudSelect @bind-Value="Task.UserPriority" 
+                <MudSelect T="int" @bind-Value="Task.UserPriority" 
                           Label="Приоритет"
                           Variant="Variant.Outlined">
                     @foreach (var priority in PriorityOptions)
                     {
-                        <MudSelectItem Value="priority.Value">@priority.Text</MudSelectItem>
+                        <MudSelectItem T="int" Value="priority.Value">@priority.Text</MudSelectItem>
                     }
                 </MudSelect>
             </MudItem>
             
             <MudItem xs="12" sm="6">
-                <MudSelect @bind-Value="Task.Status" 
+                <MudSelect T="TaskStatus" @bind-Value="Task.Status" 
                           Label="Статус"
                           Variant="Variant.Outlined">
                     @foreach (var status in Enum.GetValues<TaskStatus>())
                     {
-                        <MudSelectItem Value="status">@status.ToString()</MudSelectItem>
+                        <MudSelectItem T="TaskStatus" Value="status">@status.ToString()</MudSelectItem>
                     }
                 </MudSelect>
             </MudItem>
@@ -78,23 +78,23 @@
             </MudItem>
             
             <MudItem xs="12" sm="6">
-                <MudSelect @bind-Value="Task.DisplayType"
+                <MudSelect T="DisplayType" @bind-Value="Task.DisplayType"
                           Label="Тип отображения"
                           Variant="Variant.Outlined">
-                    <MudSelectItem Value="DisplayType.Independent">Самостоятельное</MudSelectItem>
-                    <MudSelectItem Value="DisplayType.Nested">Вложенное</MudSelectItem>
+                    <MudSelectItem T="DisplayType" Value="DisplayType.Independent">Самостоятельное</MudSelectItem>
+                    <MudSelectItem T="DisplayType" Value="DisplayType.Nested">Вложенное</MudSelectItem>
                 </MudSelect>
             </MudItem>
             
             <MudItem xs="12">
-                <MudSwitch @bind-Checked="Task.IsFavorite" 
+                <MudSwitch T="string" @bind-Checked="Task.IsFavorite" 
                           Color="Color.Warning">
                     Избранное
                 </MudSwitch>
             </MudItem>
             
             <MudItem xs="12">
-                <MudSwitch @bind-Checked="Task.IsRecurring" 
+                <MudSwitch T="string" @bind-Checked="Task.IsRecurring" 
                           Color="Color.Info">
                     Повторяющаяся задача
                 </MudSwitch>

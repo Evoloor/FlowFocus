@@ -15,11 +15,11 @@
     <MudItem xs="12" Class="mb-3">
         <MudGrid>
             <MudItem xs="12" sm="6" md="3">
-                <MudSelect @bind-Value="SelectedStatus" Label="Статус" Clearable="true">
-                    <MudSelectItem Value="null">Все</MudSelectItem>
+                <MudSelect T="TaskStatus?" @bind-Value="SelectedStatus" Label="Статус" Clearable="true">
+                    <MudSelectItem T="TaskStatus?" Value="null">Все</MudSelectItem>
                     @foreach (var status in Enum.GetValues<TaskStatus>())
                     {
-                        <MudSelectItem Value="status">@status</MudSelectItem>
+                        <MudSelectItem T="TaskStatus?" Value="status">@status</MudSelectItem>
                     }
                 </MudSelect>
             </MudItem>
@@ -27,11 +27,11 @@
                 <MudTextField @bind-Value="SearchText" Label="Поиск" Immediate="true" />
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
-                <MudSelect @bind-Value="SortBy" Label="Сортировка">
-                    <MudSelectItem Value="SortField.Priority">По приоритету</MudSelectItem>
-                    <MudSelectItem Value="SortField.Deadline">По сроку</MudSelectItem>
-                    <MudSelectItem Value="SortField.Interest">По интересу</MudSelectItem>
-                    <MudSelectItem Value="SortField.Complexity">По сложности</MudSelectItem>
+                <MudSelect T="SortField" @bind-Value="SortBy" Label="Сортировка">
+                    <MudSelectItem T="SortField" Value="SortField.Priority">По приоритету</MudSelectItem>
+                    <MudSelectItem T="SortField" Value="SortField.Deadline">По сроку</MudSelectItem>
+                    <MudSelectItem T="SortField" Value="SortField.Interest">По интересу</MudSelectItem>
+                    <MudSelectItem T="SortField" Value="SortField.Complexity">По сложности</MudSelectItem>
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="6" md="3" Class="d-flex align-end">

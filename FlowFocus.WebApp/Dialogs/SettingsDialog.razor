@@ -42,14 +42,14 @@
             </MudItem>
             
             <MudItem xs="12">
-                <MudSwitch @bind-Checked="Settings.AutoRecalculateOnAdd" 
+                <MudSwitch T="string" @bind-Checked="Settings.AutoRecalculateOnAdd" 
                           Color="Color.Primary">
                     Автоматический пересчет при добавлении задач
                 </MudSwitch>
             </MudItem>
             
             <MudItem xs="12">
-                <MudSwitch @bind-Checked="Settings.ShowFavorites" 
+                <MudSwitch T="string" @bind-Checked="Settings.ShowFavorites" 
                           Color="Color.Warning">
                     Показывать избранные задачи
                 </MudSwitch>

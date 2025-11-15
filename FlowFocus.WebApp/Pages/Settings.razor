@@ -13,16 +13,16 @@
 
         <MudItem xs="12">
             <MudPaper Class="pa-4">
-                <MudList>
-                    <MudListItem Text="Основные настройки" 
+                <MudList T="string">
+                    <MudListItem T="string" Text="Основные настройки" 
                                  Icon="Icons.Material.Filled.Settings"
                                  OnClick="ShowSettingsDialog" />
                     <MudDivider />
-                    <MudListItem Text="Управление данными" 
+                    <MudListItem T="string" Text="Управление данными" 
                                  Icon="Icons.Material.Filled.Storage"
                                  OnClick="ShowDataManagement" />
                     <MudDivider />
-                    <MudListItem Text="О программе" 
+                    <MudListItem T="string" Text="О программе" 
                                  Icon="Icons.Material.Filled.Info"
                                  OnClick="ShowAbout" />
                 </MudList>

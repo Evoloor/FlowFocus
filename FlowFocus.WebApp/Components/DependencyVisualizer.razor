@@ -6,11 +6,11 @@
     
     @if (Dependencies?.Any() == true)
     {
-        <MudList>
+        <MudList T="string">
             @foreach (var dependency in Dependencies)
             {
-                <MudListItem>
-                    <MudChip Size="Size.Small" Color="GetDependencyColor(dependency.Type)" Class="mr-2">
+                <MudListItem T="string">
+                    <MudChip T="string" Size="Size.Small" Color="GetDependencyColor(dependency.Type)" Class="mr-2">
                         @dependency.Type
                     </MudChip>
                     <MudText>@dependency.TargetTask?.Title</MudText>
