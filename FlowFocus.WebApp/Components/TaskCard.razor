@@ -1,6 +1,7 @@
 @using FlowFocus.WebApp.Dialogs
 @inject IDialogService DialogService
 @inject ITaskRepository TaskRepo
+@inject IProcrastinationService ProcrastinationService
 @inject ISnackbar Snackbar
 
 <MudCard Class="my-2 task-card" Elevation="2">
@@ -39,6 +40,12 @@
                             Заблокирована
                         </MudChip>
                     }
+                    @if (Task.ProcrastinationCount > 0)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning">
+                            Откладывалась: @Task.ProcrastinationCount
+                        </MudChip>
+                    }
                 </div>
 
                 @if (Task.Tags?.Any() == true)
@@ -67,6 +74,11 @@
                     <MudIconButton Icon="Icons.Material.Filled.StarBorder" Size="Size.Small"
                                    OnClick="@(() => ToggleFavorite(Task))"/>
                 }
+                @if (_canProcrastinate)
+                {
+                    <MudIconButton Icon="Icons.Material.Filled.Snooze" Size="Size.Small"
+                                   Color="Color.Warning" OnClick="@(() => ProcrastinateTask(Task))"/>
+                }
             </div>
         </div>
     </MudCardContent>
@@ -83,6 +95,16 @@
                    Disabled="@(Task.Status == TaskStatus.Completed)">
             Завершить
         </MudButton>
+        
+        @if (_canProcrastinate)
+        {
+            <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                       Color="Color.Warning"
+                       OnClick="@(() => ProcrastinateTask(Task))">
+                Отложить
+            </MudButton>
+        }
+        
         <MudSpacer/>
         <MudText Typo="Typo.caption" Color="Color.Secondary">
             Статус: @Task.Status
@@ -107,6 +129,13 @@
     [Parameter] public TaskItem Task { get; set; } = null!;
     [Parameter] public EventCallback<TaskItem> OnTaskUpdated { get; set; }
     [Parameter] public EventCallback<TaskItem> OnTaskDeleted { get; set; }
+
+    private bool _canProcrastinate = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _canProcrastinate = await ProcrastinationService.CanProcrastinateTaskAsync(Task.Id);
+    }
 
     private string GetPriorityStyle(int priority)
     {
@@ -201,5 +230,26 @@
         };
 
         Snackbar.Add($"Задача отмечена как {statusText}", Severity.Success);
+    }
+
+    private async Task ProcrastinateTask(TaskItem task)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(ConfirmDialog.Title)] = "Отложить задачу",
+            [nameof(ConfirmDialog.Content)] = $"Отложить задачу \"{task.Title}\" на завтра?",
+            [nameof(ConfirmDialog.ConfirmText)] = "Отложить"
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Подтверждение", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await ProcrastinationService.ProcrastinateTaskAsync(task.Id);
+            Snackbar.Add("Задача отложена на завтра", Severity.Warning);
+            await OnTaskUpdated.InvokeAsync(task);
+        }
     }
 }

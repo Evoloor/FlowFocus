@@ -1,4 +1,3 @@
-// Dialogs/SettingsDialog.razor
 @inject ISettingsRepository SettingsRepo
 @inject ISnackbar Snackbar
 
@@ -13,7 +12,7 @@
             </MudItem>
             
             <MudItem xs="12" sm="6">
-                <MudNumericField @bind-Value="Settings.DayStartHour" 
+                <MudNumericField T="int" @bind-Value="Settings.DayStartHour" 
                                      Label="Время начала дня (0-23)" 
                                      Min="0" 
                                      Max="23"
@@ -21,7 +20,7 @@
             </MudItem>
             
             <MudItem xs="12" sm="6">
-                <MudNumericField @bind-Value="Settings.DailyTimeLimit" 
+                <MudNumericField T="double" @bind-Value="Settings.DailyTimeLimit" 
                                         Label="Дневной лимит времени (часы)" 
                                         Min="1" 
                                         Max="24"
@@ -30,10 +29,18 @@
             </MudItem>
             
             <MudItem xs="12" sm="6">
-                <MudNumericField @bind-Value="Settings.DailyComplexityLimit" 
+                <MudNumericField T="int" @bind-Value="Settings.DailyComplexityLimit" 
                                      Label="Дневной лимит сложности" 
                                      Min="10" 
                                      Max="200"
+                                     Variant="Variant.Outlined" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudNumericField T="int" @bind-Value="Settings.MaxComplexTasksPerDay" 
+                                     Label="Макс. сложных задач в день" 
+                                     Min="1" 
+                                     Max="10"
                                      Variant="Variant.Outlined" />
             </MudItem>
             
@@ -42,16 +49,30 @@
             </MudItem>
             
             <MudItem xs="12">
-                <MudSwitch T="string" @bind-Checked="Settings.AutoRecalculateOnAdd" 
+                <MudSwitch T="bool" @bind-Checked="Settings.AutoRecalculateOnAdd" 
                           Color="Color.Primary">
                     Автоматический пересчет при добавлении задач
                 </MudSwitch>
             </MudItem>
             
             <MudItem xs="12">
-                <MudSwitch T="string" @bind-Checked="Settings.ShowFavorites" 
+                <MudSwitch T="bool" @bind-Checked="Settings.ShowFavorites" 
                           Color="Color.Warning">
                     Показывать избранные задачи
+                </MudSwitch>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudSwitch T="bool" @bind-Checked="Settings.ShowProcrastinationButton" 
+                          Color="Color.Info">
+                    Показывать кнопку откладывания
+                </MudSwitch>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudSwitch T="bool" @bind-Checked="Settings.AutoBalanceTasks" 
+                          Color="Color.Success">
+                    Автоматическая балансировка задач
                 </MudSwitch>
             </MudItem>
             
@@ -60,9 +81,16 @@
             </MudItem>
             
             <MudItem xs="12">
-                <MudTextField @bind-Value="Settings.PriorityBoostDates"
+                <MudTextField T="string" @bind-Value="Settings.PriorityBoostDates"
                              Label="Даты повышения приоритета (через запятую)"
                              HelperText="Формат: ДД.ММ, ДД.ММ"
+                             Variant="Variant.Outlined" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudTextField T="string" @bind-Value="Settings.CustomPriorityReferences"
+                             Label="Свои значения приоритетов"
+                             HelperText="Формат: значение:название, значение:название"
                              Variant="Variant.Outlined" />
             </MudItem>
         </MudGrid>

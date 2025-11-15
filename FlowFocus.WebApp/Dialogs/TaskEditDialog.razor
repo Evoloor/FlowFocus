@@ -1,5 +1,4 @@
 @inject ITaskRepository TaskRepo
-@inject IDependencyRepository DependencyRepo
 @inject IPlannerService PlannerService
 @inject ISettingsRepository SettingsRepo
 @inject ISnackbar Snackbar
@@ -11,14 +10,14 @@
     <DialogContent>
         <MudGrid>
             <MudItem xs="12">
-                <MudTextField @bind-Value="Task.Title" 
+                <MudTextField T="string" @bind-Value="Task.Title" 
                              Label="Название" 
                              Required="true"
                              Variant="Variant.Outlined" />
             </MudItem>
             
             <MudItem xs="12">
-                <MudTextField @bind-Value="Task.Description" 
+                <MudTextField T="string" @bind-Value="Task.Description" 
                              Label="Описание" 
                              Lines="3"
                              Variant="Variant.Outlined" />
@@ -47,7 +46,7 @@
             </MudItem>
             
             <MudItem xs="12" sm="4">
-                <MudNumericField @bind-Value="Task.Interest" 
+                <MudNumericField T="int" @bind-Value="Task.Interest" 
                                         Label="Интересность" 
                                         Min="1" 
                                         Max="10"
@@ -55,7 +54,7 @@
             </MudItem>
             
             <MudItem xs="12" sm="4">
-                <MudNumericField @bind-Value="Task.Complexity" 
+                <MudNumericField T="int" @bind-Value="Task.Complexity" 
                                      Label="Сложность" 
                                      Min="1" 
                                      Max="100"
@@ -63,7 +62,7 @@
             </MudItem>
             
             <MudItem xs="12" sm="4">
-                <MudNumericField @bind-Value="Task.EstimatedHours" 
+                <MudNumericField T="double" @bind-Value="Task.EstimatedHours" 
                                         Label="Время выполнения (часы)" 
                                         Min="0.5" 
                                         Max="24" 
@@ -72,7 +71,7 @@
             </MudItem>
             
             <MudItem xs="12" sm="6">
-                <MudDatePicker @bind-Date="Task.Deadline"
+                <MudDatePicker T="DateTime?" @bind-Date="Task.Deadline"
                               Label="Срок выполнения"
                               Variant="Variant.Outlined" />
             </MudItem>
@@ -87,16 +86,23 @@
             </MudItem>
             
             <MudItem xs="12">
-                <MudSwitch T="string" @bind-Checked="Task.IsFavorite" 
+                <MudSwitch T="bool" @bind-Checked="Task.IsFavorite" 
                           Color="Color.Warning">
                     Избранное
                 </MudSwitch>
             </MudItem>
             
             <MudItem xs="12">
-                <MudSwitch T="string" @bind-Checked="Task.IsRecurring" 
+                <MudSwitch T="bool" @bind-Checked="Task.IsRecurring" 
                           Color="Color.Info">
                     Повторяющаяся задача
+                </MudSwitch>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudSwitch T="bool" @bind-Checked="Task.IsProcrastinationResistant" 
+                          Color="Color.Success">
+                    Устойчива к прокрастинации
                 </MudSwitch>
             </MudItem>
             
@@ -162,6 +168,8 @@
                 DisplayType = ExistingTask.DisplayType,
                 IsFavorite = ExistingTask.IsFavorite,
                 IsRecurring = ExistingTask.IsRecurring,
+                IsProcrastinationResistant = ExistingTask.IsProcrastinationResistant,
+                ProcrastinationCount = ExistingTask.ProcrastinationCount,
                 Tags = [..ExistingTask.Tags],
                 CreatedDate = ExistingTask.CreatedDate
             };

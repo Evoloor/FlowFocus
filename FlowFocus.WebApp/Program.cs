@@ -7,21 +7,12 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddMudServices();
-builder.Services.AddRazorComponents()
+_ = builder.Services.AddMudServices()
+    .AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddDbContext<AppDbContext>();
-
-// Business Logic Services
-builder.Services.AddScoped<IPlannerService, BasicPlannerService>();
-builder.Services.AddScoped<IRecurringTaskService, RecurringTaskService>();
-builder.Services.AddScoped<INotificationService, NotificationService>();
-
-// Register repositories
-builder.Services.AddScoped<ITaskRepository, TaskRepository>();
-builder.Services.AddScoped<IDependencyRepository, DependencyRepository>();
-builder.Services.AddScoped<ISettingsRepository, SettingsRepository>();
+// Кастомный импорт сервисов
+_ = builder.Services.AddDataLayer();
 
 var app = builder.Build();
 
@@ -40,17 +31,7 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-// Initialize database
-using (var scope = app.Services.CreateScope())
-{
-    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    
-    // Автоматическое создание БД и применение миграций
-    await context.Database.MigrateAsync();
-    
-    // Ensure default settings exist
-    var settingsRepo = scope.ServiceProvider.GetRequiredService<ISettingsRepository>();
-    await settingsRepo.GetUserSettingsAsync();
-}
+// Кастомное заполнение БД
+_ = app.Services.InitializeDatabaseAsync();
 
 app.Run();

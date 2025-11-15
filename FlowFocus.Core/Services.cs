@@ -325,3 +325,138 @@ public class BasicPlannerService(
         return score;
     }
 }
+
+public interface IProcrastinationService
+{
+    Task<bool> CanProcrastinateTaskAsync(int taskId);
+    Task ProcrastinateTaskAsync(int taskId);
+    Task<IEnumerable<TaskItem>> GetProcrastinationCandidatesAsync();
+}
+
+public class ProcrastinationService : IProcrastinationService
+{
+    private readonly ITaskRepository _taskRepository;
+    private readonly ISettingsRepository _settingsRepository;
+
+    public ProcrastinationService(ITaskRepository taskRepository, ISettingsRepository settingsRepository)
+    {
+        _taskRepository = taskRepository;
+        _settingsRepository = settingsRepository;
+    }
+
+    public async Task<bool> CanProcrastinateTaskAsync(int taskId)
+    {
+        var task = await _taskRepository.GetByIdAsync(taskId);
+        var settings = await _settingsRepository.GetUserSettingsAsync();
+        
+        return task != null && 
+               task.CanBeProcrastinated() &&
+               settings.ShowProcrastinationButton;
+    }
+
+    public async Task ProcrastinateTaskAsync(int taskId)
+    {
+        var task = await _taskRepository.GetByIdAsync(taskId);
+        if (task == null) return;
+
+        task.ProcrastinationCount++;
+        task.LastProcrastinatedDate = DateTime.UtcNow;
+        task.PlannedDate = DateTime.Today.AddDays(1);
+        
+        await _taskRepository.UpdateAsync(task);
+    }
+
+    public async Task<IEnumerable<TaskItem>> GetProcrastinationCandidatesAsync()
+    {
+        var tasks = await _taskRepository.GetAllAsync();
+        return tasks.Where(t => t.CanBeProcrastinated());
+    }
+}
+
+// Расширенный планировщик с улучшенной балансировкой
+// public class AdvancedPlannerService : BasePlannerService
+// {
+//     public AdvancedPlannerService(
+//         ITaskRepository taskRepository,
+//         IDependencyRepository dependencyRepository,
+//         ISettingsRepository settingsRepository)
+//         : base(taskRepository, dependencyRepository, settingsRepository)
+//     {
+//     }
+//
+//     public override async Task<IEnumerable<TaskItem>> PlanTasksForDayAsync(DateTime date)
+//     {
+//         var allTasks = await _taskRepository.GetAllAsync();
+//         var settings = await _settingsRepository.GetUserSettingsAsync();
+//
+//         var availableTasks = allTasks
+//             .Where(t => t.Status is TaskStatus.Planned or TaskStatus.NotConfigured)
+//             .Where(t => t.CanBeStarted())
+//             .OrderByDescending(t => GetAdvancedTaskScore(t, date))
+//             .ThenBy(t => t.Complexity)
+//             .ThenByDescending(t => t.Interest);
+//
+//         var result = new List<TaskItem>();
+//         double totalTime = 0;
+//         var totalComplexity = 0;
+//         var complexTasksCount = 0;
+//
+//         foreach (var task in availableTasks)
+//         {
+//             // Проверка лимита сложных задач
+//             if (task.Complexity >= 70)
+//             {
+//                 if (complexTasksCount >= settings.MaxComplexTasksPerDay)
+//                     continue;
+//                 complexTasksCount++;
+//             }
+//
+//             if (totalTime + task.EstimatedHours <= settings.DailyTimeLimit &&
+//                 totalComplexity + task.Complexity <= settings.DailyComplexityLimit)
+//             {
+//                 result.Add(task);
+//                 totalTime += task.EstimatedHours;
+//                 totalComplexity += task.Complexity;
+//             }
+//         }
+//
+//         return result;
+//     }
+//
+//     private double GetAdvancedTaskScore(TaskItem task, DateTime date)
+//     {
+//         var baseScore = (double)task.CalculatedPriority;
+//
+//         // Усиленный учет дедлайна
+//         if (task.Deadline.HasValue)
+//         {
+//             var daysUntilDeadline = (task.Deadline.Value - date).TotalDays;
+//             baseScore *= GetDeadlineMultiplier(daysUntilDeadline);
+//         }
+//
+//         // Баланс интересности и сложности
+//         var balanceFactor = (task.Interest / 10.0) * (1 - task.Complexity / 100.0);
+//         baseScore *= (1 + balanceFactor * 0.5);
+//
+//         // Бонус за избранное
+//         if (task.IsFavorite) baseScore *= 1.2;
+//
+//         // Штраф за частую прокрастинацию
+//         if (task.ProcrastinationCount > 0)
+//             baseScore *= Math.Max(0.5, 1 - (task.ProcrastinationCount * 0.1));
+//
+//         return baseScore;
+//     }
+//
+//     private double GetDeadlineMultiplier(double daysUntilDeadline)
+//     {
+//         return daysUntilDeadline switch
+//         {
+//             <= 0 => 3.0, // Просроченные
+//             <= 1 => 2.5, // Сегодня
+//             <= 3 => 2.0, // Скоро
+//             <= 7 => 1.5, // На неделе
+//             _ => 1.0
+//         };
+//     }
+// }

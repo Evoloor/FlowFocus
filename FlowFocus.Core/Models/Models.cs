@@ -35,6 +35,11 @@ public class TaskItem
     
     public DisplayType DisplayType { get; set; } = DisplayType.Independent;
     
+    // Новые поля согласно ТЗ
+    public bool IsProcrastinationResistant { get; set; }
+    public DateTime? LastProcrastinatedDate { get; set; }
+    public int ProcrastinationCount { get; set; }
+    
     public List<Dependency> Dependencies { get; set; } = [];
     public List<Dependency> DependentTasks { get; set; } = [];
     
@@ -43,6 +48,15 @@ public class TaskItem
     {
         var blockingDeps = Dependencies?.Where(d => d.Type == DependencyType.Blocking) ?? new List<Dependency>();
         return !blockingDeps.Any() || blockingDeps.All(d => d.TargetTask?.Status == TaskStatus.Completed);
+    }
+
+    // Новый метод: проверка условий для прокрастинации
+    public bool CanBeProcrastinated()
+    {
+        return Status == TaskStatus.Planned && 
+               !IsProcrastinationResistant &&
+               Complexity >= 70 &&
+               ProcrastinationCount < 3;
     }
 }
 
@@ -74,6 +88,12 @@ public class UserSettings
     public string? PriorityBoostDates { get; set; }
     public bool AutoCompleteGuaranteed { get; set; } = true;
     public bool RemoveUrgentIfNotDone { get; set; } = true;
+    
+    // Новые настройки согласно ТЗ
+    public bool ShowProcrastinationButton { get; set; } = true;
+    public bool AutoBalanceTasks { get; set; } = true;
+    public int MaxComplexTasksPerDay { get; set; } = 3;
+    public string? CustomPriorityReferences { get; set; }
 }
 
 public class RecurrencePattern

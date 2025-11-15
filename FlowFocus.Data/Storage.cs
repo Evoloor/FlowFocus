@@ -108,38 +108,40 @@ public class SettingsRepository(AppDbContext context) : BaseRepository<UserSetti
         await UpdateAsync(settings);
     }
 }
+
 public static class ServiceExtensions
 {
-    public static IServiceCollection AddDataLayer(this IServiceCollection services,
-        string connectionString = "Data Source=flowfocus.db")
+    public static IServiceCollection AddDataLayer(this IServiceCollection services)
     {
-        services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlite(connectionString));
+        services.AddDbContext<AppDbContext>();
 
+        // Репо
         services.AddScoped<ITaskRepository, TaskRepository>();
         services.AddScoped<IDependencyRepository, DependencyRepository>();
         services.AddScoped<ISettingsRepository, SettingsRepository>();
 
         // Добавляем сервисы для работы с повторяющимися задачами
         services.AddScoped<IRecurringTaskService, RecurringTaskService>();
+        services.AddScoped<IPlannerService, BasicPlannerService>();
         services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<IProcrastinationService, ProcrastinationService>();
+        //services.AddScoped<AdvancedPlannerService>();
 
         return services;
     }
 
     public static async Task InitializeDatabaseAsync(this IServiceProvider serviceProvider)
     {
+// Initialize database
         using var scope = serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        await context.Database.EnsureCreatedAsync();
+// Автоматическое создание БД и применение миграций
+        await context.Database.MigrateAsync();
 
-        // Создаем начальные настройки, если их нет
-        if (!await context.UserSettings.AnyAsync())
-        {
-            context.UserSettings.Add(new UserSettings());
-            await context.SaveChangesAsync();
-        }
+// Ensure default settings exist
+        var settingsRepo = scope.ServiceProvider.GetRequiredService<ISettingsRepository>();
+        await settingsRepo.GetUserSettingsAsync();
     }
 }
 
