@@ -109,7 +109,7 @@ public class NotificationService(
 
         if (totalTime > settings.DailyTimeLimit * 1.2)
         {
-            _notifications.Add($"Превышен дневной лимит времени на {(totalTime - settings.DailyTimeLimit):0.0} часов");
+            _notifications.Add($"Превышен дневной лимит времени на {totalTime - settings.DailyTimeLimit:0.0} часов");
         }
 
         var totalComplexity = activeTasks.Sum(t => t.Complexity);
@@ -317,8 +317,8 @@ public class BasicPlannerService(
             else if (daysUntilDeadline <= 3) score *= 1.5;
         }
 
-        var balanceFactor = (task.Interest / 10.0) * (1 - task.Complexity / 100.0);
-        score *= (1 + balanceFactor * 0.3);
+        var balanceFactor = task.Interest / 10.0 * (1 - task.Complexity / 100.0);
+        score *= 1 + balanceFactor * 0.3;
 
         if (task.IsFavorite) score *= 1.1;
 

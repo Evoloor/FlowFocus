@@ -1,53 +1,61 @@
 @page "/settings"
+@using FlowFocus.WebApp.Components
 @using FlowFocus.WebApp.Dialogs
 @inject IDialogService DialogService
 
 <PageTitle>FlowFocus - Настройки</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Medium" Class="py-4">
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
     <MudGrid>
         <MudItem xs="12" Class="mb-4">
             <MudText Typo="Typo.h4">Настройки приложения</MudText>
             <MudText Color="Color.Secondary">Управление параметрами системы</MudText>
         </MudItem>
 
-        <MudItem xs="12">
+        <MudItem xs="12" md="3">
+            <MudPaper Class="pa-3">
+                <MudNavMenu>
+                    <MudNavLink Text="Основные настройки" 
+                                Icon="Icons.Material.Filled.Settings"
+                                Active="@(_activeTab == 0)"
+                                OnClick="() => SwitchTab(0)" />
+                    <MudNavLink Text="Автоматизация" 
+                                Icon="Icons.Material.Filled.AutoFixHigh"
+                                Active="@(_activeTab == 1)"
+                                OnClick="() => SwitchTab(1)" />
+                    <MudNavLink Text="Расширенные настройки" 
+                                Icon="Icons.Material.Filled.Tune"
+                                Active="@(_activeTab == 2)"
+                                OnClick="() => SwitchTab(2)" />
+                </MudNavMenu>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="9">
             <MudPaper Class="pa-4">
-                <MudList T="string">
-                    <MudListItem T="string" Text="Основные настройки" 
-                                 Icon="Icons.Material.Filled.Settings"
-                                 OnClick="@ShowSettingsDialog" />
-                    <MudDivider />
-                    <MudListItem T="string" Text="Управление данными" 
-                                 Icon="Icons.Material.Filled.Storage"
-                                 OnClick="@ShowDataManagement" />
-                    <MudDivider />
-                    <MudListItem T="string" Text="О программе" 
-                                 Icon="Icons.Material.Filled.Info"
-                                 OnClick="@ShowAbout" />
-                </MudList>
+                @switch (_activeTab)
+                {
+                    case 0:
+                        <BasicSettings />
+                        break;
+                    case 1:
+                        <AutomationSettings />
+                        break;
+                    case 2:
+                        <AdvancedSettings />
+                        break;
+                }
             </MudPaper>
         </MudItem>
     </MudGrid>
 </MudContainer>
 
 @code {
-    private async Task ShowSettingsDialog()
-    {
-        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<SettingsDialog>("Настройки", options);
-        await dialog.Result;
-    }
+    private int _activeTab = 0;
 
-    private void ShowDataManagement()
+    private void SwitchTab(int tabIndex)
     {
-        // Implementation for data management
-        // TODO: Add data export/import functionality
-    }
-
-    private void ShowAbout()
-    {
-        // Implementation for about dialog
-        // TODO: Add about information
+        _activeTab = tabIndex;
+        StateHasChanged();
     }
 }

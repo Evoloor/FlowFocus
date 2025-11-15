@@ -1,20 +1,25 @@
-﻿@inherits LayoutComponentBase
-<MudThemeProvider Theme="@_theme" IsDarkMode="_isDarkMode" />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
+﻿@using FlowFocus.WebApp.Components
+@inherits LayoutComponentBase
+<MudThemeProvider Theme="@_theme" IsDarkMode="_isDarkMode"/>
+<MudPopoverProvider/>
+<MudDialogProvider/>
+<MudSnackbarProvider/>
 <MudLayout>
     <MudAppBar Elevation="1">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                       OnClick="@((e) => DrawerToggle())"/>
         <MudText Typo="Typo.h5" Class="ml-3">Application</MudText>
-        <MudSpacer />
-        <MudIconButton Icon="@(DarkLightModeButtonIcon)" Color="Color.Inherit" OnClick="@DarkModeToggle" />
+        <MudSpacer/>
+        <MudIconButton Icon="@(DarkLightModeButtonIcon)" Color="Color.Inherit" OnClick="@DarkModeToggle"/>
     </MudAppBar>
     <MudDrawer id="nav-drawer" @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
-        <NavMenu />
+        <NavMenu/>
     </MudDrawer>
-    <MudMainContent Class="pt-16 pa-4">
+    <MudMainContent>
         @Body
+        <MudContainer MaxWidth="MaxWidth.Large" Class="py-2">
+            <QuickAddTask/>
+        </MudContainer>
     </MudMainContent>
 </MudLayout>
 
@@ -60,6 +65,10 @@
         DrawerBackground = "#ffffff",
         GrayLight = "#e8e8e8",
         GrayLighter = "#f9f9f9",
+        // Исправляем Secondary цвет
+        Secondary = "#78909C", // Серо-голубой вместо красного
+        SecondaryDarken = "#546E7A",
+        SecondaryLighten = "#90A4AE",
     };
 
     private readonly PaletteDark _darkPalette = new()
@@ -84,11 +93,15 @@
         Info = "#4a86ff",
         Success = "#3dcb6c",
         Warning = "#ffb545",
-        Error = "#ff3f5f",
+        Error = "#ff3f5f", // Красный только для ошибок
         LinesDefault = "#33323e",
         TableLines = "#33323e",
         Divider = "#292838",
         OverlayLight = "#1e1e2d80",
+        // Исправляем Secondary цвет
+        Secondary = "#82B1FF", // Голубой вместо красного
+        SecondaryDarken = "#448AFF",
+        SecondaryLighten = "#BBDEFB",
     };
 
     private string DarkLightModeButtonIcon => _isDarkMode switch
@@ -96,6 +109,7 @@
         true => Icons.Material.Rounded.AutoMode,
         false => Icons.Material.Outlined.DarkMode,
     };
+
 }
 
 

@@ -83,7 +83,7 @@
         return await Task.Run(() => 
             _availableTasks.Where(t => 
                 t.Title.Contains(value, StringComparison.OrdinalIgnoreCase) ||
-                (t.Description?.Contains(value, StringComparison.OrdinalIgnoreCase) == true)
+                t.Description?.Contains(value, StringComparison.OrdinalIgnoreCase) == true
             ).ToList()
         );
     }

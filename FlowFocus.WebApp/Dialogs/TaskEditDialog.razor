@@ -1,3 +1,4 @@
+@using FlowFocus.WebApp.Components
 @inject ITaskRepository TaskRepo
 @inject IPlannerService PlannerService
 @inject ISettingsRepository SettingsRepo
@@ -9,122 +10,108 @@
     </TitleContent>
     <DialogContent>
         <MudGrid>
+            <!-- Название -->
             <MudItem xs="12">
-                <MudTextField T="string" @bind-Value="Task.Title" 
-                             Label="Название" 
-                             Required="true"
-                             Variant="Variant.Outlined" />
+                <MudTextField T="string" @bind-Value="Task.Title"
+                              Label="Название"
+                              Required="true"
+                              Variant="Variant.Outlined"/>
             </MudItem>
-            
-            <MudItem xs="12">
-                <MudTextField T="string" @bind-Value="Task.Description" 
-                             Label="Описание" 
-                             Lines="3"
-                             Variant="Variant.Outlined" />
-            </MudItem>
-            
+
+            <!-- Дата -->
             <MudItem xs="12" sm="6">
-                <MudSelect T="int" @bind-Value="Task.UserPriority" 
-                          Label="Приоритет"
-                          Variant="Variant.Outlined">
+                <MudDatePicker T="DateTime?" @bind-Date="Task.PlannedDate"
+                               Label="Дата выполнения"
+                               Variant="Variant.Outlined"/>
+            </MudItem>
+
+            <!-- Дедлайн -->
+            <MudItem xs="12" sm="6">
+                <MudDatePicker T="DateTime?" @bind-Date="Task.Deadline"
+                               Label="Срок выполнения"
+                               Variant="Variant.Outlined"/>
+            </MudItem>
+
+            <!-- Приоритет -->
+            <MudItem xs="12" sm="4">
+                <MudSelect T="int" @bind-Value="Task.UserPriority"
+                           Label="Приоритет"
+                           Variant="Variant.Outlined">
                     @foreach (var priority in _priorityOptions)
                     {
                         <MudSelectItem T="int" Value="priority.Value">@priority.Text</MudSelectItem>
                     }
                 </MudSelect>
             </MudItem>
-            
-            <MudItem xs="12" sm="6">
-                <MudSelect T="TaskStatus" @bind-Value="Task.Status" 
-                          Label="Статус"
-                          Variant="Variant.Outlined">
-                    @foreach (var status in Enum.GetValues<TaskStatus>())
-                    {
-                        <MudSelectItem T="TaskStatus" Value="status">@status.ToString()</MudSelectItem>
-                    }
-                </MudSelect>
-            </MudItem>
-            
+
+            <!-- Интересность -->
             <MudItem xs="12" sm="4">
-                <MudNumericField T="int" @bind-Value="Task.Interest" 
-                                        Label="Интересность" 
-                                        Min="1" 
-                                        Max="10"
-                                        Variant="Variant.Outlined" />
+                <MudNumericField T="int" @bind-Value="Task.Interest"
+                                 Label="Интересность"
+                                 Min="1"
+                                 Max="10"
+                                 Variant="Variant.Outlined"/>
             </MudItem>
-            
+
+            <!-- Сложность -->
             <MudItem xs="12" sm="4">
-                <MudNumericField T="int" @bind-Value="Task.Complexity" 
-                                     Label="Сложность" 
-                                     Min="1" 
-                                     Max="100"
-                                     Variant="Variant.Outlined" />
+                <MudNumericField T="int" @bind-Value="Task.Complexity"
+                                 Label="Сложность"
+                                 Min="1"
+                                 Max="100"
+                                 Variant="Variant.Outlined"/>
             </MudItem>
-            
-            <MudItem xs="12" sm="4">
-                <MudNumericField T="double" @bind-Value="Task.EstimatedHours" 
-                                        Label="Время выполнения (часы)" 
-                                        Min="0.5" 
-                                        Max="24" 
-                                        Step="0.5"
-                                        Variant="Variant.Outlined" />
-            </MudItem>
-            
-            <MudItem xs="12" sm="6">
-                <MudDatePicker T="DateTime?" @bind-Date="Task.Deadline"
-                              Label="Срок выполнения"
-                              Variant="Variant.Outlined" />
-            </MudItem>
-            
-            <MudItem xs="12" sm="6">
-                <MudSelect T="DisplayType" @bind-Value="Task.DisplayType"
-                          Label="Тип отображения"
-                          Variant="Variant.Outlined">
-                    <MudSelectItem T="DisplayType" Value="DisplayType.Independent">Самостоятельное</MudSelectItem>
-                    <MudSelectItem T="DisplayType" Value="DisplayType.Nested">Вложенное</MudSelectItem>
-                </MudSelect>
-            </MudItem>
-            
+
+            <!-- Время выполнения -->
             <MudItem xs="12">
-                <MudSwitch T="bool" @bind-Checked="Task.IsFavorite" 
-                          Color="Color.Warning">
-                    Избранное
-                </MudSwitch>
+                <MudNumericField T="double" @bind-Value="Task.EstimatedHours"
+                                 Label="Время выполнения (часы)"
+                                 Min="0.5"
+                                 Max="24"
+                                 Step="0.5"
+                                 Variant="Variant.Outlined"/>
             </MudItem>
-            
+
+            <!-- Описание -->
+            <MudItem xs="12">
+                <MudTextField T="string" @bind-Value="Task.Description"
+                              Label="Описание"
+                              Lines="3"
+                              Variant="Variant.Outlined"/>
+            </MudItem>
+
+            <!-- Связи с другими задачами -->
+            @if (IsEdit)
+            {
+                <MudItem xs="12">
+                    <TaskRelationsEditor Task="Task"/>
+                </MudItem>
+            }
             <MudItem xs="12">
                 <MudSwitch T="bool" @bind-Checked="Task.IsRecurring" 
-                          Color="Color.Info">
+                           Color="Color.Info">
                     Повторяющаяся задача
                 </MudSwitch>
             </MudItem>
 
-            <MudItem xs="12">
-                <MudSwitch T="bool" @bind-Checked="Task.IsProcrastinationResistant" 
-                          Color="Color.Success">
-                    Устойчива к прокрастинации
-                </MudSwitch>
-            </MudItem>
-            
-            @if (IsEdit)
+            @if (Task.IsRecurring)
             {
                 <MudItem xs="12">
-                    <MudText Typo="Typo.subtitle2" Class="mb-2">Зависимости</MudText>
-                    <DependencyManager Task="Task" />
+                    <RecurrenceSettings @bind-RecurrencePattern="Task.Recurrence" />
                 </MudItem>
             }
         </MudGrid>
     </DialogContent>
     <DialogActions>
-        <MudButton Variant="Variant.Text" 
-                  OnClick="Cancel"
-                  Color="Color.Default">
+        <MudButton Variant="Variant.Text"
+                   OnClick="Cancel"
+                   Color="Color.Default">
             Отмена
         </MudButton>
-        <MudButton Variant="Variant.Filled" 
-                  Color="Color.Primary" 
-                  OnClick="SaveTask"
-                  Disabled="@string.IsNullOrWhiteSpace(Task.Title)">
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="SaveTask"
+                   Disabled="@string.IsNullOrWhiteSpace(Task.Title)">
             @(IsEdit ? "Сохранить" : "Создать")
         </MudButton>
     </DialogActions>
@@ -189,7 +176,7 @@
             {
                 await TaskRepo.AddAsync(Task);
                 Snackbar.Add("Задача создана", Severity.Success);
-                
+
                 var settings = await SettingsRepo.GetUserSettingsAsync();
                 if (settings.AutoRecalculateOnAdd)
                 {
@@ -210,4 +197,5 @@
     {
         MudDialog.Cancel();
     }
+
 }

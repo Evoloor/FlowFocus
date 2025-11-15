@@ -1,0 +1,264 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Статистика дня</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">@DateTime.Now.ToString("dd MMMM yyyy")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <!-- Основная статистика -->
+            <MudItem xs="12" Class="mb-4">
+                <MudText Typo="Typo.subtitle1" Class="mb-3">Общая статистика</MudText>
+
+                <MudGrid>
+                    <MudItem xs="6" sm="3">
+                        <MudPaper Class="pa-3 text-center" Elevation="1">
+                            <MudText Typo="Typo.h4" Color="Color.Primary">@TotalTasks</MudText>
+                            <MudText Typo="Typo.caption">Всего задач</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudPaper Class="pa-3 text-center" Elevation="1">
+                            <MudText Typo="Typo.h4" Color="Color.Success">@CompletedCount</MudText>
+                            <MudText Typo="Typo.caption">Завершено</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudPaper Class="pa-3 text-center" Elevation="1">
+                            <MudText Typo="Typo.h4" Color="Color.Warning">@ActiveCount</MudText>
+                            <MudText Typo="Typo.caption">Активных</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudPaper Class="pa-3 text-center" Elevation="1">
+                            <MudText Typo="Typo.h4" Color="Color.Error">@BlockedCount</MudText>
+                            <MudText Typo="Typo.caption">Заблокировано</MudText>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudItem>
+
+            <!-- Прогресс выполнения -->
+            <MudItem xs="12" Class="mb-4">
+                <div class="d-flex justify-space-between align-center mb-2">
+                    <MudText Typo="Typo.subtitle2">Прогресс выполнения</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Primary">@CompletionPercent.ToString("0")%</MudText>
+                </div>
+                <MudProgressLinear Color="Color.Success"
+                                   Value="@CompletionPercent"/>
+            </MudItem>
+
+            <!-- Временные метрики -->
+            <MudItem xs="12" Class="mb-4">
+                <MudText Typo="Typo.subtitle1" Class="mb-3">Временные метрики</MudText>
+
+                <MudGrid>
+                    <MudItem xs="12" sm="6">
+                        <MudPaper Class="pa-3" Elevation="1">
+                            <div class="d-flex justify-space-between align-center">
+                                <MudText Typo="Typo.body2">Общее время:</MudText>
+                                <MudText Typo="Typo.h6" Color="Color.Info">@TotalHours.ToString("0.0") ч</MudText>
+                            </div>
+                            <div class="d-flex justify-space-between align-center mt-2">
+                                <MudText Typo="Typo.body2">Лимит времени:</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">@Settings.DailyTimeLimit ч</MudText>
+                            </div>
+                            @*<MudProgressLinear Color="@GetTimeProgressColor()"
+                                               Value="@TimeUsagePercent"
+                                               Class="mt-2"/>*@
+                        </MudPaper>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudPaper Class="pa-3" Elevation="1">
+                            <div class="d-flex justify-space-between align-center">
+                                <MudText Typo="Typo.body2">Общая сложность:</MudText>
+                                <MudText Typo="Typo.h6" Color="Color.Info">@TotalComplexity</MudText>
+                            </div>
+                            <div class="d-flex justify-space-between align-center mt-2">
+                                <MudText Typo="Typo.body2">Лимит сложности:</MudText>
+                                <MudText Typo="Typo.body2"
+                                         Color="Color.Secondary">@Settings.DailyComplexityLimit</MudText>
+                            </div>
+                            @*<MudProgressLinear Color="@GetComplexityProgressColor()"
+                                               Value="@ComplexityUsagePercent"
+                                               Class="mt-2"/>*@
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+
+                @if (HasOverload)
+                {
+                    <MudAlert Severity="Severity.Warning" Class="mt-3" Icon="Icons.Material.Filled.Warning">
+                        <MudText Typo="Typo.body2">Превышены дневные лимиты!</MudText>
+                    </MudAlert>
+                }
+            </MudItem>
+
+            <!-- Баланс задач -->
+            <MudItem xs="12" Class="mb-4">
+                <MudText Typo="Typo.subtitle1" Class="mb-3">Баланс задач</MudText>
+
+                <MudGrid>
+                    <MudItem xs="6" sm="3">
+                        <MudPaper Class="pa-3 text-center" Elevation="1">
+                            <MudText Typo="Typo.h4" Color="Color.Success">@InterestingCount</MudText>
+                            <MudText Typo="Typo.caption">Интересные</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">(≥7/10)</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudPaper Class="pa-3 text-center" Elevation="1">
+                            <MudText Typo="Typo.h4" Color="Color.Warning">@ComplexCount</MudText>
+                            <MudText Typo="Typo.caption">Сложные</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">(≥70)</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudPaper Class="pa-3 text-center" Elevation="1">
+                            <MudText Typo="Typo.h4" Color="Color.Info">@HighPriorityCount</MudText>
+                            <MudText Typo="Typo.caption">Высокий приоритет</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">(≤3)</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudPaper Class="pa-3 text-center" Elevation="1">
+                            <MudText Typo="Typo.h4" Color="Color.Tertiary">@FavoriteCount</MudText>
+                            <MudText Typo="Typo.caption">Избранные</MudText>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+
+                @if (IsUnbalanced)
+                {
+                    <MudAlert Severity="Severity.Info" Class="mt-3">
+                        <MudText Typo="Typo.caption">Рекомендуется баланс интересных и сложных задач</MudText>
+                    </MudAlert>
+                }
+            </MudItem>
+
+            <!-- Распределение по приоритетам -->
+            <MudItem xs="12">
+                <MudText Typo="Typo.subtitle1" Class="mb-3">Распределение по приоритетам</MudText>
+
+                <MudGrid>
+                    @foreach (var priorityGroup in PriorityDistribution)
+                    {
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudPaper Class="pa-2" Elevation="0" Outlined>
+                                <div class="d-flex justify-space-between align-center">
+                                    <MudChip T="string" Size="Size.Small"
+                                             Color="@GetPriorityColor(priorityGroup.Priority)">
+                                        @GetPriorityName(priorityGroup.Priority)
+                                    </MudChip>
+                                    <MudText Typo="Typo.body2">@priorityGroup.Count</MudText>
+                                </div>
+                            </MudPaper>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text"
+                   OnClick="@Close"
+                   Color="Color.Default">
+            Закрыть
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter] public List<TaskItem> TodayTasks { get; set; } = [];
+
+    [Parameter] public UserSettings Settings { get; set; } = new();
+
+    // Вычисляемые свойства
+    private int TotalTasks => TodayTasks.Count;
+    private int CompletedCount => TodayTasks.Count(t => t.Status == TaskStatus.Completed);
+    private int InterestingCount => TodayTasks.Count(t => t.Interest >= 7);
+    private int ComplexCount => TodayTasks.Count(t => t.Complexity >= 70);
+    private double TotalHours => TodayTasks.Where(t => t.Status != TaskStatus.Completed).Sum(t => t.EstimatedHours);
+    private int TotalComplexity => TodayTasks.Where(t => t.Status != TaskStatus.Completed).Sum(t => t.Complexity);
+    private int HighPriorityCount => TodayTasks.Count(t => t.UserPriority <= 3);
+    private int FavoriteCount => TodayTasks.Count(t => t.IsFavorite);
+    private int ActiveCount => TodayTasks.Count(t => t.Status == TaskStatus.Active);
+    private int BlockedCount => TodayTasks.Count(t => !t.CanBeStarted());
+    private double CompletionPercent => TotalTasks > 0 ? CompletedCount * 100.0 / TotalTasks : 0;
+    private bool HasOverload => TotalHours > Settings.DailyTimeLimit || TotalComplexity > Settings.DailyComplexityLimit;
+    private bool IsUnbalanced => InterestingCount == 0 || ComplexCount > TotalTasks * 0.4;
+    private double TimeUsagePercent => Settings.DailyTimeLimit > 0 ? Math.Min(TotalHours / Settings.DailyTimeLimit * 100, 100) : 0;
+    private double ComplexityUsagePercent => Settings.DailyComplexityLimit > 0 ? Math.Min(TotalComplexity * 100.0 / Settings.DailyComplexityLimit, 100) : 0;
+
+
+    private void Close()
+    {
+        MudDialog?.Close();
+    }
+
+    private List<PriorityGroup> PriorityDistribution => TodayTasks
+        .GroupBy(t => t.UserPriority)
+        .Select(g => new PriorityGroup { Priority = g.Key, Count = g.Count() })
+        .OrderBy(g => g.Priority)
+        .ToList();
+
+    /*private Color GetTimeProgressColor()
+    {
+        return TimeUsagePercent switch
+        {
+            < 80 => Color.Success,
+            < 100 => Color.Warning,
+            _ => Color.Error
+        };
+    }*/
+
+    /*private Color GetComplexityProgressColor()
+    {
+        return ComplexityUsagePercent switch
+        {
+            < 80 => Color.Success,
+            < 100 => Color.Warning,
+            _ => Color.Error
+        };
+    }*/
+
+    private static Color GetPriorityColor(int priority)
+    {
+        return priority switch
+        {
+            0 => Color.Success,
+            1 => Color.Error,
+            3 => Color.Warning,
+            5 => Color.Info,
+            8 => Color.Secondary,
+            13 => Color.Tertiary,
+            _ => Color.Default
+        };
+    }
+
+    private static string GetPriorityName(int priority)
+    {
+        return priority switch
+        {
+            0 => "Гарантированные",
+            1 => "Неотложные",
+            3 => "Срочные",
+            5 => "Важные",
+            8 => "Среднесрочные",
+            13 => "Долгосрочные",
+            21 => "Саморазвитие",
+            34 => "Мечты",
+            _ => $"Приоритет {priority}",
+        };
+    }
+
+
+    private class PriorityGroup
+    {
+        public int Priority { get; init; }
+        public int Count { get; init; }
+    }
+
+}

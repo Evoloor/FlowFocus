@@ -1,0 +1,100 @@
+@inject ITaskRepository TaskRepo
+@inject IDependencyRepository DependencyRepo
+@inject ISnackbar Snackbar
+
+<MudPaper Class="pa-3" Elevation="0" Outlined="true">
+    <MudText Typo="Typo.subtitle2" Class="mb-3">Связи с другими задачами</MudText>
+    
+    <MudItem xs="12" Class="mb-3">
+        <MudSelect T="TaskItem" @bind-Value="_selectedRelatedTask" 
+                  Label="Выберите связанную задачу"
+                  Variant="Variant.Outlined"
+                  ToStringFunc="(task) => task?.Title ?? string.Empty"
+                  SearchFunc="SearchTasks"
+                  Clearable="true">
+            @foreach (var task in _availableTasks)
+            {
+                <MudSelectItem T="TaskItem" Value="task">@task.Title</MudSelectItem>
+            }
+        </MudSelect>
+    </MudItem>
+    
+    @if (_selectedRelatedTask != null)
+    {
+        <MudItem xs="12">
+            <MudSelect T="RelationType" @bind-Value="_selectedRelationType" 
+                      Label="Тип связи"
+                      Variant="Variant.Outlined">
+                <MudSelectItem T="RelationType" Value="RelationType.Parent">Родительская</MudSelectItem>
+                <MudSelectItem T="RelationType" Value="RelationType.Child">Дочерняя</MudSelectItem>
+                <MudSelectItem T="RelationType" Value="RelationType.Related">Связанная</MudSelectItem>
+                <MudSelectItem T="RelationType" Value="RelationType.Blocking">Блокирующая</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        
+        @if (_selectedRelationType == RelationType.Blocking)
+        {
+            <MudItem xs="12">
+                <MudSelect T="DisplayType" @bind-Value="_blockingDisplayType"
+                          Label="Отображение блокирующей задачи"
+                          Variant="Variant.Outlined">
+                    <MudSelectItem T="DisplayType" Value="DisplayType.Independent">Самостоятельно</MudSelectItem>
+                    <MudSelectItem T="DisplayType" Value="DisplayType.Nested">Вложенно</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        }
+        
+        <MudItem xs="12" Class="mt-2">
+            <MudButton Variant="Variant.Outlined" 
+                      Color="Color.Primary"
+                      OnClick="AddRelation"
+                      Size="Size.Small">
+                Добавить связь
+            </MudButton>
+        </MudItem>
+    }
+</MudPaper>
+
+@code {
+    [Parameter] public TaskItem Task { get; set; } = null!;
+    
+    private List<TaskItem> _availableTasks = [];
+    private TaskItem? _selectedRelatedTask;
+    private RelationType _selectedRelationType;
+    private DisplayType _blockingDisplayType = DisplayType.Independent;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var allTasks = await TaskRepo.GetAllAsync();
+        _availableTasks = allTasks.Where(t => t.Id != Task.Id).ToList();
+    }
+
+    private async Task AddRelation()
+    {
+        if (_selectedRelatedTask == null) return;
+        
+        // Логика добавления связи в зависимости от типа
+        // ...
+        
+        Snackbar.Add("Связь добавлена", Severity.Success);
+        _selectedRelatedTask = null;
+    }
+
+    private async Task<IEnumerable<TaskItem>> SearchTasks(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return _availableTasks;
+
+        return _availableTasks.Where(t => 
+            t.Title.Contains(value, StringComparison.OrdinalIgnoreCase)
+        ).ToList();
+    }
+
+    private enum RelationType
+    {
+        Parent,
+        Child, 
+        Related,
+        Blocking
+    }
+}

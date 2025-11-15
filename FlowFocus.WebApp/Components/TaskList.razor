@@ -135,7 +135,7 @@
         {
             query = query.Where(t => 
                 t.Title.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
-                (t.Description?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) == true) ||
+                t.Description?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) == true ||
                 t.Tags.Any(tag => tag.Contains(_searchText, StringComparison.OrdinalIgnoreCase))
             );
         }

@@ -49,17 +49,18 @@
                         Балансировать
                     </MudButton>
                     <MudButton Variant="Variant.Outlined"
-                              Color="Color.Info"
-                              StartIcon="Icons.Material.Filled.PlayArrow"
-                              OnClick="ProcessDayStart"
-                              Size="Size.Small">
+                               Color="Color.Info"
+                               StartIcon="Icons.Material.Filled.PlayArrow"
+                               OnClick="ProcessDayStart"
+                               Size="Size.Small">
                         Начать день
                     </MudButton>
                     <MudButton Variant="Variant.Outlined"
-                              StartIcon="Icons.Material.Filled.Settings"
-                              OnClick="ShowSettings"
-                              Size="Size.Small">
-                        Настройки
+                                           Color="Color.Info"
+                                           StartIcon="Icons.Material.Filled.Analytics"
+                                           OnClick="ShowStatistics"
+                                           Size="Size.Small">
+                        Статистика
                     </MudButton>
                 </div>
             </div>
@@ -111,70 +112,15 @@
         </MudItem>
 
         <!-- Боковая панель статистики -->
-        <MudItem xs="12" md="4">
-            <MudPaper Class="pa-4 sticky-sidebar">
-                <MudText Typo="Typo.h6" Class="mb-3">Статистика дня</MudText>
-                
-                <div class="mb-4">
-                    <MudText Typo="Typo.body2">Всего задач: <MudText Color="Color.Primary" Typo="Typo.body1">@_todayTasks.Count</MudText></MudText>
-                    <MudText Typo="Typo.body2">Завершено: <MudText Color="Color.Success" Typo="Typo.body1">@CompletedCount</MudText></MudText>
-                    <MudText Typo="Typo.body2">Активных: <MudText Color="Color.Warning" Typo="Typo.body1">@ActiveCount</MudText></MudText>
-                    <MudText Typo="Typo.body2">Заблокировано: <MudText Color="Color.Error" Typo="Typo.body1">@BlockedCount</MudText></MudText>
-                </div>
-
-                <MudProgressLinear Color="Color.Success" 
-                                  Value="@CompletionPercent" 
-                                  Class="mb-2" />
-                <MudText Typo="Typo.caption">Прогресс: @CompletionPercent.ToString("0")%</MudText>
-
-                <div class="mt-4">
-                    <MudText Typo="Typo.body2">Общее время: <MudText Color="Color.Info" Typo="Typo.body1">@TotalHours.ToString("0.0") ч</MudText></MudText>
-                    <MudText Typo="Typo.body2">Общая сложность: <MudText Color="Color.Info" Typo="Typo.body1">@TotalComplexity</MudText></MudText>
-                    <MudText Typo="Typo.body2">Лимит времени: <MudText Color="Color.Secondary" Typo="Typo.body1">@_settings.DailyTimeLimit ч</MudText></MudText>
-                    <MudText Typo="Typo.body2">Лимит сложности: <MudText Color="Color.Secondary" Typo="Typo.body1">@_settings.DailyComplexityLimit</MudText></MudText>
-                </div>
-
-                @if (HasOverload)
-                {
-                    <MudAlert Severity="Severity.Warning" Class="mt-3" Icon="Icons.Material.Filled.Warning">
-                        <MudText Typo="Typo.body2">Превышены дневные лимиты!</MudText>
-                    </MudAlert>
-                }
-
-                <!-- Баланс задач -->
-                <div class="mt-4">
-                    <MudText Typo="Typo.subtitle2" Class="mb-2">Баланс задач</MudText>
-                    <MudText Typo="Typo.body2">Интересные: <MudText Color="Color.Success" Typo="Typo.body1">@InterestingCount</MudText></MudText>
-                    <MudText Typo="Typo.body2">Сложные: <MudText Color="Color.Warning" Typo="Typo.body1">@ComplexCount</MudText></MudText>
-                    
-                    @if (IsUnbalanced)
-                    {
-                        <MudAlert Severity="Severity.Info" Class="mt-2" Size="Size.Small">
-                            <MudText Typo="Typo.caption">Рекомендуется баланс интересных и сложных задач</MudText>
-                        </MudAlert>
-                    }
-                </div>
-            </MudPaper>
-        </MudItem>
     </MudGrid>
 </MudContainer>
 
 @code {
-    private List<TaskItem> _todayTasks = new List<TaskItem>();
+    private List<TaskItem> _todayTasks = [];
     private bool _isLoading = true;
     private UserSettings _settings = new UserSettings();
-    private List<string> _notifications = new List<string>();
+    private List<string> _notifications = [];
 
-    private int CompletedCount => _todayTasks.Count(t => t.Status == TaskStatus.Completed);
-    private int ActiveCount => _todayTasks.Count(t => t.Status == TaskStatus.Active);
-    private int BlockedCount => _todayTasks.Count(t => !t.CanBeStarted());
-    private int InterestingCount => _todayTasks.Count(t => t.Interest >= 7);
-    private int ComplexCount => _todayTasks.Count(t => t.Complexity >= 70);
-    private double CompletionPercent => _todayTasks.Any() ? (CompletedCount * 100.0) / _todayTasks.Count : 0;
-    private double TotalHours => _todayTasks.Where(t => t.Status != TaskStatus.Completed).Sum(t => t.EstimatedHours);
-    private int TotalComplexity => _todayTasks.Where(t => t.Status != TaskStatus.Completed).Sum(t => t.Complexity);
-    private bool HasOverload => TotalHours > _settings.DailyTimeLimit || TotalComplexity > _settings.DailyComplexityLimit;
-    private bool IsUnbalanced => InterestingCount == 0 || ComplexCount > _todayTasks.Count * 0.4;
 
     protected override async Task OnInitializedAsync()
     {
@@ -290,18 +236,15 @@
             Snackbar.Add($"Ошибка планирования: {ex.Message}", Severity.Error);
         }
     }
-
-    private async Task ShowSettings()
+    private async Task ShowStatistics()
     {
-        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<SettingsDialog>("Настройки", options);
-        var result = await dialog.Result;
-
-        if (result is { Canceled: false })
+        var parameters = new DialogParameters
         {
-            _settings = await SettingsRepo.GetUserSettingsAsync();
-            await LoadTodayTasks();
-            await LoadNotifications();
-        }
+            [nameof(StatisticsDialog.TodayTasks)] = _todayTasks,
+            [nameof(StatisticsDialog.Settings)] = _settings
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        await DialogService.ShowAsync<StatisticsDialog>("Статистика дня", parameters, options);
     }
 }

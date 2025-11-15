@@ -34,7 +34,7 @@ public class DependencyRepository(AppDbContext context) : BaseRepository<Depende
             return true;
 
         // Проверка транзитивных зависимостей через рекурсивный запрос
-        return await CheckTransitiveDependencyAsync(targetTaskId, sourceTaskId, new HashSet<int>());
+        return await CheckTransitiveDependencyAsync(targetTaskId, sourceTaskId, []);
     }
 
     private async Task<bool> CheckTransitiveDependencyAsync(int currentTaskId, int targetTaskId, HashSet<int> visited)
@@ -132,7 +132,7 @@ public static class ServiceExtensions
 
     public static async Task InitializeDatabaseAsync(this IServiceProvider serviceProvider)
     {
-// Initialize database
+        // Initialize database
         using var scope = serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
@@ -184,7 +184,7 @@ public class RecurringTaskService(AppDbContext context, ITaskRepository taskRepo
                 Recurrence = task.Recurrence,
                 RecurrenceEndDate = task.RecurrenceEndDate,
                 ParentTaskId = task.Id,
-                Tags = new List<string>(task.Tags),
+                Tags = [..task.Tags],
                 DisplayType = task.DisplayType
             };
 
@@ -249,9 +249,9 @@ public abstract class BaseRepository<T>(AppDbContext context) : IRepository<T> w
 {
     protected readonly AppDbContext _context = context;
 
-    protected readonly Microsoft.Extensions.Caching.Memory.IMemoryCache _cache =
-        new Microsoft.Extensions.Caching.Memory.MemoryCache(
-            new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions());
+    protected readonly IMemoryCache _cache =
+        new MemoryCache(
+            new MemoryCacheOptions());
 
     public virtual async Task<T?> GetByIdAsync(int id)
     {
@@ -310,7 +310,7 @@ public abstract class BaseRepository<T>(AppDbContext context) : IRepository<T> w
 
     protected virtual void InvalidateCache()
     {
-        if (_cache is Microsoft.Extensions.Caching.Memory.MemoryCache memoryCache)
+        if (_cache is MemoryCache memoryCache)
         {
             // Упрощенная инвалидация - в продакшене нужно более точное управление кэшем
             memoryCache.Compact(1.0);
@@ -394,10 +394,7 @@ public class AppDbContext : DbContext
         });
 
         // UserSettings configuration
-        modelBuilder.Entity<UserSettings>(entity =>
-        {
-            entity.HasData(new UserSettings { Id = 1 });
-        }); 
+        modelBuilder.Entity<UserSettings>(entity => { entity.HasData(new UserSettings { Id = 1 }); });
     }
 }
 
