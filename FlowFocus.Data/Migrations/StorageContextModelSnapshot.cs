@@ -46,7 +46,7 @@ namespace FlowFocus.Data.Migrations
 
                     b.HasIndex("TaskItemId");
 
-                    b.ToTable("TaskBlockers");
+                    b.ToTable("TaskBlockers", (string)null);
                 });
 
             modelBuilder.Entity("FlowFocus.Core.Models.TaskItem", b =>
@@ -98,7 +98,7 @@ namespace FlowFocus.Data.Migrations
 
                     b.HasIndex("Status");
 
-                    b.ToTable("Tasks");
+                    b.ToTable("Tasks", (string)null);
                 });
 
             modelBuilder.Entity("FlowFocus.Core.Models.UserAppSettings", b =>
@@ -124,7 +124,7 @@ namespace FlowFocus.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Settings");
+                    b.ToTable("Settings", (string)null);
                 });
 
             modelBuilder.Entity("FlowFocus.Core.Models.TaskBlocker", b =>

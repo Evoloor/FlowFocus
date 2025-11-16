@@ -226,7 +226,8 @@ public class StorageContext : DbContext
         var folder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         if (string.IsNullOrWhiteSpace(folder))
             folder = ".";
-        _dbPath = Path.Combine(folder, dbPath ?? "flowfocus.db");
+        //_dbPath = Path.Combine(folder, dbPath ?? "flowfocus.db");
+        _dbPath = "flowfocus.db";
     }
 
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
