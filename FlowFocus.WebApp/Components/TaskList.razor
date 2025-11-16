@@ -1,6 +1,6 @@
 @using FlowFocus.WebApp.Dialogs
 @inject ITaskRepository TaskRepo
-@inject IDialogService DialogService
+@inject IDialogService DialogServiceObj
 
 <MudGrid>
     <MudItem xs="12" Class="d-flex justify-space-between align-center mb-4">
@@ -155,7 +155,7 @@
     private async Task ShowCreateDialog()
     {
         var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<TaskEditDialog>("Новая задача", options);
+        var dialog = await DialogServiceObj.ShowAsync<TaskEditDialog>("Новая задача", options);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })

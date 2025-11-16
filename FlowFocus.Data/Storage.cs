@@ -135,20 +135,26 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
         {
             if (entity.Id == 0)
             {
-                var maxId = GetBaseQuery()
-                    .Select(e => e.Id)
-                    .DefaultIfEmpty(0)
-                    .Max();
-                entity.Id = maxId + 1;
+                entity.Id = GetNextId();
             }
 
             entity.LastChangesOn = DateTime.UtcNow;
-
-            // Добавляем новую сущность
             GetDbSet().Add(entity);
             context.SaveChanges();
             MarkDirty();
         }
+    }
+
+    private int GetNextId()
+    {
+        var maxId = context.Set<T>()
+            .AsNoTracking()
+            .Select(e => (int?)e.Id)
+            .Max();
+    
+        if (maxId.HasValue)
+            return maxId.Value + 1;
+        return 1;
     }
 
     public virtual void Update(T entity)

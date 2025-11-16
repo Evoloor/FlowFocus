@@ -129,7 +129,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Ошибка: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Ошибка: {ex.Message}; {ex.InnerException?.Message}", Severity.Error);
         }
     }
 

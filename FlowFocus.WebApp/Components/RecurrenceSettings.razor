@@ -10,50 +10,54 @@
             <MudSelectItem T="RecurrenceType" Value="RecurrenceType.Monthly">Ежемесячно</MudSelectItem>
         </MudSelect>
     </MudItem>
-    
-    @if (RecurrencePattern.Type == RecurrenceType.Daily)
+
+    @switch (RecurrencePattern.Type)
     {
-        <MudItem xs="12">
-            <MudNumericField T="int" @bind-Value="RecurrencePattern.Interval" 
-                                    Label="Интервал (дни)" 
-                                    Min="1" 
-                                    Max="30"
-                                    Variant="Variant.Outlined" />
-        </MudItem>
-    }
-    else if (RecurrencePattern.Type == RecurrenceType.Weekly)
-    {
-        <MudItem xs="12">
-            <MudNumericField T="int" @bind-Value="RecurrencePattern.Interval" 
-                                    Label="Интервал (недели)" 
-                                    Min="1" 
-                                    Max="12"
-                                    Variant="Variant.Outlined" />
-        </MudItem>
-        <MudItem xs="12">
-            <MudText Typo="Typo.body2" Class="mb-2">Дни недели:</MudText>
-            <div class="d-flex gap-1">
-                @foreach (var day in Enum.GetValues<DayOfWeek>())
-                {
-                    <MudButton Variant="@(IsDaySelected(day) ? Variant.Filled : Variant.Outlined)"
-                              Color="Color.Primary"
-                              Size="Size.Small"
-                              OnClick="() => ToggleDay(day)">
-                        @GetDayName(day)
-                    </MudButton>
-                }
-            </div>
-        </MudItem>
-    }
-    else if (RecurrencePattern.Type == RecurrenceType.Monthly)
-    {
-        <MudItem xs="12">
-            <MudText Typo="Typo.body2" Class="mb-2">Выберите даты месяца:</MudText>
-            <MudDatePicker @bind-Date="_tempDate"
-                          MultiSelection="true"
-                          PickerVariant="PickerVariant.Inline"
-                          Label="Даты повторения" />
-        </MudItem>
+        case RecurrenceType.Daily:
+            <MudItem xs="12">
+                <MudNumericField T="int" @bind-Value="RecurrencePattern.Interval" 
+                                 Label="Интервал (дни)" 
+                                 Min="1" 
+                                 Max="30"
+                                 Variant="Variant.Outlined" />
+            </MudItem>
+            break;
+        case RecurrenceType.Weekly:
+            <MudItem xs="12">
+                <MudNumericField T="int" @bind-Value="RecurrencePattern.Interval" 
+                                 Label="Интервал (недели)" 
+                                 Min="1" 
+                                 Max="12"
+                                 Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudText Typo="Typo.body2" Class="mb-2">Дни недели:</MudText>
+                <div class="d-flex gap-1">
+                    @foreach (var day in Enum.GetValues<DayOfWeek>())
+                    {
+                        <MudButton Variant="@(IsDaySelected(day) ? Variant.Filled : Variant.Outlined)"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   OnClick="@(() => ToggleDay(day))">
+                            @GetDayName(day)
+                        </MudButton>
+                    }
+                </div>
+            </MudItem>
+            break;
+        case RecurrenceType.Monthly:
+            <MudItem xs="12">
+                <MudText Typo="Typo.body2" Class="mb-2">Выберите даты месяца:</MudText>
+                <MudDatePicker @bind-Date="_tempDate"
+                               PickerVariant="PickerVariant.Inline"
+                               Label="Даты повторения" />
+            </MudItem>
+            break;
+        case RecurrenceType.Yearly:
+            // TODO: Yearly
+            break;
+        default:
+            throw new ArgumentOutOfRangeException();
     }
 </MudPaper>
 

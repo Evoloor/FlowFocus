@@ -1,5 +1,7 @@
+@using FlowFocus.WebApp.Dialogs
 @inject ITaskRepository TaskRepo
 @inject ISnackbar Snackbar
+@inject IDialogService DialogServiceObj
 
 <MudPaper Class="pa-4 quick-add-task" Elevation="1">
     <div class="d-flex align-center gap-2">
@@ -17,7 +19,7 @@
         </MudButton>
         
         <MudIconButton Icon="@Icons.Material.Filled.Tune" 
-                       OnClick="@ShowFullCreateDialog" />
+                       OnClick="@ShowFullCreateDialogAsync" />
     </div>
 </MudPaper>
 
@@ -55,9 +57,9 @@
         }
     }
 
-    private void ShowFullCreateDialog()
+    private async Task ShowFullCreateDialogAsync()
     {
-        // TODO: This would open the full task creation dialog
-        // Implementation depends on parent component
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        _ = await DialogServiceObj.ShowAsync<TaskEditDialog>("Новая задача", options);
     }
 }

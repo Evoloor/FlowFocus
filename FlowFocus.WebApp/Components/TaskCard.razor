@@ -2,7 +2,7 @@
 @using FlowFocus.WebApp.Dialogs
 @using Color = MudBlazor.Color
 @using Size = MudBlazor.Size
-@inject IDialogService DialogService
+@inject IDialogService DialogServiceObj
 @inject ITaskRepository TaskRepo
 @inject ISnackbar Snackbar
 <MudCard Class="@($"my-2 task-card {GetTaskCardClass()}")" Elevation="2">
@@ -124,7 +124,7 @@
         };
 
         var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<TaskEditDialog>("Редактировать задачу", parameters, options);
+        var dialog = await DialogServiceObj.ShowAsync<TaskEditDialog>("Редактировать задачу", parameters, options);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })
@@ -143,7 +143,7 @@
         };
 
         var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall };
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Подтверждение", parameters, options);
+        var dialog = await DialogServiceObj.ShowAsync<ConfirmDialog>("Подтверждение", parameters, options);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })

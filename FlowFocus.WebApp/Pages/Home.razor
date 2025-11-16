@@ -4,7 +4,7 @@
 @using FlowFocus.WebApp.Dialogs
 @inject ITaskRepository TaskRepo
 @inject IPlannerService PlannerService
-@inject IDialogService DialogService
+@inject IDialogService DialogServiceObj
 @inject ISnackbar Snackbar
 @inject ISettingsRepository SettingsRepo
 @inject INotificationService NotificationService
@@ -240,6 +240,6 @@
         };
 
         var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
-        await DialogService.ShowAsync<StatisticsDialog>("Статистика дня", parameters, options);
+        await DialogServiceObj.ShowAsync<StatisticsDialog>("Статистика дня", parameters, options);
     }
 }

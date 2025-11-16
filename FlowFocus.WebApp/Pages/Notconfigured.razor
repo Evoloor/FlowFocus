@@ -1,7 +1,7 @@
 @page "/not-configured"
 @using FlowFocus.WebApp.Dialogs
 @inject ITaskRepository TaskRepo
-@inject IDialogService DialogService
+@inject IDialogService DialogServiceObj
 @inject ISnackbar Snackbar
 
 <PageTitle>FlowFocus - Ненастроенные</PageTitle>
@@ -120,7 +120,7 @@
         };
 
         var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<TaskEditDialog>("Настройка задачи", parameters, options);
+        var dialog = await DialogServiceObj.ShowAsync<TaskEditDialog>("Настройка задачи", parameters, options);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })
@@ -139,7 +139,7 @@
         };
 
         var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall };
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Подтверждение", parameters, options);
+        var dialog = await DialogServiceObj.ShowAsync<ConfirmDialog>("Подтверждение", parameters, options);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })
@@ -161,7 +161,7 @@
         };
 
         var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall };
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Подтверждение", parameters, options);
+        var dialog = await DialogServiceObj.ShowAsync<ConfirmDialog>("Подтверждение", parameters, options);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })

@@ -1,6 +1,6 @@
 @using FlowFocus.WebApp.Dialogs
 @inject IDependencyRepository DependencyRepo
-@inject IDialogService DialogService
+@inject IDialogService DialogServiceObj
 @inject ISnackbar Snackbar
 
 <MudPaper Class="pa-3" Elevation="0" Outlined="true">
@@ -74,7 +74,7 @@
         };
 
         var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<AddDependencyDialog>("Добавить зависимость", parameters, options);
+        var dialog = await DialogServiceObj.ShowAsync<AddDependencyDialog>("Добавить зависимость", parameters, options);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })
@@ -93,7 +93,7 @@
         };
 
         var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall };
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Подтверждение", parameters, options);
+        var dialog = await DialogServiceObj.ShowAsync<ConfirmDialog>("Подтверждение", parameters, options);
         var result = await dialog.Result;
 
         if (result is { Canceled: false })
