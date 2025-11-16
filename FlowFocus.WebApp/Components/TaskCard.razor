@@ -1,4 +1,7 @@
+@using System.Drawing
 @using FlowFocus.WebApp.Dialogs
+@using Color = MudBlazor.Color
+@using Size = MudBlazor.Size
 @inject IDialogService DialogService
 @inject ITaskRepository TaskRepo
 @inject IProcrastinationService ProcrastinationService
@@ -6,7 +9,7 @@
 <MudCard Class="@($"my-2 task-card {GetTaskCardClass()}")" Elevation="2">
     <div class="d-flex">
         <!-- Вертикальный индикатор приоритета -->
-        <div class="priority-indicator-vertical" style="@GetPriorityStyle(Task.UserPriority)"></div>
+        <div class="priority-indicator-vertical" style="@($"background-color: {ColorTranslator.ToHtml(PriorityService.Shared.GetColor(Task.UserPriority)) }")"></div>
 
         <div class="flex-grow-1 pa-3">
             <div class="d-flex justify-space-between align-start">
@@ -36,7 +39,7 @@
 
                     <!-- Метки -->
                     <div class="d-flex align-center gap-2 mt-2 flex-wrap">
-                        <MudChip T="string" Size="Size.Small" Color="@GetPriorityColor(Task.UserPriority)">
+                        <MudChip T="string" Size="Size.Small">
                             Приоритет: @Task.UserPriority
                         </MudChip>
                         <MudChip T="string" Size="Size.Small" Color="Color.Secondary">
@@ -123,33 +126,6 @@
 
     private string GetTitleClass() => Task.Status == TaskStatus.Completed ? "text-strikethrough" : "";
     private string GetDescriptionClass() => Task.Status == TaskStatus.Completed ? "text-strikethrough" : "";
-
-    private string GetPriorityStyle(int priority)
-    {
-        var color = priority switch
-        {
-            0 => "#4CAF50", 1 => "#F44336", 3 => "#FF9800", 5 => "#2196F3",
-            8 => "#9C27B0", 13 => "#607D8B", 21 => "#00BCD4", 34 => "#FF4081",
-            _ => "#757575"
-        };
-        return $"background: {color}";
-    }
-
-    private Color GetPriorityColor(int priority)
-    {
-        return priority switch
-        {
-            0 => Color.Success,
-            1 => Color.Error,
-            3 => Color.Warning,
-            5 => Color.Info,
-            8 => Color.Secondary,
-            13 => Color.Tertiary,
-            21 => Color.Default,
-            34 => Color.Default,
-            _ => Color.Default
-        };
-    }
 
     private async Task EditTask(TaskItem task)
     {

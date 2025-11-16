@@ -33,15 +33,38 @@
             </MudItem>
 
             <!-- Приоритет -->
-            <MudItem xs="12" sm="4">
-                <MudSelect T="int" @bind-Value="Task.UserPriority"
+            <MudItem xs="12" sm="6">
+                <!-- Слайдер -->
+                <MudSlider T="int" @bind-Value="Task.UserPriority"
+                           Min="0" Max="35"
+                           Step="1"
+                           Immediate="true"
                            Label="Приоритет"
-                           Variant="Variant.Outlined">
-                    @foreach (var priority in _priorityOptions)
+                           ValueLabel="true"
+                           ValueLabelFormat="{0}" />
+    
+                <!-- Референсные точки Фибоначчи -->
+                <div class="d-flex justify-space-between mt-1 px-2">
+                    @foreach (var fib in new[] { 0, 1, 3, 5, 8, 13, 21, 34 })
                     {
-                        <MudSelectItem T="int" Value="priority.Value">@priority.Text</MudSelectItem>
+                        <MudText Typo="Typo.caption" 
+                                 Color="Task.UserPriority == fib ? Color.Primary : Color.Secondary"
+                                 Style="cursor: pointer;"
+                                 OnClick="@(() => Task.UserPriority = fib)">
+                            @fib
+                        </MudText>
                     }
-                </MudSelect>
+                </div>
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <!-- Числовое поле -->
+                <MudNumericField T="int" @bind-Value="Task.UserPriority"
+                                 Min="0" Max="35"
+                                 Label="Приоритет"
+                                 Variant="Variant.Outlined"
+                                 Immediate="true"
+                                 HelperText="@GetPriorityDisplayText(Task.UserPriority)" />
             </MudItem>
 
             <!-- Интересность -->
@@ -120,21 +143,10 @@
 @code {
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter] public TaskItem? ExistingTask { get; set; }
+    public PriorityService PriorityService { get; set; } = PriorityService.Shared;
 
     private TaskItem Task { get; set; } = new();
     private bool IsEdit => ExistingTask != null;
-
-    private readonly List<(int Value, string Text)> _priorityOptions =
-    [
-        (0, "0 - Гарантированные"),
-        (1, "1 - Неотложные"),
-        (3, "3 - Срочные"),
-        (5, "5 - Важные"),
-        (8, "8 - Среднесрочные"),
-        (13, "13 - Долгосрочные"),
-        (21, "21 - Саморазвитие"),
-        (34, "34 - Мечты")
-    ];
 
     protected override void OnParametersSet()
     {
@@ -197,5 +209,24 @@
     {
         MudDialog.Cancel();
     }
+    private string GetPriorityDisplayText(int priority)
+    {
+        // Если значение не установлено (создание новой задачи)
+        if (priority == 0 && !IsEditingExistingTask) // Добавь флаг редактирования
+            return "Не выбран";
+    
+        // Проверяем, является ли значение референсным
+        var fibValues = new[] { 0, 1, 3, 5, 8, 13, 21, 34 };
+        if (fibValues.Contains(priority))
+        {
+            // Преобразуем в enum и получаем название
+            var priorityEnum = (Priority)priority;
+            return PriorityService.Shared.GetName(priorityEnum);
+        }
+    
+        // Для не-референсных значений показываем просто число
+        return priority.ToString();
+    }
 
+    private bool IsEditingExistingTask => Task?.Id != 0; // или твоя логика определения
 }

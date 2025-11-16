@@ -372,7 +372,6 @@ public class ProcrastinationService : IProcrastinationService
         return tasks.Where(t => t.CanBeProcrastinated());
     }
 }
-
 // Расширенный планировщик с улучшенной балансировкой
 // public class AdvancedPlannerService : BasePlannerService
 // {

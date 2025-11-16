@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FlowFocus.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251115120451_Reworkv2_4")]
-    partial class Reworkv2_4
+    [Migration("20251116073023_InitReworkedV2")]
+    partial class InitReworkedV2
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

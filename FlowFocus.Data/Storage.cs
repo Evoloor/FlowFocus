@@ -310,7 +310,7 @@ public class RecurringTaskService(AppDbContext context, ITaskRepository taskRepo
         if (pattern.DaysOfWeek?.Any() == true)
         {
             // Поиск следующего подходящего дня недели
-            for (int i = 0; i < 7; i++)
+            for (var i = 0; i < 7; i++)
             {
                 var candidate = nextDate.AddDays(i);
                 if (pattern.DaysOfWeek.Contains(candidate.DayOfWeek))
