@@ -8,51 +8,92 @@ using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Data;
 
-public class DependencyRepository(AppDbContext context) : BaseRepository<Dependency>(context), IDependencyRepository
+public class DependencyRepository(AppDbContext context, DataCache dataCache) 
+    : BaseRepository<Dependency>(context, dataCache), IDependencyRepository
 {
-    public async Task<IEnumerable<Dependency>> GetDependenciesForTaskAsync(int taskId)
+    public override Task<Dependency?> GetByIdAsync(int id)
     {
-        return await _context.Dependencies
+        var dependency = _dataCache.GetAllDependencies().FirstOrDefault(d => d.Id == id);
+        return Task.FromResult(dependency);
+    }
+
+    public override Task<IEnumerable<Dependency>> GetAllAsync()
+    {
+        var dependencies = _dataCache.GetAllDependencies();
+        return Task.FromResult(dependencies.AsEnumerable());
+    }
+
+    public override async Task AddAsync(Dependency entity)
+    {
+        _dataCache.AddDependency(entity);
+        await SyncToDatabaseAsync();
+    }
+
+    public override async Task UpdateAsync(Dependency entity)
+    {
+        // Для зависимостей проще удалить и добавить заново
+        _dataCache.RemoveDependency(entity.Id);
+        _dataCache.AddDependency(entity);
+        await SyncToDatabaseAsync();
+    }
+
+    public override async Task DeleteAsync(int id)
+    {
+        _dataCache.RemoveDependency(id);
+        await SyncToDatabaseAsync();
+    }
+
+    public override Task<bool> ExistsAsync(int id)
+    {
+        var exists = _dataCache.GetAllDependencies().Any(d => d.Id == id);
+        return Task.FromResult(exists);
+    }
+
+    public Task<IEnumerable<Dependency>> GetDependenciesForTaskAsync(int taskId)
+    {
+        var dependencies = _dataCache.GetAllDependencies()
             .Where(d => d.SourceTaskId == taskId)
-            .Include(d => d.TargetTask)
-            .ToListAsync();
+            .ToList();
+        return Task.FromResult(dependencies.AsEnumerable());
     }
 
-    public async Task<IEnumerable<Dependency>> GetDependentTasksAsync(int taskId)
+    public Task<IEnumerable<Dependency>> GetDependentTasksAsync(int taskId)
     {
-        return await _context.Dependencies
+        var dependencies = _dataCache.GetAllDependencies()
             .Where(d => d.TargetTaskId == taskId)
-            .Include(d => d.SourceTask)
-            .ToListAsync();
+            .ToList();
+        return Task.FromResult(dependencies.AsEnumerable());
     }
 
-    public async Task<bool> HasCircularDependencyAsync(int sourceTaskId, int targetTaskId)
+    public Task<bool> HasCircularDependencyAsync(int sourceTaskId, int targetTaskId)
     {
         // Проверка прямой циклической зависимости
-        if (await _context.Dependencies.AnyAsync(d =>
-                d.SourceTaskId == targetTaskId && d.TargetTaskId == sourceTaskId))
-            return true;
+        var hasDirectCircular = _dataCache.GetAllDependencies()
+            .Any(d => d.SourceTaskId == targetTaskId && d.TargetTaskId == sourceTaskId);
+            
+        if (hasDirectCircular)
+            return Task.FromResult(true);
 
         // Проверка транзитивных зависимостей через рекурсивный запрос
-        return await CheckTransitiveDependencyAsync(targetTaskId, sourceTaskId, []);
+        return Task.FromResult(CheckTransitiveDependency(targetTaskId, sourceTaskId, []));
     }
 
-    private async Task<bool> CheckTransitiveDependencyAsync(int currentTaskId, int targetTaskId, HashSet<int> visited)
+    private bool CheckTransitiveDependency(int currentTaskId, int targetTaskId, HashSet<int> visited)
     {
         if (!visited.Add(currentTaskId))
             return false;
 
-        var dependencies = await _context.Dependencies
+        var dependencies = _dataCache.GetAllDependencies()
             .Where(d => d.SourceTaskId == currentTaskId)
             .Select(d => d.TargetTaskId)
-            .ToListAsync();
+            .ToList();
 
         foreach (var dependencyId in dependencies)
         {
             if (dependencyId == targetTaskId)
                 return true;
 
-            if (await CheckTransitiveDependencyAsync(dependencyId, targetTaskId, visited))
+            if (CheckTransitiveDependency(dependencyId, targetTaskId, visited))
                 return true;
         }
 
@@ -62,50 +103,90 @@ public class DependencyRepository(AppDbContext context) : BaseRepository<Depende
 
     public async Task RemoveDependenciesForTaskAsync(int taskId)
     {
-        var dependencies = await _context.Dependencies
-            .Where(d => d.SourceTaskId == taskId || d.TargetTaskId == taskId)
-            .ToListAsync();
-
-        _context.Dependencies.RemoveRange(dependencies);
-        await _context.SaveChangesAsync();
-        InvalidateCache();
+        _dataCache.RemoveDependenciesForTask(taskId);
+        await SyncToDatabaseAsync();
     }
 
-    public async Task<IEnumerable<Dependency>> GetBlockingDependenciesAsync(int taskId)
+    public Task<IEnumerable<Dependency>> GetBlockingDependenciesAsync(int taskId)
     {
-        return await _context.Dependencies
+        var dependencies = _dataCache.GetAllDependencies()
             .Where(d => d.SourceTaskId == taskId && d.Type == DependencyType.Blocking)
-            .Include(d => d.TargetTask)
-            .ToListAsync();
+            .ToList();
+        return Task.FromResult(dependencies.AsEnumerable());
     }
 }
 
-public class SettingsRepository(AppDbContext context) : BaseRepository<UserSettings>(context), ISettingsRepository
+public class SettingsRepository(AppDbContext context, DataCache dataCache) 
+    : BaseRepository<UserSettings>(context, dataCache), ISettingsRepository
 {
-    public async Task<UserSettings> GetUserSettingsAsync()
+    public override Task<UserSettings?> GetByIdAsync(int id)
     {
-        var settings = await _context.UserSettings.FirstOrDefaultAsync();
-        if (settings == null)
-        {
-            settings = new UserSettings();
-            await _context.UserSettings.AddAsync(settings);
-            await _context.SaveChangesAsync();
-        }
-
-        return settings;
+        var settings = _dataCache.GetUserSettings();
+        return Task.FromResult<UserSettings?>(settings);
     }
 
-    public async Task<bool> GetAutoRecalculateSettingAsync()
+    public override Task<IEnumerable<UserSettings>> GetAllAsync()
     {
-        var settings = await GetUserSettingsAsync();
-        return settings.AutoRecalculateOnAdd;
+        var settings = new List<UserSettings> { _dataCache.GetUserSettings() };
+        return Task.FromResult(settings.AsEnumerable());
+    }
+
+    public override async Task AddAsync(UserSettings entity)
+    {
+        _dataCache.SetUserSettings(entity);
+        await SyncToDatabaseAsync();
+    }
+
+    public override async Task UpdateAsync(UserSettings entity)
+    {
+        _dataCache.SetUserSettings(entity);
+        await SyncToDatabaseAsync();
+    }
+
+    public override async Task DeleteAsync(int id)
+    {
+        // Создаем настройки по умолчанию
+        _dataCache.SetUserSettings(new UserSettings());
+        await SyncToDatabaseAsync();
+    }
+
+    public override Task<bool> ExistsAsync(int id)
+    {
+        return Task.FromResult(true); // Настройки всегда существуют
+    }
+
+    public Task<UserSettings> GetUserSettingsAsync()
+    {
+        var settings = _dataCache.GetUserSettings();
+        return Task.FromResult(settings);
+    }
+
+    public Task<bool> GetAutoRecalculateSettingAsync()
+    {
+        var settings = _dataCache.GetUserSettings();
+        return Task.FromResult(settings.AutoRecalculateOnAdd);
     }
 
     public async Task UpdateDayStartHourAsync(int hour)
     {
-        var settings = await GetUserSettingsAsync();
-        settings.DayStartHour = Math.Clamp(hour, 0, 23);
-        await UpdateAsync(settings);
+        var settings = _dataCache.GetUserSettings();
+        var updatedSettings = settings.Clone();
+        updatedSettings.DayStartHour = Math.Clamp(hour, 0, 23);
+        _dataCache.SetUserSettings(updatedSettings);
+        await SyncToDatabaseAsync();
+    }
+
+    // Метод для загрузки настроек при старте приложения
+    public async Task LoadSettingsAsync()
+    {
+        var settings = await _context.UserSettings
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
+            
+        if (settings != null)
+        {
+            _dataCache.SetUserSettings(settings);
+        }
     }
 }
 
@@ -114,34 +195,43 @@ public static class ServiceExtensions
     public static IServiceCollection AddDataLayer(this IServiceCollection services)
     {
         services.AddDbContext<AppDbContext>();
+        services.AddSingleton<DataCache>(); // Единый кэш на все приложение
 
-        // Репо
+        // Репозитории
         services.AddScoped<ITaskRepository, TaskRepository>();
         services.AddScoped<IDependencyRepository, DependencyRepository>();
         services.AddScoped<ISettingsRepository, SettingsRepository>();
 
-        // Добавляем сервисы для работы с повторяющимися задачами
+        // Сервисы
         services.AddScoped<IRecurringTaskService, RecurringTaskService>();
         services.AddScoped<IPlannerService, BasicPlannerService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IProcrastinationService, ProcrastinationService>();
-        //services.AddScoped<AdvancedPlannerService>();
 
         return services;
     }
 
     public static async Task InitializeDatabaseAsync(this IServiceProvider serviceProvider)
     {
-        // Initialize database
         using var scope = serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-// Автоматическое создание БД и применение миграций
+        // Автоматическое создание БД и применение миграций
         await context.Database.MigrateAsync();
 
-// Ensure default settings exist
+        // Загружаем все данные в кэш
+        var taskRepo = scope.ServiceProvider.GetRequiredService<ITaskRepository>();
         var settingsRepo = scope.ServiceProvider.GetRequiredService<ISettingsRepository>();
-        await settingsRepo.GetUserSettingsAsync();
+
+        if (taskRepo is TaskRepository concreteTaskRepo)
+        {
+            await concreteTaskRepo.LoadAllDataAsync();
+        }
+
+        if (settingsRepo is SettingsRepository concreteSettingsRepo)
+        {
+            await concreteSettingsRepo.LoadSettingsAsync();
+        }
     }
 }
 
@@ -245,79 +335,6 @@ public class RecurringTaskService(AppDbContext context, ITaskRepository taskRepo
     }
 }
 
-public abstract class BaseRepository<T>(AppDbContext context) : IRepository<T> where T : class
-{
-    protected readonly AppDbContext _context = context;
-
-    protected readonly IMemoryCache _cache =
-        new MemoryCache(
-            new MemoryCacheOptions());
-
-    public virtual async Task<T?> GetByIdAsync(int id)
-    {
-        var cacheKey = $"{typeof(T).Name}_{id}";
-        if (_cache.TryGetValue(cacheKey, out T? cachedEntity))
-            return cachedEntity;
-
-        var entity = await _context.Set<T>().FindAsync(id);
-        if (entity != null)
-            _cache.Set(cacheKey, entity, TimeSpan.FromMinutes(5));
-
-        return entity;
-    }
-
-    public virtual async Task<IEnumerable<T>> GetAllAsync()
-    {
-        var cacheKey = $"{typeof(T).Name}_All";
-        if (_cache.TryGetValue(cacheKey, out IEnumerable<T>? cachedEntities))
-            return cachedEntities ?? new List<T>();
-
-        var entities = await _context.Set<T>().ToListAsync();
-        _cache.Set(cacheKey, entities, TimeSpan.FromMinutes(2));
-
-        return entities;
-    }
-
-    public virtual async Task AddAsync(T entity)
-    {
-        await _context.Set<T>().AddAsync(entity);
-        await _context.SaveChangesAsync();
-        InvalidateCache();
-    }
-
-    public virtual async Task UpdateAsync(T entity)
-    {
-        _context.Set<T>().Update(entity);
-        await _context.SaveChangesAsync();
-        InvalidateCache();
-    }
-
-    public virtual async Task DeleteAsync(int id)
-    {
-        var entity = await GetByIdAsync(id);
-        if (entity != null)
-        {
-            _context.Set<T>().Remove(entity);
-            await _context.SaveChangesAsync();
-            InvalidateCache();
-        }
-    }
-
-    public virtual async Task<bool> ExistsAsync(int id)
-    {
-        return await GetByIdAsync(id) != null;
-    }
-
-    protected virtual void InvalidateCache()
-    {
-        if (_cache is MemoryCache memoryCache)
-        {
-            // Упрощенная инвалидация - в продакшене нужно более точное управление кэшем
-            memoryCache.Compact(1.0);
-        }
-    }
-}
-
 public class AppDbContext : DbContext
 {
     public AppDbContext()
@@ -398,169 +415,366 @@ public class AppDbContext : DbContext
     }
 }
 
-public class TaskRepository(AppDbContext context) : BaseRepository<TaskItem>(context), ITaskRepository
+public class TaskRepository(AppDbContext context, DataCache dataCache) 
+    : BaseRepository<TaskItem>(context, dataCache), ITaskRepository
 {
-    public async Task<IEnumerable<TaskItem>> GetByStatusAsync(TaskStatus status)
+    public override Task<TaskItem?> GetByIdAsync(int id)
     {
-        var cacheKey = $"Tasks_Status_{status}";
-        if (_cache.TryGetValue(cacheKey, out IEnumerable<TaskItem>? cachedTasks))
-            return cachedTasks ?? new List<TaskItem>();
-
-        var tasks = await _context.Tasks
-            .Where(t => t.Status == status)
-            .Include(t => t.Dependencies)
-            .ThenInclude(d => d.TargetTask)
-            .Include(t => t.DependentTasks)
-            .ThenInclude(d => d.SourceTask)
-            .ToListAsync();
-
-        _cache.Set(cacheKey, tasks, TimeSpan.FromMinutes(3));
-        return tasks;
+        var task = _dataCache.GetAllTasks().FirstOrDefault(t => t.Id == id);
+        return Task.FromResult(task);
     }
 
-    public async Task<IEnumerable<TaskItem>> GetByDateAsync(DateTime date)
+    public override Task<IEnumerable<TaskItem>> GetAllAsync()
     {
-        var cacheKey = $"Tasks_Date_{date:yyyyMMdd}";
-        if (_cache.TryGetValue(cacheKey, out IEnumerable<TaskItem>? cachedTasks))
-            return cachedTasks ?? new List<TaskItem>();
+        var tasks = _dataCache.GetAllTasks();
+        return Task.FromResult(tasks.AsEnumerable());
+    }
 
-        var tasks = await _context.Tasks
+    public override async Task AddAsync(TaskItem entity)
+    {
+        _dataCache.AddTask(entity);
+        await SyncToDatabaseAsync();
+    }
+
+    public override async Task UpdateAsync(TaskItem entity)
+    {
+        _dataCache.UpdateTask(entity);
+        await SyncToDatabaseAsync();
+    }
+
+    public override async Task DeleteAsync(int id)
+    {
+        _dataCache.RemoveTask(id);
+        _dataCache.RemoveDependenciesForTask(id);
+        await SyncToDatabaseAsync();
+    }
+
+    public override Task<bool> ExistsAsync(int id)
+    {
+        var exists = _dataCache.GetAllTasks().Any(t => t.Id == id);
+        return Task.FromResult(exists);
+    }
+
+    public Task<IEnumerable<TaskItem>> GetByStatusAsync(TaskStatus status)
+    {
+        var tasks = _dataCache.GetAllTasks()
+            .Where(t => t.Status == status)
+            .ToList();
+        return Task.FromResult(tasks.AsEnumerable());
+    }
+
+    public Task<IEnumerable<TaskItem>> GetByDateAsync(DateTime date)
+    {
+        var tasks = _dataCache.GetAllTasks()
             .Where(t => t.PlannedDate.HasValue &&
                         t.PlannedDate.Value.Date == date.Date)
-            .Include(t => t.Dependencies)
-            .ThenInclude(d => d.TargetTask)
-            .Include(t => t.DependentTasks)
-            .ThenInclude(d => d.SourceTask)
-            .ToListAsync();
-
-        _cache.Set(cacheKey, tasks, TimeSpan.FromMinutes(5));
-        return tasks;
+            .ToList();
+        return Task.FromResult(tasks.AsEnumerable());
     }
 
-    public async Task<IEnumerable<TaskItem>> GetByPriorityRangeAsync(int minPriority, int maxPriority)
+    public Task<IEnumerable<TaskItem>> GetByPriorityRangeAsync(int minPriority, int maxPriority)
     {
-        return await _context.Tasks
+        var tasks = _dataCache.GetAllTasks()
             .Where(t => t.UserPriority >= minPriority && t.UserPriority <= maxPriority)
-            .Include(t => t.Dependencies)
-            .ThenInclude(d => d.TargetTask)
-            .Include(t => t.DependentTasks)
-            .ThenInclude(d => d.SourceTask)
-            .ToListAsync();
+            .ToList();
+        return Task.FromResult(tasks.AsEnumerable());
     }
 
-    public async Task<IEnumerable<TaskItem>> GetWithDependenciesAsync()
+    public Task<IEnumerable<TaskItem>> GetWithDependenciesAsync()
     {
-        return await _context.Tasks
-            .Include(t => t.Dependencies)
-            .ThenInclude(d => d.TargetTask)
-            .Include(t => t.DependentTasks)
-            .ThenInclude(d => d.SourceTask)
-            .ToListAsync();
+        var tasks = _dataCache.GetAllTasks();
+        return Task.FromResult(tasks.AsEnumerable());
     }
 
-    public async Task<IEnumerable<TaskItem>> GetNotConfiguredAsync()
+    public Task<IEnumerable<TaskItem>> GetNotConfiguredAsync()
     {
-        return await _context.Tasks
+        var tasks = _dataCache.GetAllTasks()
             .Where(t => t.Status == TaskStatus.NotConfigured)
-            .Include(t => t.Dependencies)
-            .ThenInclude(d => d.TargetTask)
-            .Include(t => t.DependentTasks)
-            .ThenInclude(d => d.SourceTask)
-            .ToListAsync();
+            .ToList();
+        return Task.FromResult(tasks.AsEnumerable());
     }
 
-    public async Task<IEnumerable<TaskItem>> GetRecurringTasksAsync()
+    public Task<IEnumerable<TaskItem>> GetRecurringTasksAsync()
     {
-        return await _context.Tasks
+        var tasks = _dataCache.GetAllTasks()
             .Where(t => t.IsRecurring && t.Recurrence != null)
-            .Include(t => t.Dependencies)
-            .ThenInclude(d => d.TargetTask)
-            .ToListAsync();
+            .ToList();
+        return Task.FromResult(tasks.AsEnumerable());
     }
 
-    public async Task<IEnumerable<TaskItem>> GetChildTasksAsync(int parentTaskId)
+    public Task<IEnumerable<TaskItem>> GetChildTasksAsync(int parentTaskId)
     {
-        return await _context.Tasks
+        var tasks = _dataCache.GetAllTasks()
             .Where(t => t.ParentTaskId == parentTaskId)
-            .Include(t => t.Dependencies)
-            .ThenInclude(d => d.TargetTask)
-            .ToListAsync();
+            .ToList();
+        return Task.FromResult(tasks.AsEnumerable());
     }
 
     public async Task UpdateStatusAsync(int taskId, TaskStatus status)
     {
-        var task = await _context.Tasks.FindAsync(taskId);
+        var task = _dataCache.GetAllTasks().FirstOrDefault(t => t.Id == taskId);
         if (task != null)
         {
-            task.Status = status;
-            await _context.SaveChangesAsync();
-            InvalidateCache();
+            var updatedTask = task.Clone();
+            updatedTask.Status = status;
+            _dataCache.UpdateTask(updatedTask);
+            await SyncToDatabaseAsync();
         }
     }
 
     public async Task ProcessDayStartAsync()
     {
-        var settings = await _context.UserSettings.FirstOrDefaultAsync();
-        if (settings == null) return;
-
+        var settings = _dataCache.GetUserSettings();
         var today = DateTime.Today;
+        var allTasks = _dataCache.GetAllTasks();
+        var modified = false;
 
         // Обработка гарантированных задач (приоритет 0)
         if (settings.AutoCompleteGuaranteed)
         {
-            var guaranteedTasks = await _context.Tasks
+            var guaranteedTasks = allTasks
                 .Where(t => t.UserPriority == 0 &&
                             t.PlannedDate.HasValue &&
                             t.PlannedDate.Value.Date < today &&
                             t.Status != TaskStatus.Completed)
-                .ToListAsync();
+                .ToList();
 
             foreach (var task in guaranteedTasks)
             {
-                task.Status = TaskStatus.Completed;
+                var updatedTask = task.Clone();
+                updatedTask.Status = TaskStatus.Completed;
+                _dataCache.UpdateTask(updatedTask);
+                modified = true;
             }
         }
 
         // Обработка неотложных задач (приоритет 1)
         if (settings.RemoveUrgentIfNotDone)
         {
-            var urgentTasks = await _context.Tasks
+            var urgentTasks = allTasks
                 .Where(t => t.UserPriority == 1 &&
                             t.PlannedDate.HasValue &&
                             t.PlannedDate.Value.Date < today &&
                             t.Status != TaskStatus.Completed)
-                .ToListAsync();
+                .ToList();
 
             foreach (var task in urgentTasks)
             {
-                task.Status = TaskStatus.Irrelevant;
+                var updatedTask = task.Clone();
+                updatedTask.Status = TaskStatus.Irrelevant;
+                _dataCache.UpdateTask(updatedTask);
+                modified = true;
             }
         }
 
         // Перенос невыполненных задач на сегодня
-        var unfinishedTasks = await _context.Tasks
+        var unfinishedTasks = allTasks
             .Where(t => t.PlannedDate.HasValue &&
                         t.PlannedDate.Value.Date < today &&
                         t.Status == TaskStatus.Active)
-            .ToListAsync();
+            .ToList();
 
         foreach (var task in unfinishedTasks)
         {
-            task.PlannedDate = today;
+            var updatedTask = task.Clone();
+            updatedTask.PlannedDate = today;
+            _dataCache.UpdateTask(updatedTask);
+            modified = true;
         }
 
-        await _context.SaveChangesAsync();
-        InvalidateCache();
+        if (modified)
+        {
+            await SyncToDatabaseAsync();
+        }
     }
 
-    protected override void InvalidateCache()
+    // Метод для загрузки всех данных при старте приложения
+    public async Task LoadAllDataAsync()
     {
-        base.InvalidateCache();
-        // Дополнительная инвалидация кэша для задач
-        var cacheKeys = new[] { "Tasks_Status_", "Tasks_Date_", "Tasks_" };
-        foreach (var key in cacheKeys)
+        var tasks = await _context.Tasks
+            .AsNoTracking()
+            .ToListAsync();
+            
+        var dependencies = await _context.Dependencies
+            .AsNoTracking()
+            .ToListAsync();
+
+        _dataCache.SetAllTasks(tasks);
+        _dataCache.SetAllDependencies(dependencies);
+    }
+}
+
+public class DataCache
+{
+    private readonly object _lock = new object();
+    private List<TaskItem> _allTasks = new();
+    private List<Dependency> _allDependencies = new();
+    private UserSettings _userSettings = new();
+
+    public List<TaskItem> GetAllTasks()
+    {
+        lock (_lock)
         {
-            // В реальном приложении нужно более точное управление кэшем
+            return new List<TaskItem>(_allTasks);
         }
+    }
+
+    public void SetAllTasks(List<TaskItem> tasks)
+    {
+        lock (_lock)
+        {
+            _allTasks = new List<TaskItem>(tasks);
+        }
+    }
+
+    public List<Dependency> GetAllDependencies()
+    {
+        lock (_lock)
+        {
+            return new List<Dependency>(_allDependencies);
+        }
+    }
+
+    public void SetAllDependencies(List<Dependency> dependencies)
+    {
+        lock (_lock)
+        {
+            _allDependencies = new List<Dependency>(dependencies);
+        }
+    }
+
+    public UserSettings GetUserSettings()
+    {
+        lock (_lock)
+        {
+            return _userSettings.Clone();
+        }
+    }
+
+    public void SetUserSettings(UserSettings settings)
+    {
+        lock (_lock)
+        {
+            _userSettings = settings.Clone();
+        }
+    }
+
+    // Методы для атомарных операций с задачами
+    public void AddTask(TaskItem task)
+    {
+        lock (_lock)
+        {
+            _allTasks.Add(task);
+        }
+    }
+
+    public void UpdateTask(TaskItem updatedTask)
+    {
+        lock (_lock)
+        {
+            var existingTask = _allTasks.FirstOrDefault(t => t.Id == updatedTask.Id);
+            if (existingTask != null)
+            {
+                _allTasks.Remove(existingTask);
+                _allTasks.Add(updatedTask);
+            }
+        }
+    }
+
+    public void RemoveTask(int taskId)
+    {
+        lock (_lock)
+        {
+            _allTasks.RemoveAll(t => t.Id == taskId);
+        }
+    }
+
+    // Методы для зависимостей
+    public void AddDependency(Dependency dependency)
+    {
+        lock (_lock)
+        {
+            _allDependencies.Add(dependency);
+        }
+    }
+
+    public void RemoveDependency(int dependencyId)
+    {
+        lock (_lock)
+        {
+            _allDependencies.RemoveAll(d => d.Id == dependencyId);
+        }
+    }
+
+    public void RemoveDependenciesForTask(int taskId)
+    {
+        lock (_lock)
+        {
+            _allDependencies.RemoveAll(d => 
+                d.SourceTaskId == taskId || d.TargetTaskId == taskId);
+        }
+    }
+}
+
+public abstract class BaseRepository<T>(AppDbContext context, DataCache dataCache) : IRepository<T> where T : class
+{
+    protected readonly AppDbContext _context = context;
+    protected readonly DataCache _dataCache = dataCache;
+
+    public abstract Task<T?> GetByIdAsync(int id);
+    public abstract Task<IEnumerable<T>> GetAllAsync();
+    public abstract Task AddAsync(T entity);
+    public abstract Task UpdateAsync(T entity);
+    public abstract Task DeleteAsync(int id);
+    public abstract Task<bool> ExistsAsync(int id);
+
+    protected virtual async Task SyncToDatabaseAsync()
+    {
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            // Логируем ошибку, но не прерываем работу приложения
+            Console.WriteLine($"Ошибка синхронизации с БД: {ex.Message}");
+        }
+    }
+}
+public static class ModelExtensions
+{
+    public static TaskItem Clone(this TaskItem task)
+    {
+        return new TaskItem
+        {
+            Id = task.Id,
+            Title = task.Title,
+            Description = task.Description,
+            UserPriority = task.UserPriority,
+            Status = task.Status,
+            Interest = task.Interest,
+            Complexity = task.Complexity,
+            EstimatedHours = task.EstimatedHours,
+            PlannedDate = task.PlannedDate,
+            IsRecurring = task.IsRecurring,
+            Recurrence = task.Recurrence,
+            RecurrenceEndDate = task.RecurrenceEndDate,
+            ParentTaskId = task.ParentTaskId,
+            Tags = new List<string>(task.Tags),
+            DisplayType = task.DisplayType,
+            CreatedDate = task.CreatedDate
+        };
+    }
+
+    public static UserSettings Clone(this UserSettings settings)
+    {
+        return new UserSettings
+        {
+            Id = settings.Id,
+            DayStartHour = settings.DayStartHour,
+            AutoRecalculateOnAdd = settings.AutoRecalculateOnAdd,
+            AutoCompleteGuaranteed = settings.AutoCompleteGuaranteed,
+            RemoveUrgentIfNotDone = settings.RemoveUrgentIfNotDone
+        };
     }
 }

@@ -16,7 +16,7 @@
                 </div>
                 <MudButton Variant="Variant.Outlined" 
                           Color="Color.Error"
-                          StartIcon="Icons.Material.Filled.ClearAll"
+                          StartIcon="@Icons.Material.Filled.ClearAll"
                           OnClick="@MarkAllAsIrrelevant"
                           Disabled="@(!_notConfiguredTasks.Any())"
                           Size="Size.Small">
@@ -28,12 +28,12 @@
         <MudItem xs="12">
             @if (_isLoading)
             {
-                <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+                <MudProgressLinear Color="Color.Primary" Indeterminate/>
             }
             else if (!_notConfiguredTasks.Any())
             {
                 <MudPaper Class="py-12 text-center">
-                    <MudIcon Icon="Icons.Material.Filled.DoneAll" 
+                    <MudIcon Icon="@Icons.Material.Filled.DoneAll" 
                             Color="Color.Success" 
                             Size="Size.Large" 
                             Class="mb-3" />

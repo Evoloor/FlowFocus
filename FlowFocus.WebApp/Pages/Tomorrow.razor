@@ -8,31 +8,15 @@
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
     <MudGrid>
-        <MudItem xs="12" Class="mb-4">
-            <div class="d-flex justify-space-between align-center">
-                <div>
-                    <MudText Typo="Typo.h4" Class="mb-1">Задачи на завтра</MudText>
-                    <MudText Color="Color.Secondary">@DateTime.Now.AddDays(1).ToString("dd MMMM yyyy")</MudText>
-                </div>
-                <MudButton Variant="Variant.Outlined" 
-                          Color="Color.Primary"
-                          StartIcon="Icons.Material.Filled.AutoSchedule"
-                          OnClick="@PlanTomorrowTasks"
-                          Size="Size.Small">
-                    Запланировать
-                </MudButton>
-            </div>
-        </MudItem>
-
         <MudItem xs="12">
             @if (_isLoading)
             {
-                <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+                <MudProgressLinear Color="Color.Primary" Indeterminate />
             }
             else if (!_tomorrowTasks.Any())
             {
                 <MudPaper Class="py-12 text-center">
-                    <MudIcon Icon="Icons.Material.Filled.Schedule" 
+                    <MudIcon Icon="@Icons.Material.Filled.Schedule" 
                             Color="Color.Secondary" 
                             Size="Size.Large" 
                             Class="mb-3" />

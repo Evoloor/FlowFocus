@@ -16,15 +16,15 @@
             <MudPaper Class="pa-3">
                 <MudNavMenu>
                     <MudNavLink Text="Основные настройки" 
-                                Icon="Icons.Material.Filled.Settings"
+                                Icon="@Icons.Material.Filled.Settings"
                                 Active="@(_activeTab == 0)"
                                 OnClick="() => SwitchTab(0)" />
                     <MudNavLink Text="Автоматизация" 
-                                Icon="Icons.Material.Filled.AutoFixHigh"
+                                Icon="@Icons.Material.Filled.AutoFixHigh"
                                 Active="@(_activeTab == 1)"
                                 OnClick="() => SwitchTab(1)" />
                     <MudNavLink Text="Расширенные настройки" 
-                                Icon="Icons.Material.Filled.Tune"
+                                Icon="@Icons.Material.Filled.Tune"
                                 Active="@(_activeTab == 2)"
                                 OnClick="() => SwitchTab(2)" />
                 </MudNavMenu>

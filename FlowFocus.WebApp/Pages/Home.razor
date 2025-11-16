@@ -36,28 +36,28 @@
                 <div class="d-flex gap-2">
                     <MudButton Variant="Variant.Outlined" 
                               Color="Color.Primary"
-                              StartIcon="Icons.Material.Filled.Refresh"
+                              StartIcon="@Icons.Material.Filled.Refresh"
                               OnClick="RecalculatePriorities"
                               Size="Size.Small">
                         Пересчитать
                     </MudButton>
                     <MudButton Variant="Variant.Outlined"
                               Color="Color.Secondary"
-                              StartIcon="Icons.Material.Filled.AutoFixHigh"
+                              StartIcon="@Icons.Material.Filled.AutoFixHigh"
                               OnClick="BalanceTasks"
                               Size="Size.Small">
                         Балансировать
                     </MudButton>
                     <MudButton Variant="Variant.Outlined"
                                Color="Color.Info"
-                               StartIcon="Icons.Material.Filled.PlayArrow"
+                               StartIcon="@Icons.Material.Filled.PlayArrow"
                                OnClick="ProcessDayStart"
                                Size="Size.Small">
                         Начать день
                     </MudButton>
                     <MudButton Variant="Variant.Outlined"
                                            Color="Color.Info"
-                                           StartIcon="Icons.Material.Filled.Analytics"
+                                           StartIcon="@Icons.Material.Filled.Analytics"
                                            OnClick="ShowStatistics"
                                            Size="Size.Small">
                         Статистика
@@ -70,12 +70,12 @@
         <MudItem xs="12" md="8">
             @if (_isLoading)
             {
-                <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+                <MudProgressLinear Color="Color.Primary" Indeterminate/>
             }
             else if (!_todayTasks.Any())
             {
                 <MudPaper Class="py-12 text-center">
-                    <MudIcon Icon="Icons.Material.Filled.CheckCircle" 
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" 
                             Color="Color.Success" 
                             Size="Size.Large" 
                             Class="mb-3" />

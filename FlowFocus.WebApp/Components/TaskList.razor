@@ -6,7 +6,7 @@
     <MudItem xs="12" Class="d-flex justify-space-between align-center mb-4">
         <MudText Typo="Typo.h4">@Title</MudText>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" 
-                  StartIcon="Icons.Material.Filled.Add"
+                  StartIcon="@Icons.Material.Filled.Add"
                   OnClick="ShowCreateDialog">
             Новая задача
         </MudButton>
@@ -24,7 +24,7 @@
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
-                <MudTextField @bind-Value="_searchText" Label="Поиск" Immediate="true" />
+                <MudTextField @bind-Value="_searchText" Label="Поиск" Immediate/>
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
                 <MudSelect T="SortField" @bind-Value="_sortBy" Label="Сортировка">
@@ -46,7 +46,7 @@
     <MudItem xs="12">
         @if (_isLoading)
         {
-            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+            <MudProgressLinear Color="Color.Primary" Indeterminate/>
         }
         else if (!FilteredTasks.Any())
         {

@@ -12,11 +12,11 @@
         
         <MudButton Variant="Variant.Filled" Color="Color.Primary"
                    OnClick="@AddQuickTask" Disabled="@string.IsNullOrWhiteSpace(_newTaskTitle)"
-                   StartIcon="Icons.Material.Filled.Add">
+                   StartIcon="@Icons.Material.Filled.Add">
             Добавить
         </MudButton>
         
-        <MudIconButton Icon="Icons.Material.Filled.Tune" 
+        <MudIconButton Icon="@Icons.Material.Filled.Tune" 
                        OnClick="@ShowFullCreateDialog" />
     </div>
 </MudPaper>
