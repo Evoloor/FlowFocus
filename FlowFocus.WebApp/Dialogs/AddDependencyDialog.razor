@@ -12,15 +12,12 @@
                 <MudSelect T="TaskItem" @bind-Value="_selectedTask" 
                           Label="Выберите задачу"
                           Variant="Variant.Outlined"
-                          ToStringFunc="(task) => task?.Title ?? string.Empty"
+                          ToStringFunc="task => task?.Title ?? string.Empty"
                           SearchFunc="SearchTasks"
                           Clearable="true">
-                    @if (_availableTasks != null)
+                    @foreach (var task in _availableTasks)
                     {
-                        @foreach (var task in _availableTasks)
-                        {
-                            <MudSelectItem T="TaskItem" Value="task">@task.Title</MudSelectItem>
-                        }
+                        <MudSelectItem T="TaskItem" Value="task">@task.Title</MudSelectItem>
                     }
                 </MudSelect>
             </MudItem>
@@ -46,13 +43,13 @@
     </DialogContent>
     <DialogActions>
         <MudButton Variant="Variant.Text" 
-                  OnClick="Cancel"
+                  OnClick="@Cancel"
                   Color="Color.Default">
             Отмена
         </MudButton>
         <MudButton Variant="Variant.Filled" 
                   Color="Color.Primary" 
-                  OnClick="AddDependency"
+                  OnClick="@AddDependency"
                   Disabled="@(_selectedTask == null)">
             Добавить
         </MudButton>

@@ -9,12 +9,12 @@
         <MudButton Variant="Variant.Outlined"
                    Size="Size.Small"
                    StartIcon="@Icons.Material.Filled.AddLink"
-                   OnClick="ShowAddDependencyDialog">
+                   OnClick="@ShowAddDependencyDialog">
             Добавить зависимость
         </MudButton>
     </div>
 
-    @if (_dependencies?.Any() == true)
+    @if (_dependencies.Any())
     {
         <MudList T="string">
             @foreach (var dependency in _dependencies)
@@ -29,7 +29,7 @@
                     <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                    Size="Size.Small"
                                    Color="Color.Error"
-                                   OnClick="() => RemoveDependency(dependency)"/>
+                                   OnClick="@(() => RemoveDependency(dependency))"/>
                 </MudListItem>
             }
         </MudList>
@@ -41,7 +41,7 @@
 </MudPaper>
 
 @code {
-    [Parameter] public TaskItem Task { get; set; } = null!;
+    [Parameter] public required TaskItem Task { get; set; } = null!;
 
     private List<Dependency> _dependencies = [];
 
@@ -52,11 +52,8 @@
 
     private void LoadDependencies()
     {
-        if (Task != null)
-        {
-            _dependencies = (DependencyRepo.GetDependenciesForTask(Task.Id)).ToList();
-            StateHasChanged();
-        }
+        _dependencies = DependencyRepo.GetDependenciesForTask(Task.Id).ToList();
+        StateHasChanged();
     }
 
     private Color GetDependencyColor(DependencyType type)
@@ -80,7 +77,7 @@
         var dialog = await DialogService.ShowAsync<AddDependencyDialog>("Добавить зависимость", parameters, options);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             LoadDependencies();
         }
@@ -99,7 +96,7 @@
         var dialog = await DialogService.ShowAsync<ConfirmDialog>("Подтверждение", parameters, options);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             DependencyRepo.Delete(dependency.Id);
             LoadDependencies();

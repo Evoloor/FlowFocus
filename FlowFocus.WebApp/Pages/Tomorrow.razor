@@ -59,7 +59,7 @@
         try
         {
             var tomorrow = DateTime.Today.AddDays(1);
-            _tomorrowTasks = ( TaskRepo.GetByDate(tomorrow)).ToList();
+            _tomorrowTasks = TaskRepo.GetByDate(tomorrow).ToList();
         }
         catch (Exception ex)
         {
@@ -77,7 +77,7 @@
         try
         {
             var tomorrow = DateTime.Today.AddDays(1);
-            var plannedTasks = ( PlannerService.PlanTasksForDay(tomorrow)).ToArray();
+            var plannedTasks = PlannerService.PlanTasksForDay(tomorrow).ToArray();
             
             foreach (var task in plannedTasks)
             {

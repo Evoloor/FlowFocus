@@ -3,7 +3,7 @@
 <MudPaper Class="pa-4" Elevation="1">
     <MudText Typo="Typo.h6" Class="mb-4">Зависимости задачи: @Task?.Title</MudText>
     
-    @if (_dependencies.Any() == true)
+    @if (_dependencies.Any())
     {
         <MudList T="string">
             @foreach (var dependency in _dependencies)
@@ -32,7 +32,7 @@
     {
         if (Task != null)
         {
-            _dependencies = (DependencyRepo.GetDependenciesForTask(Task.Id))?.ToList() ?? [];
+            _dependencies = DependencyRepo.GetDependenciesForTask(Task.Id).ToList();
         }
     }
 

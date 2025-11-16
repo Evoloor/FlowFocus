@@ -37,7 +37,7 @@
     <MudItem xs="12" Class="mt-4">
         <MudButton Variant="Variant.Filled" 
                    Color="Color.Primary" 
-                   OnClick="SaveSettings"
+                   OnClick="@SaveSettings"
                    StartIcon="@Icons.Material.Filled.Save">
             Сохранить настройки автоматизации
         </MudButton>
@@ -52,7 +52,7 @@
         Settings = SettingsRepo.GetUserSettings();
     }
 
-    private async Task SaveSettings()
+    private void SaveSettings()
     {
         try
         {

@@ -10,7 +10,7 @@ public class PriorityColorGradient
 {
     private readonly List<ColorCheckpoint> _checkpoints;
 
-    public PriorityColorGradient(IEnumerable<ColorCheckpoint> checkpoints)
+    private PriorityColorGradient(IEnumerable<ColorCheckpoint> checkpoints)
     {
         _checkpoints = checkpoints.OrderBy(c => c.Priority).ToList();
 

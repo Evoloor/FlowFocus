@@ -127,13 +127,13 @@
     </DialogContent>
     <DialogActions>
         <MudButton Variant="Variant.Text"
-                   OnClick="Cancel"
+                   OnClick="@Cancel"
                    Color="Color.Default">
             Отмена
         </MudButton>
         <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"
-                   OnClick="SaveTask"
+                   OnClick="@SaveTask"
                    Disabled="@string.IsNullOrWhiteSpace(Task.Title)">
             @(IsEdit ? "Сохранить" : "Создать")
         </MudButton>
@@ -143,7 +143,7 @@
 @code {
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter] public TaskItem? ExistingTask { get; set; }
-    public PriorityService PriorityService { get; set; } = PriorityService.Shared;
+    public PriorityService PriorityService { get; init; } = PriorityService.Shared;
 
     private TaskItem Task { get; set; } = new();
     private bool IsEdit => ExistingTask != null;
@@ -153,29 +153,11 @@
         if (ExistingTask != null)
         {
             // Create a copy to avoid direct mutation
-            Task = new TaskItem
-            {
-                Id = ExistingTask.Id,
-                Title = ExistingTask.Title,
-                Description = ExistingTask.Description,
-                UserPriority = ExistingTask.UserPriority,
-                Status = ExistingTask.Status,
-                Interest = ExistingTask.Interest,
-                Complexity = ExistingTask.Complexity,
-                EstimatedHours = ExistingTask.EstimatedHours,
-                Deadline = ExistingTask.Deadline,
-                DisplayType = ExistingTask.DisplayType,
-                IsFavorite = ExistingTask.IsFavorite,
-                IsRecurring = ExistingTask.IsRecurring,
-                IsProcrastinationResistant = ExistingTask.IsProcrastinationResistant,
-                ProcrastinationCount = ExistingTask.ProcrastinationCount,
-                Tags = [..ExistingTask.Tags],
-                CreatedDate = ExistingTask.CreatedDate
-            };
+            Task = new(ExistingTask);
         }
     }
 
-    private async Task SaveTask()
+    private void SaveTask()
     {
         try
         {
@@ -217,16 +199,13 @@
     
         // Проверяем, является ли значение референсным
         var fibValues = new[] { 0, 1, 3, 5, 8, 13, 21, 34 };
-        if (fibValues.Contains(priority))
-        {
-            // Преобразуем в enum и получаем название
-            var priorityEnum = (Priority)priority;
-            return PriorityService.Shared.GetName(priorityEnum);
-        }
-    
+        if (!fibValues.Contains(priority)) return priority.ToString();
+        // Преобразуем в enum и получаем название
+        var priorityEnum = (Priority)priority;
+        return PriorityService.Shared.GetName(priorityEnum);
+
         // Для не-референсных значений показываем просто число
-        return priority.ToString();
     }
 
-    private bool IsEditingExistingTask => Task?.Id != 0; // или твоя логика определения
+    private bool IsEditingExistingTask => Task.Id != 0; // или твоя логика определения
 }

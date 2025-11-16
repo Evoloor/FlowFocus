@@ -1,7 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 using FlowFocus.Core.Enums;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
+
 namespace FlowFocus.Core.Models;
+
 public interface IAuditEntity
 {
     int Id { get; set; }
@@ -10,6 +12,28 @@ public interface IAuditEntity
 
 public class TaskItem : IAuditEntity
 {
+    public TaskItem()
+    {
+    }
+
+    public TaskItem(TaskItem task)
+    {
+        Title = task.Title;
+        Description = task.Description;
+        UserPriority = task.UserPriority;
+        Status = TaskStatus.Planned;
+        Interest = task.Interest;
+        Complexity = task.Complexity;
+        EstimatedHours = task.EstimatedHours;
+        PlannedDate = task.PlannedDate;
+        IsRecurring = true;
+        Recurrence = task.Recurrence;
+        RecurrenceEndDate = task.RecurrenceEndDate;
+        ParentTaskId = task.Id;
+        Tags = [..task.Tags];
+        DisplayType = task.DisplayType;
+    }
+
     public int Id { get; set; }
     public DateTime LastChangesOn { get; set; }
 

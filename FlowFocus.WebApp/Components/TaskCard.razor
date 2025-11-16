@@ -127,7 +127,7 @@
         var dialog = await DialogService.ShowAsync<TaskEditDialog>("Редактировать задачу", parameters, options);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             await OnTaskUpdated.InvokeAsync(task);
         }
@@ -146,7 +146,7 @@
         var dialog = await DialogService.ShowAsync<ConfirmDialog>("Подтверждение", parameters, options);
         var result = await dialog.Result;
 
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
              TaskRepo.Delete(task.Id);
             Snackbar.Add("Задача удалена", Severity.Success);

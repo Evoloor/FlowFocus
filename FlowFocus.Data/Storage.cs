@@ -3,7 +3,6 @@ using FlowFocus.Core;
 using FlowFocus.Core.Enums;
 using FlowFocus.Core.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Data;
@@ -65,6 +64,8 @@ public class StorageContext : DbContext
         // Dependency configuration
         modelBuilder.Entity<Dependency>(entity =>
         {
+            entity.ToTable(t =>
+                t.HasCheckConstraint("CK_Dependency_SelfReference", "SourceTaskId != TargetTaskId"));
             entity.Property(d => d.Type).HasConversion<string>();
             entity.Property(d => d.Logic).HasConversion<string>();
 
@@ -78,8 +79,6 @@ public class StorageContext : DbContext
                 .WithMany(t => t.DependentTasks)
                 .HasForeignKey(d => d.TargetTaskId)
                 .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasCheckConstraint("CK_Dependency_SelfReference", "SourceTaskId != TargetTaskId");
         });
 
         // UserSettings configuration
@@ -125,7 +124,7 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
     }
 
     // Метод для получения отслеживаемой сущности (только для операций изменения)
-    protected virtual T? GetTrackedById(int id)
+    protected T? GetTrackedById(int id)
     {
         return GetTrackedQuery().FirstOrDefault(e => e.Id == id);
     }
@@ -185,7 +184,7 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
     }
 
     // Альтернативный метод Update с явным указанием изменяемых свойств
-    public virtual void UpdatePartial(int id, Action<T> updateAction)
+    protected void UpdatePartial(int id, Action<T> updateAction)
     {
         lock (CacheLock)
         {
@@ -223,7 +222,7 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
 
     protected void MarkDirty() => IsDirty = true;
 
-    public virtual void RefreshCache()
+    protected void RefreshCache()
     {
         lock (CacheLock)
         {
@@ -235,10 +234,11 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
 
 public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>(context), ITaskRepository
 {
-    protected override DbSet<TaskItem> GetDbSet() => context.Tasks;
+    private readonly StorageContext _context = context;
+    protected override DbSet<TaskItem> GetDbSet() => _context.Tasks;
 
     protected override IQueryable<TaskItem> GetBaseQuery() =>
-        context.Tasks
+        _context.Tasks
             .AsNoTracking()
             .Include(t => t.Dependencies)
             .ThenInclude(d => d.TargetTask)
@@ -247,7 +247,7 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
             .OrderBy(t => t.PlannedDate);
 
     protected override IQueryable<TaskItem> GetTrackedQuery() =>
-        context.Tasks
+        _context.Tasks
             .Include(t => t.Dependencies)
             .ThenInclude(d => d.TargetTask)
             .Include(t => t.DependentTasks)
@@ -270,7 +270,7 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
         => GetByStatus(TaskStatus.NotConfigured);
 
     public List<TaskItem> GetRecurringTasks()
-        => GetAll().Where(t => t.IsRecurring && t.Recurrence != null).ToList();
+        => GetAll().Where(t => t is { IsRecurring: true, Recurrence: not null }).ToList();
 
     public List<TaskItem> GetChildTasks(int parentTaskId)
         => GetAll().Where(t => t.ParentTaskId == parentTaskId).ToList();
@@ -282,7 +282,7 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
 
     public void ProcessDayStart()
     {
-        var settings = new SettingsRepository(context).GetUserSettings();
+        var settings = new SettingsRepository(_context).GetUserSettings();
         var today = DateTime.Today;
         var modified = false;
 
@@ -314,32 +314,31 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
                 modified = true;
             }
 
-            if (task.Status != originalStatus || task.PlannedDate != task.PlannedDate)
+            if (task.Status != originalStatus)
             {
                 task.LastChangesOn = DateTime.UtcNow;
             }
         }
 
-        if (modified)
-        {
-            context.SaveChanges();
-            RefreshCache();
-        }
+        if (!modified) return;
+        _context.SaveChanges();
+        RefreshCache();
     }
 }
 
 public class DependencyRepository(StorageContext context) : CachedRepository<Dependency>(context), IDependencyRepository
 {
-    protected override DbSet<Dependency> GetDbSet() => context.Dependencies;
+    private readonly StorageContext _context = context;
+    protected override DbSet<Dependency> GetDbSet() => _context.Dependencies;
 
     protected override IQueryable<Dependency> GetBaseQuery() =>
-        context.Dependencies
+        _context.Dependencies
             .AsNoTracking()
             .Include(d => d.SourceTask)
             .Include(d => d.TargetTask);
 
     protected override IQueryable<Dependency> GetTrackedQuery() =>
-        context.Dependencies
+        _context.Dependencies
             .Include(d => d.SourceTask)
             .Include(d => d.TargetTask);
 
@@ -358,7 +357,7 @@ public class DependencyRepository(StorageContext context) : CachedRepository<Dep
         if (hasDirectCircular)
             return true;
 
-        return CheckTransitiveDependency(targetTaskId, sourceTaskId, new HashSet<int>());
+        return CheckTransitiveDependency(targetTaskId, sourceTaskId, []);
     }
 
     private bool CheckTransitiveDependency(int currentTaskId, int targetTaskId, HashSet<int> visited)
@@ -396,7 +395,7 @@ public class DependencyRepository(StorageContext context) : CachedRepository<Dep
             GetDbSet().Remove(dependency);
         }
 
-        context.SaveChanges();
+        _context.SaveChanges();
         MarkDirty();
     }
 
@@ -433,10 +432,11 @@ public class DependencyRepository(StorageContext context) : CachedRepository<Dep
 
 public class SettingsRepository(StorageContext context) : CachedRepository<UserSettings>(context), ISettingsRepository
 {
-    protected override DbSet<UserSettings> GetDbSet() => context.UserSettings;
+    private readonly StorageContext _context = context;
+    protected override DbSet<UserSettings> GetDbSet() => _context.UserSettings;
 
     protected override IQueryable<UserSettings> GetTrackedQuery() =>
-        context.UserSettings.AsQueryable();
+        _context.UserSettings.AsQueryable();
 
     public override List<UserSettings> GetAll()
     {
@@ -449,7 +449,7 @@ public class SettingsRepository(StorageContext context) : CachedRepository<UserS
                 {
                     settings = new UserSettings();
                     GetDbSet().Add(settings);
-                    context.SaveChanges();
+                    _context.SaveChanges();
                 }
 
                 Cache = [settings];
@@ -489,9 +489,9 @@ public class SettingsRepository(StorageContext context) : CachedRepository<UserS
         {
             // Сброс к значениям по умолчанию вместо удаления
             var defaultSettings = new UserSettings { Id = settings.Id };
-            context.Entry(settings).CurrentValues.SetValues(defaultSettings);
+            _context.Entry(settings).CurrentValues.SetValues(defaultSettings);
             settings.LastChangesOn = DateTime.UtcNow;
-            context.SaveChanges();
+            _context.SaveChanges();
             MarkDirty();
         }
     }

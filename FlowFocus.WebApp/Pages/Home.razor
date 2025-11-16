@@ -132,7 +132,7 @@
         try
         {
             var today = DateTime.Today;
-            _todayTasks = (TaskRepo.GetByDate(today)).ToList();
+            _todayTasks = TaskRepo.GetByDate(today).ToList();
         }
         catch (Exception ex)
         {

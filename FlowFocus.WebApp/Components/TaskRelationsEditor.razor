@@ -9,7 +9,7 @@
         <MudSelect T="TaskItem" @bind-Value="_selectedRelatedTask" 
                   Label="Выберите связанную задачу"
                   Variant="Variant.Outlined"
-                  ToStringFunc="(task) => task?.Title ?? string.Empty"
+                  ToStringFunc="task => task?.Title ?? string.Empty"
                   SearchFunc="SearchTasks"
                   Clearable="true">
             @foreach (var task in _availableTasks)
@@ -47,7 +47,7 @@
         <MudItem xs="12" Class="mt-2">
             <MudButton Variant="Variant.Outlined" 
                       Color="Color.Primary"
-                      OnClick="AddRelation"
+                      OnClick="@AddRelation"
                       Size="Size.Small">
                 Добавить связь
             </MudButton>

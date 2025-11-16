@@ -64,13 +64,13 @@
                                     <MudButton Variant="Variant.Filled" 
                                               Color="Color.Primary"
                                               Size="Size.Small"
-                                              OnClick="() => ConfigureTask(task)">
+                                              OnClick="@(() => ConfigureTask(task))">
                                         Настроить
                                     </MudButton>
                                     <MudButton Variant="Variant.Text" 
                                               Color="Color.Default"
                                               Size="Size.Small"
-                                              OnClick="() => MarkAsIrrelevant(task)">
+                                              OnClick="@(() => MarkAsIrrelevant(task))">
                                         Неактуально
                                     </MudButton>
                                 </MudCardActions>
@@ -99,7 +99,7 @@
 
         try
         {
-            _notConfiguredTasks = (TaskRepo.GetNotConfigured()).ToList();
+            _notConfiguredTasks = TaskRepo.GetNotConfigured().ToList();
         }
         catch (Exception ex)
         {
