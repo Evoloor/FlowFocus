@@ -63,13 +63,13 @@
     private RelationType _selectedRelationType;
     private DisplayType _blockingDisplayType = DisplayType.Independent;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        var allTasks = await TaskRepo.GetAllAsync();
+        var allTasks = TaskRepo.GetAll();
         _availableTasks = allTasks.Where(t => t.Id != Task.Id).ToList();
     }
 
-    private async Task AddRelation()
+    private void AddRelation()
     {
         if (_selectedRelatedTask == null) return;
         
@@ -80,7 +80,7 @@
         _selectedRelatedTask = null;
     }
 
-    private async Task<IEnumerable<TaskItem>> SearchTasks(string value)
+    private IEnumerable<TaskItem> SearchTasks(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
             return _availableTasks;

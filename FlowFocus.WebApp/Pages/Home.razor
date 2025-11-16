@@ -37,28 +37,28 @@
                     <MudButton Variant="Variant.Outlined" 
                               Color="Color.Primary"
                               StartIcon="@Icons.Material.Filled.Refresh"
-                              OnClick="RecalculatePriorities"
+                              OnClick="@RecalculatePriorities"
                               Size="Size.Small">
                         Пересчитать
                     </MudButton>
                     <MudButton Variant="Variant.Outlined"
                               Color="Color.Secondary"
                               StartIcon="@Icons.Material.Filled.AutoFixHigh"
-                              OnClick="BalanceTasks"
+                              OnClick="@BalanceTasks"
                               Size="Size.Small">
                         Балансировать
                     </MudButton>
                     <MudButton Variant="Variant.Outlined"
                                Color="Color.Info"
                                StartIcon="@Icons.Material.Filled.PlayArrow"
-                               OnClick="ProcessDayStart"
+                               OnClick="@ProcessDayStart"
                                Size="Size.Small">
                         Начать день
                     </MudButton>
                     <MudButton Variant="Variant.Outlined"
                                            Color="Color.Info"
                                            StartIcon="@Icons.Material.Filled.Analytics"
-                                           OnClick="ShowStatistics"
+                                           OnClick="@ShowStatistics"
                                            Size="Size.Small">
                         Статистика
                     </MudButton>
@@ -86,7 +86,7 @@
                     <MudButton Variant="Variant.Outlined" 
                               Color="Color.Primary"
                               Class="mt-3"
-                              OnClick="PlanForToday">
+                              OnClick="@PlanForToday">
                         Запланировать на сегодня
                     </MudButton>
                 </MudPaper>
@@ -117,14 +117,14 @@
     private List<string> _notifications = [];
 
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        _settings = await SettingsRepo.GetUserSettingsAsync();
-        await LoadNotifications();
-        await LoadTodayTasks();
+        _settings = SettingsRepo.GetUserSettings();
+        LoadNotifications();
+        LoadTodayTasks();
     }
 
-    private async Task LoadTodayTasks()
+    private void LoadTodayTasks()
     {
         _isLoading = true;
         StateHasChanged();
@@ -132,7 +132,7 @@
         try
         {
             var today = DateTime.Today;
-            _todayTasks = (await TaskRepo.GetByDateAsync(today)).ToList();
+            _todayTasks = (TaskRepo.GetByDate(today)).ToList();
         }
         catch (Exception ex)
         {
@@ -145,11 +145,11 @@
         }
     }
 
-    private async Task LoadNotifications()
+    private void LoadNotifications()
     {
         try
         {
-            _notifications = await NotificationService.GetNotificationsAsync();
+            _notifications = NotificationService.GetNotifications();
         }
         catch (Exception ex)
         {
@@ -157,25 +157,25 @@
         }
     }
 
-    private async Task HandleTaskUpdated(TaskItem task)
+    private void HandleTaskUpdated(TaskItem task)
     {
-        await LoadTodayTasks();
-        await LoadNotifications();
+        LoadTodayTasks();
+        LoadNotifications();
     }
 
-    private async Task HandleTaskDeleted(TaskItem task)
+    private void HandleTaskDeleted(TaskItem task)
     {
-        await LoadTodayTasks();
-        await LoadNotifications();
+        LoadTodayTasks();
+        LoadNotifications();
     }
 
-    private async Task RecalculatePriorities()
+    private void RecalculatePriorities()
     {
         try
         {
-            await PlannerService.RecalculatePrioritiesAsync();
+            PlannerService.RecalculatePriorities();
             Snackbar.Add("Приоритеты пересчитаны", Severity.Success);
-            await LoadTodayTasks();
+            LoadTodayTasks();
         }
         catch (Exception ex)
         {
@@ -183,13 +183,13 @@
         }
     }
 
-    private async Task BalanceTasks() // Новый метод для балансировки
+    private void BalanceTasks() // Новый метод для балансировки
     {
         try
         {
-            await PlannerService.BalanceTaskLoadAsync(DateTime.Today);
+            PlannerService.BalanceTaskLoad(DateTime.Today);
             Snackbar.Add("Задачи сбалансированы", Severity.Success);
-            await LoadTodayTasks();
+            LoadTodayTasks();
         }
         catch (Exception ex)
         {
@@ -197,15 +197,15 @@
         }
     }
 
-    private async Task ProcessDayStart()
+    private void ProcessDayStart()
     {
         try
         {
-            await TaskRepo.ProcessDayStartAsync();
-            await RecurringTaskService.ProcessRecurringTasksAsync();
+            TaskRepo.ProcessDayStart();
+             RecurringTaskService.ProcessRecurringTasks();
             Snackbar.Add("День начат! Обработаны повторяющиеся задачи", Severity.Success);
-            await LoadTodayTasks();
-            await LoadNotifications();
+            LoadTodayTasks();
+            LoadNotifications();
         }
         catch (Exception ex)
         {
@@ -213,18 +213,18 @@
         }
     }
 
-    private async Task PlanForToday()
+    private void PlanForToday()
     {
         try
         {
-            var plannedTasks = await PlannerService.PlanTasksForDayAsync(DateTime.Today);
+            var plannedTasks =  PlannerService.PlanTasksForDay(DateTime.Today);
             foreach (var task in plannedTasks)
             {
                 task.PlannedDate = DateTime.Today;
-                await TaskRepo.UpdateAsync(task);
+                TaskRepo.Update(task);
             }
             Snackbar.Add($"Запланировано {plannedTasks.Count()} задач на сегодня", Severity.Success);
-            await LoadTodayTasks();
+            LoadTodayTasks();
         }
         catch (Exception ex)
         {

@@ -4,7 +4,6 @@
 @using Size = MudBlazor.Size
 @inject IDialogService DialogService
 @inject ITaskRepository TaskRepo
-@inject IProcrastinationService ProcrastinationService
 @inject ISnackbar Snackbar
 <MudCard Class="@($"my-2 task-card {GetTaskCardClass()}")" Elevation="2">
     <div class="d-flex">
@@ -86,16 +85,6 @@
         min-height: 100%;
     }
 
-    .task-card.completed {
-        opacity: 0.7;
-        background-color: var(--mud-palette-action-disabled-background);
-    }
-
-    .task-card.irrelevant {
-        opacity: 0.5;
-        background-color: var(--mud-palette-grey-lighter);
-    }
-
     .completed .mud-text {
         text-decoration: line-through;
         color: var(--mud-palette-text-disabled);
@@ -159,7 +148,7 @@
 
         if (!result.Canceled)
         {
-            await TaskRepo.DeleteAsync(task.Id);
+             TaskRepo.Delete(task.Id);
             Snackbar.Add("Задача удалена", Severity.Success);
             await OnTaskDeleted.InvokeAsync(task);
         }
@@ -168,7 +157,7 @@
     private async Task ToggleFavorite(TaskItem task)
     {
         task.IsFavorite = !task.IsFavorite;
-        await TaskRepo.UpdateAsync(task);
+         TaskRepo.Update(task);
         await OnTaskUpdated.InvokeAsync(task);
         Snackbar.Add(task.IsFavorite ? "Добавлено в избранное" : "Убрано из избранного", Severity.Info);
     }

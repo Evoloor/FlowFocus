@@ -40,7 +40,7 @@
             EstimatedHours = 1.0
         };
 
-        await TaskRepo.AddAsync(newTask);
+        TaskRepo.Add(newTask);
         Snackbar.Add("Задача добавлена в ненастроенные", Severity.Success);
         
         _newTaskTitle = string.Empty;

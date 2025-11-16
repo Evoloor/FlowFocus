@@ -37,3 +37,10 @@ public enum Priority
     SelfDevelopment = 21,
     Dreams = 34
 }
+public enum RecurrenceType
+{
+    Daily,
+    Weekly,
+    Monthly,
+    Yearly
+}

@@ -87,19 +87,19 @@
     private List<TaskItem> _notConfiguredTasks = [];
     private bool _isLoading = true;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        await LoadNotConfiguredTasks();
+        LoadNotConfiguredTasks();
     }
 
-    private async Task LoadNotConfiguredTasks()
+    private void LoadNotConfiguredTasks()
     {
         _isLoading = true;
         StateHasChanged();
 
         try
         {
-            _notConfiguredTasks = (await TaskRepo.GetNotConfiguredAsync()).ToList();
+            _notConfiguredTasks = (TaskRepo.GetNotConfigured()).ToList();
         }
         catch (Exception ex)
         {
@@ -125,7 +125,7 @@
 
         if (result is { Canceled: false })
         {
-            await LoadNotConfiguredTasks();
+             LoadNotConfiguredTasks();
         }
     }
 
@@ -145,9 +145,9 @@
         if (result is { Canceled: false })
         {
             task.Status = TaskStatus.Irrelevant;
-            await TaskRepo.UpdateAsync(task);
+             TaskRepo.Update(task);
             Snackbar.Add("Задача отмечена как неактуальная", Severity.Info);
-            await LoadNotConfiguredTasks();
+             LoadNotConfiguredTasks();
         }
     }
 
@@ -169,11 +169,11 @@
             foreach (var task in _notConfiguredTasks)
             {
                 task.Status = TaskStatus.Irrelevant;
-                await TaskRepo.UpdateAsync(task);
+                 TaskRepo.Update(task);
             }
 
             Snackbar.Add($"Все задачи отмечены как неактуальные", Severity.Info);
-            await LoadNotConfiguredTasks();
+             LoadNotConfiguredTasks();
         }
     }
 }

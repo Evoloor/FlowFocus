@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FlowFocus.Data.Migrations
 {
     [DbContext(typeof(StorageContext))]
-    [Migration("20251116073023_InitReworkedV2")]
-    partial class InitReworkedV2
+    [Migration("20251116190045_AuditEntity")]
+    partial class AuditEntity
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -33,6 +33,9 @@ namespace FlowFocus.Data.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("ConditionParameters")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("LastChangesOn")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Logic")
@@ -101,6 +104,9 @@ namespace FlowFocus.Data.Migrations
 
                     b.Property<bool>("IsRecurring")
                         .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("LastChangesOn")
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("LastProcrastinatedDate")
                         .HasColumnType("TEXT");
@@ -176,6 +182,9 @@ namespace FlowFocus.Data.Migrations
                     b.Property<int>("DayStartHour")
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime>("LastChangesOn")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("MaxComplexTasksPerDay")
                         .HasColumnType("INTEGER");
 
@@ -205,6 +214,7 @@ namespace FlowFocus.Data.Migrations
                             DailyComplexityLimit = 50,
                             DailyTimeLimit = 8.0,
                             DayStartHour = 6,
+                            LastChangesOn = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             MaxComplexTasksPerDay = 3,
                             RemoveUrgentIfNotDone = true,
                             ShowFavorites = true,

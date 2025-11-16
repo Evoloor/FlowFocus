@@ -68,10 +68,10 @@
     private DependencyType _dependencyType = DependencyType.Blocking;
     private DependencyLogic _dependencyLogic = DependencyLogic.And;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         // Load all tasks except the current one
-        var allTasks = await TaskRepo.GetAllAsync();
+        var allTasks = TaskRepo.GetAll();
         _availableTasks = allTasks.Where(t => t.Id != SourceTask.Id).ToList();
     }
 
@@ -88,7 +88,7 @@
         );
     }
 
-    private async Task AddDependency()
+    private void AddDependency()
     {
         if (_selectedTask == null)
             return;
@@ -96,7 +96,7 @@
         try
         {
             // Check for circular dependency
-            if (await DependencyRepo.HasCircularDependencyAsync(SourceTask.Id, _selectedTask.Id))
+            if (DependencyRepo.HasCircularDependency(SourceTask.Id, _selectedTask.Id))
             {
                 Snackbar.Add("Обнаружена циклическая зависимость!", Severity.Error);
                 return;
@@ -110,7 +110,7 @@
                 Logic = _dependencyLogic
             };
 
-            await DependencyRepo.AddAsync(dependency);
+            DependencyRepo.Add(dependency);
             Snackbar.Add("Зависимость добавлена", Severity.Success);
             MudDialog.Close(DialogResult.Ok(true));
         }

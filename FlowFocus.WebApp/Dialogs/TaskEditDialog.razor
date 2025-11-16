@@ -181,18 +181,18 @@
         {
             if (IsEdit)
             {
-                await TaskRepo.UpdateAsync(Task);
+                TaskRepo.Update(Task);
                 Snackbar.Add("Задача обновлена", Severity.Success);
             }
             else
             {
-                await TaskRepo.AddAsync(Task);
+                TaskRepo.Add(Task);
                 Snackbar.Add("Задача создана", Severity.Success);
 
-                var settings = await SettingsRepo.GetUserSettingsAsync();
+                var settings = SettingsRepo.GetUserSettings();
                 if (settings.AutoRecalculateOnAdd)
                 {
-                    await PlannerService.RecalculatePrioritiesAsync();
+                    PlannerService.RecalculatePriorities();
                     Snackbar.Add("Приоритеты пересчитаны", Severity.Info);
                 }
             }

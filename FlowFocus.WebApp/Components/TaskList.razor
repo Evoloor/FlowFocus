@@ -81,21 +81,21 @@
     private string _searchText = string.Empty;
     private SortField _sortBy = SortField.Priority;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        await LoadTasks();
+        LoadTasks();
     }
 
-    protected override async Task OnParametersSetAsync()
+    protected override void OnParametersSet()
     {
         if (FilterStatus.HasValue)
         {
             _selectedStatus = FilterStatus;
         }
-        await LoadTasks();
+        LoadTasks();
     }
 
-    private async Task LoadTasks()
+    private void LoadTasks()
     {
         _isLoading = true;
         StateHasChanged();
@@ -104,15 +104,15 @@
         {
             if (FilterDate.HasValue)
             {
-                _tasks = (await TaskRepo.GetByDateAsync(FilterDate.Value)).ToList();
+                _tasks = ( TaskRepo.GetByDate(FilterDate.Value)).ToList();
             }
             else if (FilterStatus.HasValue)
             {
-                _tasks = (await TaskRepo.GetByStatusAsync(FilterStatus.Value)).ToList();
+                _tasks = ( TaskRepo.GetByStatus(FilterStatus.Value)).ToList();
             }
             else
             {
-                _tasks = (await TaskRepo.GetAllAsync()).ToList();
+                _tasks = ( TaskRepo.GetAll()).ToList();
             }
         }
         finally
@@ -152,7 +152,7 @@
         return query.ToList();
     }
 
-    private async void ShowCreateDialog()
+    private async Task ShowCreateDialog()
     {
         var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
         var dialog = await DialogService.ShowAsync<TaskEditDialog>("Новая задача", options);
@@ -160,18 +160,18 @@
 
         if (!result.Canceled)
         {
-            await LoadTasks();
+            LoadTasks();
         }
     }
 
-    private async Task HandleTaskUpdated(TaskItem task)
+    private void HandleTaskUpdated(TaskItem task)
     {
-        await LoadTasks();
+         LoadTasks();
     }
 
-    private async Task HandleTaskDeleted(TaskItem task)
+    private void HandleTaskDeleted(TaskItem task)
     {
-        await LoadTasks();
+         LoadTasks();
     }
 
     private enum SortField

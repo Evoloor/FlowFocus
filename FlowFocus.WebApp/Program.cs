@@ -1,5 +1,7 @@
+using FlowFocus.Core;
 using FlowFocus.Data;
 using FlowFocus.WebApp;
+using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -30,6 +32,37 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 // Кастомное заполнение БД
-_ = app.Services.InitializeDatabaseAsync();
+app.Services.InitializeDatabase();
 
 app.Run();
+
+
+public static class ServiceExtensions
+{
+    public static IServiceCollection AddDataLayer(this IServiceCollection services)
+    {
+        services.AddDbContext<StorageContext>();
+        
+        // Репозитории
+        services.AddScoped<ITaskRepository, TaskRepository>();
+        services.AddScoped<IDependencyRepository, DependencyRepository>();
+        services.AddScoped<ISettingsRepository, SettingsRepository>();
+
+        // Сервисы
+        services.AddScoped<IRecurringTaskService, RecurringTaskService>();
+        services.AddScoped<IPlannerService, BasicPlannerService>();
+        services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<IProcrastinationService, ProcrastinationService>();
+
+        return services;
+    }
+
+    public static void InitializeDatabase(this IServiceProvider serviceProvider)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<StorageContext>();
+
+        // Автоматическое создание БД и применение миграций
+        context.Database.Migrate();
+    }
+}

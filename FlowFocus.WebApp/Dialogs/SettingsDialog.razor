@@ -114,16 +114,16 @@
 
     private UserSettings Settings { get; set; } = new();
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        Settings = await SettingsRepo.GetUserSettingsAsync();
+        Settings = SettingsRepo.GetUserSettings();
     }
 
-    private async Task SaveSettings()
+    private void SaveSettings()
     {
         try
         {
-            await SettingsRepo.UpdateAsync(Settings);
+            SettingsRepo.Update(Settings);
             Snackbar.Add("Настройки сохранены", Severity.Success);
             MudDialog.Close(DialogResult.Ok(Settings));
         }

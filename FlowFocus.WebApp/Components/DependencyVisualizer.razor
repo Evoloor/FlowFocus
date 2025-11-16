@@ -28,11 +28,11 @@
     
     private List<Dependency> _dependencies = [];
 
-    protected override async Task OnParametersSetAsync()
+    protected override void OnParametersSet()
     {
         if (Task != null)
         {
-            _dependencies = (await DependencyRepo.GetDependenciesForTaskAsync(Task.Id))?.ToList() ?? [];
+            _dependencies = (DependencyRepo.GetDependenciesForTask(Task.Id))?.ToList() ?? [];
         }
     }
 

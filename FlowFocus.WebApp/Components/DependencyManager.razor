@@ -6,10 +6,10 @@
 <MudPaper Class="pa-3" Elevation="0" Outlined="true">
     <div class="d-flex justify-space-between align-center mb-3">
         <MudText Typo="Typo.subtitle2">Зависимости задачи</MudText>
-        <MudButton Variant="Variant.Outlined" 
-                  Size="Size.Small"
-                  StartIcon="@Icons.Material.Filled.AddLink"
-                  OnClick="ShowAddDependencyDialog">
+        <MudButton Variant="Variant.Outlined"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.AddLink"
+                   OnClick="ShowAddDependencyDialog">
             Добавить зависимость
         </MudButton>
     </div>
@@ -20,16 +20,16 @@
             @foreach (var dependency in _dependencies)
             {
                 <MudListItem T="string">
-                    <MudChip T="string" Size="Size.Small" 
-                            Color="GetDependencyColor(dependency.Type)" 
-                            Class="mr-2">
+                    <MudChip T="string" Size="Size.Small"
+                             Color="GetDependencyColor(dependency.Type)"
+                             Class="mr-2">
                         @dependency.Type
                     </MudChip>
                     <MudText Class="flex-grow-1">@dependency.TargetTask?.Title</MudText>
-                    <MudIconButton Icon="@Icons.Material.Filled.Delete" 
-                                  Size="Size.Small"
-                                  Color="Color.Error"
-                                  OnClick="() => RemoveDependency(dependency)" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Size="Size.Small"
+                                   Color="Color.Error"
+                                   OnClick="() => RemoveDependency(dependency)"/>
                 </MudListItem>
             }
         </MudList>
@@ -42,19 +42,19 @@
 
 @code {
     [Parameter] public TaskItem Task { get; set; } = null!;
-    
+
     private List<Dependency> _dependencies = [];
 
-    protected override async Task OnParametersSetAsync()
+    protected override void OnParametersSet()
     {
-        await LoadDependencies();
+        LoadDependencies();
     }
 
-    private async Task LoadDependencies()
+    private void LoadDependencies()
     {
         if (Task != null)
         {
-            _dependencies = (await DependencyRepo.GetDependenciesForTaskAsync(Task.Id)).ToList();
+            _dependencies = (DependencyRepo.GetDependenciesForTask(Task.Id)).ToList();
             StateHasChanged();
         }
     }
@@ -82,7 +82,7 @@
 
         if (!result.Canceled)
         {
-            await LoadDependencies();
+            LoadDependencies();
         }
     }
 
@@ -101,9 +101,10 @@
 
         if (!result.Canceled)
         {
-            await DependencyRepo.DeleteAsync(dependency.Id);
-            await LoadDependencies();
+            DependencyRepo.Delete(dependency.Id);
+            LoadDependencies();
             Snackbar.Add("Зависимость удалена", Severity.Success);
         }
     }
+
 }

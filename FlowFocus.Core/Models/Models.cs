@@ -1,48 +1,51 @@
 using System.ComponentModel.DataAnnotations;
 using FlowFocus.Core.Enums;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
-
 namespace FlowFocus.Core.Models;
+public interface IAuditEntity
+{
+    int Id { get; set; }
+    DateTime LastChangesOn { get; set; }
+}
 
-public class TaskItem
+public class TaskItem : IAuditEntity
 {
     public int Id { get; set; }
-    
-    [Required]
-    [MaxLength(500)]
-    public string Title { get; set; } = string.Empty;
-    
+    public DateTime LastChangesOn { get; set; }
+
+    [Required] [MaxLength(500)] public string Title { get; set; } = string.Empty;
+
     public string? Description { get; set; }
     public List<string> Tags { get; set; } = [];
-    
+
     public TaskStatus Status { get; set; } = TaskStatus.NotConfigured;
     public int UserPriority { get; set; } = 5;
     public int CalculatedPriority { get; set; }
-    
+
     public int Interest { get; set; } = 5;
     public int Complexity { get; set; } = 5;
     public double EstimatedHours { get; set; } = 1.0;
-    
+
     public DateTime? Deadline { get; set; }
     public DateTime? PlannedDate { get; set; }
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
-    
+
     public bool IsFavorite { get; set; }
     public bool IsRecurring { get; set; }
     public RecurrencePattern? Recurrence { get; set; }
     public DateTime? RecurrenceEndDate { get; set; }
     public int? ParentTaskId { get; set; }
-    
+
     public DisplayType DisplayType { get; set; } = DisplayType.Independent;
-    
+
     // Новые поля согласно ТЗ
     public bool IsProcrastinationResistant { get; set; }
     public DateTime? LastProcrastinatedDate { get; set; }
     public int ProcrastinationCount { get; set; }
-    
+
     public List<Dependency> Dependencies { get; set; } = [];
     public List<Dependency> DependentTasks { get; set; } = [];
-    
+
     // Метод для проверки, можно ли выполнить задачу
     public bool CanBeStarted()
     {
@@ -53,33 +56,35 @@ public class TaskItem
     // Новый метод: проверка условий для прокрастинации
     public bool CanBeProcrastinated()
     {
-        return Status == TaskStatus.Planned && 
+        return Status == TaskStatus.Planned &&
                !IsProcrastinationResistant &&
                Complexity >= 70 &&
                ProcrastinationCount < 3;
     }
 }
 
-public class Dependency
+public class Dependency : IAuditEntity
 {
     public int Id { get; set; }
+    public DateTime LastChangesOn { get; set; }
     public int SourceTaskId { get; set; }
     public int TargetTaskId { get; set; }
-    
+
     public DependencyType Type { get; set; }
     public DependencyLogic Logic { get; set; } = DependencyLogic.And;
     public string? ConditionParameters { get; set; }
     public string? ConditionGroup { get; set; }
     public int ConditionOrder { get; set; }
-    
+
     // Navigation properties
     public TaskItem? SourceTask { get; set; }
     public TaskItem? TargetTask { get; set; }
 }
 
-public class UserSettings
+public class UserSettings : IAuditEntity
 {
     public int Id { get; set; } = 1;
+    public DateTime LastChangesOn { get; set; }
     public int DayStartHour { get; set; } = 6;
     public double DailyTimeLimit { get; set; } = 8.0;
     public int DailyComplexityLimit { get; set; } = 50;
@@ -88,8 +93,6 @@ public class UserSettings
     public string? PriorityBoostDates { get; set; }
     public bool AutoCompleteGuaranteed { get; set; } = true;
     public bool RemoveUrgentIfNotDone { get; set; } = true;
-    
-    // Новые настройки согласно ТЗ
     public bool ShowProcrastinationButton { get; set; } = true;
     public bool AutoBalanceTasks { get; set; } = true;
     public int MaxComplexTasksPerDay { get; set; } = 3;
@@ -103,12 +106,4 @@ public class RecurrencePattern
     public List<DayOfWeek>? DaysOfWeek { get; set; }
     public int? DayOfMonth { get; set; }
     public DateTime StartDate { get; set; } = DateTime.Today;
-}
-
-public enum RecurrenceType
-{
-    Daily,
-    Weekly,
-    Monthly,
-    Yearly
 }

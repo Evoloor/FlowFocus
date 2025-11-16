@@ -1,347 +1,20 @@
+using System.Text.Json;
 using FlowFocus.Core;
 using FlowFocus.Core.Enums;
 using FlowFocus.Core.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Data;
 
-public class DependencyRepository(AppDbContext context, DataCache dataCache) 
-    : BaseRepository<Dependency>(context, dataCache), IDependencyRepository
+public class StorageContext : DbContext
 {
-    public override Task<Dependency?> GetByIdAsync(int id)
-    {
-        var dependency = _dataCache.GetAllDependencies().FirstOrDefault(d => d.Id == id);
-        return Task.FromResult(dependency);
-    }
-
-    public override Task<IEnumerable<Dependency>> GetAllAsync()
-    {
-        var dependencies = _dataCache.GetAllDependencies();
-        return Task.FromResult(dependencies.AsEnumerable());
-    }
-
-    public override async Task AddAsync(Dependency entity)
-    {
-        _dataCache.AddDependency(entity);
-        await SyncToDatabaseAsync();
-    }
-
-    public override async Task UpdateAsync(Dependency entity)
-    {
-        // Для зависимостей проще удалить и добавить заново
-        _dataCache.RemoveDependency(entity.Id);
-        _dataCache.AddDependency(entity);
-        await SyncToDatabaseAsync();
-    }
-
-    public override async Task DeleteAsync(int id)
-    {
-        _dataCache.RemoveDependency(id);
-        await SyncToDatabaseAsync();
-    }
-
-    public override Task<bool> ExistsAsync(int id)
-    {
-        var exists = _dataCache.GetAllDependencies().Any(d => d.Id == id);
-        return Task.FromResult(exists);
-    }
-
-    public Task<IEnumerable<Dependency>> GetDependenciesForTaskAsync(int taskId)
-    {
-        var dependencies = _dataCache.GetAllDependencies()
-            .Where(d => d.SourceTaskId == taskId)
-            .ToList();
-        return Task.FromResult(dependencies.AsEnumerable());
-    }
-
-    public Task<IEnumerable<Dependency>> GetDependentTasksAsync(int taskId)
-    {
-        var dependencies = _dataCache.GetAllDependencies()
-            .Where(d => d.TargetTaskId == taskId)
-            .ToList();
-        return Task.FromResult(dependencies.AsEnumerable());
-    }
-
-    public Task<bool> HasCircularDependencyAsync(int sourceTaskId, int targetTaskId)
-    {
-        // Проверка прямой циклической зависимости
-        var hasDirectCircular = _dataCache.GetAllDependencies()
-            .Any(d => d.SourceTaskId == targetTaskId && d.TargetTaskId == sourceTaskId);
-            
-        if (hasDirectCircular)
-            return Task.FromResult(true);
-
-        // Проверка транзитивных зависимостей через рекурсивный запрос
-        return Task.FromResult(CheckTransitiveDependency(targetTaskId, sourceTaskId, []));
-    }
-
-    private bool CheckTransitiveDependency(int currentTaskId, int targetTaskId, HashSet<int> visited)
-    {
-        if (!visited.Add(currentTaskId))
-            return false;
-
-        var dependencies = _dataCache.GetAllDependencies()
-            .Where(d => d.SourceTaskId == currentTaskId)
-            .Select(d => d.TargetTaskId)
-            .ToList();
-
-        foreach (var dependencyId in dependencies)
-        {
-            if (dependencyId == targetTaskId)
-                return true;
-
-            if (CheckTransitiveDependency(dependencyId, targetTaskId, visited))
-                return true;
-        }
-
-        visited.Remove(currentTaskId);
-        return false;
-    }
-
-    public async Task RemoveDependenciesForTaskAsync(int taskId)
-    {
-        _dataCache.RemoveDependenciesForTask(taskId);
-        await SyncToDatabaseAsync();
-    }
-
-    public Task<IEnumerable<Dependency>> GetBlockingDependenciesAsync(int taskId)
-    {
-        var dependencies = _dataCache.GetAllDependencies()
-            .Where(d => d.SourceTaskId == taskId && d.Type == DependencyType.Blocking)
-            .ToList();
-        return Task.FromResult(dependencies.AsEnumerable());
-    }
-}
-
-public class SettingsRepository(AppDbContext context, DataCache dataCache) 
-    : BaseRepository<UserSettings>(context, dataCache), ISettingsRepository
-{
-    public override Task<UserSettings?> GetByIdAsync(int id)
-    {
-        var settings = _dataCache.GetUserSettings();
-        return Task.FromResult<UserSettings?>(settings);
-    }
-
-    public override Task<IEnumerable<UserSettings>> GetAllAsync()
-    {
-        var settings = new List<UserSettings> { _dataCache.GetUserSettings() };
-        return Task.FromResult(settings.AsEnumerable());
-    }
-
-    public override async Task AddAsync(UserSettings entity)
-    {
-        _dataCache.SetUserSettings(entity);
-        await SyncToDatabaseAsync();
-    }
-
-    public override async Task UpdateAsync(UserSettings entity)
-    {
-        _dataCache.SetUserSettings(entity);
-        await SyncToDatabaseAsync();
-    }
-
-    public override async Task DeleteAsync(int id)
-    {
-        // Создаем настройки по умолчанию
-        _dataCache.SetUserSettings(new UserSettings());
-        await SyncToDatabaseAsync();
-    }
-
-    public override Task<bool> ExistsAsync(int id)
-    {
-        return Task.FromResult(true); // Настройки всегда существуют
-    }
-
-    public Task<UserSettings> GetUserSettingsAsync()
-    {
-        var settings = _dataCache.GetUserSettings();
-        return Task.FromResult(settings);
-    }
-
-    public Task<bool> GetAutoRecalculateSettingAsync()
-    {
-        var settings = _dataCache.GetUserSettings();
-        return Task.FromResult(settings.AutoRecalculateOnAdd);
-    }
-
-    public async Task UpdateDayStartHourAsync(int hour)
-    {
-        var settings = _dataCache.GetUserSettings();
-        var updatedSettings = settings.Clone();
-        updatedSettings.DayStartHour = Math.Clamp(hour, 0, 23);
-        _dataCache.SetUserSettings(updatedSettings);
-        await SyncToDatabaseAsync();
-    }
-
-    // Метод для загрузки настроек при старте приложения
-    public async Task LoadSettingsAsync()
-    {
-        var settings = await _context.UserSettings
-            .AsNoTracking()
-            .FirstOrDefaultAsync();
-            
-        if (settings != null)
-        {
-            _dataCache.SetUserSettings(settings);
-        }
-    }
-}
-
-public static class ServiceExtensions
-{
-    public static IServiceCollection AddDataLayer(this IServiceCollection services)
-    {
-        services.AddDbContext<AppDbContext>();
-        services.AddSingleton<DataCache>(); // Единый кэш на все приложение
-
-        // Репозитории
-        services.AddScoped<ITaskRepository, TaskRepository>();
-        services.AddScoped<IDependencyRepository, DependencyRepository>();
-        services.AddScoped<ISettingsRepository, SettingsRepository>();
-
-        // Сервисы
-        services.AddScoped<IRecurringTaskService, RecurringTaskService>();
-        services.AddScoped<IPlannerService, BasicPlannerService>();
-        services.AddScoped<INotificationService, NotificationService>();
-        services.AddScoped<IProcrastinationService, ProcrastinationService>();
-
-        return services;
-    }
-
-    public static async Task InitializeDatabaseAsync(this IServiceProvider serviceProvider)
-    {
-        using var scope = serviceProvider.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        // Автоматическое создание БД и применение миграций
-        await context.Database.MigrateAsync();
-
-        // Загружаем все данные в кэш
-        var taskRepo = scope.ServiceProvider.GetRequiredService<ITaskRepository>();
-        var settingsRepo = scope.ServiceProvider.GetRequiredService<ISettingsRepository>();
-
-        if (taskRepo is TaskRepository concreteTaskRepo)
-        {
-            await concreteTaskRepo.LoadAllDataAsync();
-        }
-
-        if (settingsRepo is SettingsRepository concreteSettingsRepo)
-        {
-            await concreteSettingsRepo.LoadSettingsAsync();
-        }
-    }
-}
-
-public class RecurringTaskService(AppDbContext context, ITaskRepository taskRepository) : IRecurringTaskService
-{
-    private readonly AppDbContext _context = context;
-
-    public async Task ProcessRecurringTasksAsync()
-    {
-        var recurringTasks = await taskRepository.GetRecurringTasksAsync();
-        var today = DateTime.Today;
-
-        foreach (var task in recurringTasks.Where(t => t.Recurrence != null))
-        {
-            if (ShouldCreateRecurrence(task, today))
-            {
-                await CreateNextRecurrenceAsync(task);
-            }
-        }
-    }
-
-    public async Task CreateNextRecurrenceAsync(TaskItem task)
-    {
-        if (task.Recurrence == null) return;
-
-        var nextDate = CalculateNextDate(task.Recurrence, DateTime.Today);
-        if (nextDate.HasValue && (!task.RecurrenceEndDate.HasValue || nextDate <= task.RecurrenceEndDate))
-        {
-            var newTask = new TaskItem
-            {
-                Title = task.Title,
-                Description = task.Description,
-                UserPriority = task.UserPriority,
-                Status = TaskStatus.Planned,
-                Interest = task.Interest,
-                Complexity = task.Complexity,
-                EstimatedHours = task.EstimatedHours,
-                PlannedDate = nextDate,
-                IsRecurring = true,
-                Recurrence = task.Recurrence,
-                RecurrenceEndDate = task.RecurrenceEndDate,
-                ParentTaskId = task.Id,
-                Tags = [..task.Tags],
-                DisplayType = task.DisplayType
-            };
-
-            await taskRepository.AddAsync(newTask);
-        }
-    }
-
-    private bool ShouldCreateRecurrence(TaskItem task, DateTime today)
-    {
-        if (task.Recurrence == null) return false;
-
-        var lastOccurrence = task.PlannedDate ?? task.CreatedDate.Date;
-        var nextDate = CalculateNextDate(task.Recurrence, lastOccurrence);
-
-        return nextDate.HasValue && nextDate.Value.Date <= today.Date;
-    }
-
-    private DateTime? CalculateNextDate(RecurrencePattern pattern, DateTime lastDate)
-    {
-        return pattern.Type switch
-        {
-            RecurrenceType.Daily => lastDate.AddDays(pattern.Interval),
-            RecurrenceType.Weekly => CalculateNextWeeklyDate(pattern, lastDate),
-            RecurrenceType.Monthly => CalculateNextMonthlyDate(pattern, lastDate),
-            RecurrenceType.Yearly => lastDate.AddYears(pattern.Interval),
-            _ => null
-        };
-    }
-
-    private DateTime? CalculateNextWeeklyDate(RecurrencePattern pattern, DateTime lastDate)
-    {
-        var nextDate = lastDate.AddDays(7 * pattern.Interval);
-        if (pattern.DaysOfWeek?.Any() == true)
-        {
-            // Поиск следующего подходящего дня недели
-            for (var i = 0; i < 7; i++)
-            {
-                var candidate = nextDate.AddDays(i);
-                if (pattern.DaysOfWeek.Contains(candidate.DayOfWeek))
-                    return candidate;
-            }
-        }
-
-        return nextDate;
-    }
-
-    private DateTime? CalculateNextMonthlyDate(RecurrencePattern pattern, DateTime lastDate)
-    {
-        var nextDate = lastDate.AddMonths(pattern.Interval);
-        if (pattern.DayOfMonth.HasValue)
-        {
-            var daysInMonth = DateTime.DaysInMonth(nextDate.Year, nextDate.Month);
-            var day = Math.Min(pattern.DayOfMonth.Value, daysInMonth);
-            return new DateTime(nextDate.Year, nextDate.Month, day);
-        }
-
-        return nextDate;
-    }
-}
-
-public class AppDbContext : DbContext
-{
-    public AppDbContext()
+    public StorageContext()
     {
     }
 
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+    public StorageContext(DbContextOptions<StorageContext> options) : base(options)
     {
     }
 
@@ -376,11 +49,10 @@ public class AppDbContext : DbContext
                 .HasConversion(
                     v => v == null
                         ? null
-                        : System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+                        : JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
                     v => string.IsNullOrEmpty(v)
                         ? null
-                        : System.Text.Json.JsonSerializer.Deserialize<RecurrencePattern>(v,
-                            (System.Text.Json.JsonSerializerOptions?)null)
+                        : JsonSerializer.Deserialize<RecurrencePattern>(v, (JsonSerializerOptions?)null)
                 );
 
             // Индексы
@@ -415,366 +87,412 @@ public class AppDbContext : DbContext
     }
 }
 
-public class TaskRepository(AppDbContext context, DataCache dataCache) 
-    : BaseRepository<TaskItem>(context, dataCache), ITaskRepository
+public abstract class CachedRepository<T>(StorageContext context) : IRepository<T>
+    where T : class, IAuditEntity
 {
-    public override Task<TaskItem?> GetByIdAsync(int id)
-    {
-        var task = _dataCache.GetAllTasks().FirstOrDefault(t => t.Id == id);
-        return Task.FromResult(task);
-    }
+    protected List<T>? Cache;
+    protected bool IsDirty = true;
+    protected readonly object CacheLock = new();
 
-    public override Task<IEnumerable<TaskItem>> GetAllAsync()
-    {
-        var tasks = _dataCache.GetAllTasks();
-        return Task.FromResult(tasks.AsEnumerable());
-    }
+    protected abstract DbSet<T> GetDbSet();
 
-    public override async Task AddAsync(TaskItem entity)
-    {
-        _dataCache.AddTask(entity);
-        await SyncToDatabaseAsync();
-    }
+    // Для операций чтения - без отслеживания
+    protected virtual IQueryable<T> GetBaseQuery() =>
+        GetDbSet().AsNoTracking().AsQueryable();
 
-    public override async Task UpdateAsync(TaskItem entity)
-    {
-        _dataCache.UpdateTask(entity);
-        await SyncToDatabaseAsync();
-    }
+    // Для операций записи - с отслеживанием
+    protected virtual IQueryable<T> GetTrackedQuery() =>
+        GetDbSet().AsQueryable();
 
-    public override async Task DeleteAsync(int id)
+    public virtual List<T> GetAll()
     {
-        _dataCache.RemoveTask(id);
-        _dataCache.RemoveDependenciesForTask(id);
-        await SyncToDatabaseAsync();
-    }
-
-    public override Task<bool> ExistsAsync(int id)
-    {
-        var exists = _dataCache.GetAllTasks().Any(t => t.Id == id);
-        return Task.FromResult(exists);
-    }
-
-    public Task<IEnumerable<TaskItem>> GetByStatusAsync(TaskStatus status)
-    {
-        var tasks = _dataCache.GetAllTasks()
-            .Where(t => t.Status == status)
-            .ToList();
-        return Task.FromResult(tasks.AsEnumerable());
-    }
-
-    public Task<IEnumerable<TaskItem>> GetByDateAsync(DateTime date)
-    {
-        var tasks = _dataCache.GetAllTasks()
-            .Where(t => t.PlannedDate.HasValue &&
-                        t.PlannedDate.Value.Date == date.Date)
-            .ToList();
-        return Task.FromResult(tasks.AsEnumerable());
-    }
-
-    public Task<IEnumerable<TaskItem>> GetByPriorityRangeAsync(int minPriority, int maxPriority)
-    {
-        var tasks = _dataCache.GetAllTasks()
-            .Where(t => t.UserPriority >= minPriority && t.UserPriority <= maxPriority)
-            .ToList();
-        return Task.FromResult(tasks.AsEnumerable());
-    }
-
-    public Task<IEnumerable<TaskItem>> GetWithDependenciesAsync()
-    {
-        var tasks = _dataCache.GetAllTasks();
-        return Task.FromResult(tasks.AsEnumerable());
-    }
-
-    public Task<IEnumerable<TaskItem>> GetNotConfiguredAsync()
-    {
-        var tasks = _dataCache.GetAllTasks()
-            .Where(t => t.Status == TaskStatus.NotConfigured)
-            .ToList();
-        return Task.FromResult(tasks.AsEnumerable());
-    }
-
-    public Task<IEnumerable<TaskItem>> GetRecurringTasksAsync()
-    {
-        var tasks = _dataCache.GetAllTasks()
-            .Where(t => t.IsRecurring && t.Recurrence != null)
-            .ToList();
-        return Task.FromResult(tasks.AsEnumerable());
-    }
-
-    public Task<IEnumerable<TaskItem>> GetChildTasksAsync(int parentTaskId)
-    {
-        var tasks = _dataCache.GetAllTasks()
-            .Where(t => t.ParentTaskId == parentTaskId)
-            .ToList();
-        return Task.FromResult(tasks.AsEnumerable());
-    }
-
-    public async Task UpdateStatusAsync(int taskId, TaskStatus status)
-    {
-        var task = _dataCache.GetAllTasks().FirstOrDefault(t => t.Id == taskId);
-        if (task != null)
+        lock (CacheLock)
         {
-            var updatedTask = task.Clone();
-            updatedTask.Status = status;
-            _dataCache.UpdateTask(updatedTask);
-            await SyncToDatabaseAsync();
+            if (IsDirty || Cache == null)
+            {
+                Cache = GetBaseQuery().ToList();
+                IsDirty = false;
+            }
+
+            return Cache.ToList(); // Возвращаем копию
         }
     }
 
-    public async Task ProcessDayStartAsync()
+    public virtual T? GetById(int id)
     {
-        var settings = _dataCache.GetUserSettings();
+        // Для операций чтения используем кэш (без отслеживания)
+        return GetAll().FirstOrDefault(e => e.Id == id);
+    }
+
+    // Метод для получения отслеживаемой сущности (только для операций изменения)
+    protected virtual T? GetTrackedById(int id)
+    {
+        return GetTrackedQuery().FirstOrDefault(e => e.Id == id);
+    }
+
+    public virtual void Add(T entity)
+    {
+        lock (CacheLock)
+        {
+            if (entity.Id == 0)
+            {
+                var maxId = GetBaseQuery()
+                    .Select(e => e.Id)
+                    .DefaultIfEmpty(0)
+                    .Max();
+                entity.Id = maxId + 1;
+            }
+
+            entity.LastChangesOn = DateTime.UtcNow;
+
+            // Добавляем новую сущность
+            GetDbSet().Add(entity);
+            context.SaveChanges();
+            MarkDirty();
+        }
+    }
+
+    public virtual void Update(T entity)
+    {
+        lock (CacheLock)
+        {
+            try
+            {
+                Console.WriteLine($"Updating entity {typeof(T).Name} with ID {entity.Id}");
+
+                // Получаем отслеживаемую сущность из БД
+                var trackedEntity = GetTrackedById(entity.Id);
+                if (trackedEntity == null)
+                {
+                    throw new InvalidOperationException($"Entity with ID {entity.Id} not found");
+                }
+
+                // Обновляем свойства отслеживаемой сущности
+                context.Entry(trackedEntity).CurrentValues.SetValues(entity);
+                trackedEntity.LastChangesOn = DateTime.UtcNow;
+
+                var result = context.SaveChanges();
+                Console.WriteLine($"SaveChanges affected {result} records");
+
+                MarkDirty();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in Update: {ex.Message}");
+                throw;
+            }
+        }
+    }
+
+    // Альтернативный метод Update с явным указанием изменяемых свойств
+    public virtual void UpdatePartial(int id, Action<T> updateAction)
+    {
+        lock (CacheLock)
+        {
+            var entity = GetTrackedById(id);
+            if (entity != null)
+            {
+                updateAction(entity);
+                entity.LastChangesOn = DateTime.UtcNow;
+                context.SaveChanges();
+                MarkDirty();
+            }
+        }
+    }
+
+    public virtual void Delete(int id)
+    {
+        lock (CacheLock)
+        {
+            // Используем отслеживаемый запрос для удаления
+            var entity = GetTrackedQuery().FirstOrDefault(e => e.Id == id);
+            if (entity != null)
+            {
+                GetDbSet().Remove(entity);
+                context.SaveChanges();
+                MarkDirty();
+            }
+        }
+    }
+
+    public void SaveChanges()
+    {
+        context.SaveChanges();
+        MarkDirty();
+    }
+
+    protected void MarkDirty() => IsDirty = true;
+
+    public virtual void RefreshCache()
+    {
+        lock (CacheLock)
+        {
+            IsDirty = true;
+            Cache = null;
+        }
+    }
+}
+
+public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>(context), ITaskRepository
+{
+    protected override DbSet<TaskItem> GetDbSet() => context.Tasks;
+
+    protected override IQueryable<TaskItem> GetBaseQuery() =>
+        context.Tasks
+            .AsNoTracking()
+            .Include(t => t.Dependencies)
+            .ThenInclude(d => d.TargetTask)
+            .Include(t => t.DependentTasks)
+            .ThenInclude(d => d.SourceTask)
+            .OrderBy(t => t.PlannedDate);
+
+    protected override IQueryable<TaskItem> GetTrackedQuery() =>
+        context.Tasks
+            .Include(t => t.Dependencies)
+            .ThenInclude(d => d.TargetTask)
+            .Include(t => t.DependentTasks)
+            .ThenInclude(d => d.SourceTask)
+            .OrderBy(t => t.PlannedDate);
+
+    public List<TaskItem> GetByStatus(TaskStatus status)
+        => GetAll().Where(t => t.Status == status).ToList();
+
+    public List<TaskItem> GetByDate(DateTime date)
+        => GetAll().Where(t => t.PlannedDate.HasValue && t.PlannedDate.Value.Date == date.Date).ToList();
+
+    public List<TaskItem> GetByPriorityRange(int minPriority, int maxPriority)
+        => GetAll().Where(t => t.UserPriority >= minPriority && t.UserPriority <= maxPriority).ToList();
+
+    public List<TaskItem> GetWithDependencies()
+        => GetAll();
+
+    public List<TaskItem> GetNotConfigured()
+        => GetByStatus(TaskStatus.NotConfigured);
+
+    public List<TaskItem> GetRecurringTasks()
+        => GetAll().Where(t => t.IsRecurring && t.Recurrence != null).ToList();
+
+    public List<TaskItem> GetChildTasks(int parentTaskId)
+        => GetAll().Where(t => t.ParentTaskId == parentTaskId).ToList();
+
+    public void UpdateStatus(int taskId, TaskStatus status)
+    {
+        UpdatePartial(taskId, task => { task.Status = status; });
+    }
+
+    public void ProcessDayStart()
+    {
+        var settings = new SettingsRepository(context).GetUserSettings();
         var today = DateTime.Today;
-        var allTasks = _dataCache.GetAllTasks();
         var modified = false;
 
-        // Обработка гарантированных задач (приоритет 0)
-        if (settings.AutoCompleteGuaranteed)
-        {
-            var guaranteedTasks = allTasks
-                .Where(t => t.UserPriority == 0 &&
-                            t.PlannedDate.HasValue &&
-                            t.PlannedDate.Value.Date < today &&
-                            t.Status != TaskStatus.Completed)
-                .ToList();
-
-            foreach (var task in guaranteedTasks)
-            {
-                var updatedTask = task.Clone();
-                updatedTask.Status = TaskStatus.Completed;
-                _dataCache.UpdateTask(updatedTask);
-                modified = true;
-            }
-        }
-
-        // Обработка неотложных задач (приоритет 1)
-        if (settings.RemoveUrgentIfNotDone)
-        {
-            var urgentTasks = allTasks
-                .Where(t => t.UserPriority == 1 &&
-                            t.PlannedDate.HasValue &&
-                            t.PlannedDate.Value.Date < today &&
-                            t.Status != TaskStatus.Completed)
-                .ToList();
-
-            foreach (var task in urgentTasks)
-            {
-                var updatedTask = task.Clone();
-                updatedTask.Status = TaskStatus.Irrelevant;
-                _dataCache.UpdateTask(updatedTask);
-                modified = true;
-            }
-        }
-
-        // Перенос невыполненных задач на сегодня
-        var unfinishedTasks = allTasks
-            .Where(t => t.PlannedDate.HasValue &&
-                        t.PlannedDate.Value.Date < today &&
-                        t.Status == TaskStatus.Active)
+        // Используем отслеживаемые сущности для изменений
+        var tasksToProcess = GetTrackedQuery()
+            .Where(t => t.PlannedDate.HasValue && t.PlannedDate.Value.Date < today)
             .ToList();
 
-        foreach (var task in unfinishedTasks)
+        foreach (var task in tasksToProcess)
         {
-            var updatedTask = task.Clone();
-            updatedTask.PlannedDate = today;
-            _dataCache.UpdateTask(updatedTask);
-            modified = true;
+            var originalStatus = task.Status;
+
+            // Обработка гарантированных задач
+            if (settings.AutoCompleteGuaranteed && task.UserPriority == 0 && task.Status != TaskStatus.Completed)
+            {
+                task.Status = TaskStatus.Completed;
+                modified = true;
+            }
+            // Обработка неотложных задач
+            else if (settings.RemoveUrgentIfNotDone && task.UserPriority == 1 && task.Status != TaskStatus.Completed)
+            {
+                task.Status = TaskStatus.Irrelevant;
+                modified = true;
+            }
+            // Перенос активных задач
+            else if (task.Status == TaskStatus.Active)
+            {
+                task.PlannedDate = today;
+                modified = true;
+            }
+
+            if (task.Status != originalStatus || task.PlannedDate != task.PlannedDate)
+            {
+                task.LastChangesOn = DateTime.UtcNow;
+            }
         }
 
         if (modified)
         {
-            await SyncToDatabaseAsync();
+            context.SaveChanges();
+            RefreshCache();
         }
-    }
-
-    // Метод для загрузки всех данных при старте приложения
-    public async Task LoadAllDataAsync()
-    {
-        var tasks = await _context.Tasks
-            .AsNoTracking()
-            .ToListAsync();
-            
-        var dependencies = await _context.Dependencies
-            .AsNoTracking()
-            .ToListAsync();
-
-        _dataCache.SetAllTasks(tasks);
-        _dataCache.SetAllDependencies(dependencies);
     }
 }
 
-public class DataCache
+public class DependencyRepository(StorageContext context) : CachedRepository<Dependency>(context), IDependencyRepository
 {
-    private readonly object _lock = new object();
-    private List<TaskItem> _allTasks = new();
-    private List<Dependency> _allDependencies = new();
-    private UserSettings _userSettings = new();
+    protected override DbSet<Dependency> GetDbSet() => context.Dependencies;
 
-    public List<TaskItem> GetAllTasks()
+    protected override IQueryable<Dependency> GetBaseQuery() =>
+        context.Dependencies
+            .AsNoTracking()
+            .Include(d => d.SourceTask)
+            .Include(d => d.TargetTask);
+
+    protected override IQueryable<Dependency> GetTrackedQuery() =>
+        context.Dependencies
+            .Include(d => d.SourceTask)
+            .Include(d => d.TargetTask);
+
+    public List<Dependency> GetDependenciesForTask(int taskId)
+        => GetAll().Where(d => d.SourceTaskId == taskId).ToList();
+
+    public List<Dependency> GetDependentTasks(int taskId)
+        => GetAll().Where(d => d.TargetTaskId == taskId).ToList();
+
+    public bool HasCircularDependency(int sourceTaskId, int targetTaskId)
     {
-        lock (_lock)
-        {
-            return new List<TaskItem>(_allTasks);
-        }
+        // Для проверки зависимостей используем неотслеживаемый запрос
+        var hasDirectCircular = GetBaseQuery()
+            .Any(d => d.SourceTaskId == targetTaskId && d.TargetTaskId == sourceTaskId);
+
+        if (hasDirectCircular)
+            return true;
+
+        return CheckTransitiveDependency(targetTaskId, sourceTaskId, new HashSet<int>());
     }
 
-    public void SetAllTasks(List<TaskItem> tasks)
+    private bool CheckTransitiveDependency(int currentTaskId, int targetTaskId, HashSet<int> visited)
     {
-        lock (_lock)
-        {
-            _allTasks = new List<TaskItem>(tasks);
-        }
-    }
+        if (!visited.Add(currentTaskId))
+            return false;
 
-    public List<Dependency> GetAllDependencies()
-    {
-        lock (_lock)
-        {
-            return new List<Dependency>(_allDependencies);
-        }
-    }
+        var dependencies = GetBaseQuery()
+            .Where(d => d.SourceTaskId == currentTaskId)
+            .Select(d => d.TargetTaskId)
+            .ToList();
 
-    public void SetAllDependencies(List<Dependency> dependencies)
-    {
-        lock (_lock)
+        foreach (var dependencyId in dependencies)
         {
-            _allDependencies = new List<Dependency>(dependencies);
-        }
-    }
+            if (dependencyId == targetTaskId)
+                return true;
 
-    public UserSettings GetUserSettings()
-    {
-        lock (_lock)
-        {
-            return _userSettings.Clone();
+            if (CheckTransitiveDependency(dependencyId, targetTaskId, visited))
+                return true;
         }
-    }
 
-    public void SetUserSettings(UserSettings settings)
-    {
-        lock (_lock)
-        {
-            _userSettings = settings.Clone();
-        }
-    }
-
-    // Методы для атомарных операций с задачами
-    public void AddTask(TaskItem task)
-    {
-        lock (_lock)
-        {
-            _allTasks.Add(task);
-        }
-    }
-
-    public void UpdateTask(TaskItem updatedTask)
-    {
-        lock (_lock)
-        {
-            var existingTask = _allTasks.FirstOrDefault(t => t.Id == updatedTask.Id);
-            if (existingTask != null)
-            {
-                _allTasks.Remove(existingTask);
-                _allTasks.Add(updatedTask);
-            }
-        }
-    }
-
-    public void RemoveTask(int taskId)
-    {
-        lock (_lock)
-        {
-            _allTasks.RemoveAll(t => t.Id == taskId);
-        }
-    }
-
-    // Методы для зависимостей
-    public void AddDependency(Dependency dependency)
-    {
-        lock (_lock)
-        {
-            _allDependencies.Add(dependency);
-        }
-    }
-
-    public void RemoveDependency(int dependencyId)
-    {
-        lock (_lock)
-        {
-            _allDependencies.RemoveAll(d => d.Id == dependencyId);
-        }
+        visited.Remove(currentTaskId);
+        return false;
     }
 
     public void RemoveDependenciesForTask(int taskId)
     {
-        lock (_lock)
+        // Для удаления используем отслеживаемые сущности
+        var dependencies = GetTrackedQuery()
+            .Where(d => d.SourceTaskId == taskId || d.TargetTaskId == taskId)
+            .ToList();
+
+        foreach (var dependency in dependencies)
         {
-            _allDependencies.RemoveAll(d => 
-                d.SourceTaskId == taskId || d.TargetTaskId == taskId);
+            GetDbSet().Remove(dependency);
+        }
+
+        context.SaveChanges();
+        MarkDirty();
+    }
+
+    public List<Dependency> GetBlockingDependencies(int taskId)
+        => GetAll().Where(d => d.SourceTaskId == taskId && d.Type == DependencyType.Blocking).ToList();
+
+    // Новые методы для работы с зависимостями
+    public void AddDependency(int sourceTaskId, int targetTaskId, DependencyType type,
+        DependencyLogic logic = DependencyLogic.And)
+    {
+        var dependency = new Dependency
+        {
+            SourceTaskId = sourceTaskId,
+            TargetTaskId = targetTaskId,
+            Type = type,
+            Logic = logic,
+            LastChangesOn = DateTime.UtcNow
+        };
+
+        Add(dependency);
+    }
+
+    public void RemoveDependency(int sourceTaskId, int targetTaskId)
+    {
+        var dependency = GetTrackedQuery()
+            .FirstOrDefault(d => d.SourceTaskId == sourceTaskId && d.TargetTaskId == targetTaskId);
+
+        if (dependency != null)
+        {
+            Delete(dependency.Id);
         }
     }
 }
 
-public abstract class BaseRepository<T>(AppDbContext context, DataCache dataCache) : IRepository<T> where T : class
+public class SettingsRepository(StorageContext context) : CachedRepository<UserSettings>(context), ISettingsRepository
 {
-    protected readonly AppDbContext _context = context;
-    protected readonly DataCache _dataCache = dataCache;
+    protected override DbSet<UserSettings> GetDbSet() => context.UserSettings;
 
-    public abstract Task<T?> GetByIdAsync(int id);
-    public abstract Task<IEnumerable<T>> GetAllAsync();
-    public abstract Task AddAsync(T entity);
-    public abstract Task UpdateAsync(T entity);
-    public abstract Task DeleteAsync(int id);
-    public abstract Task<bool> ExistsAsync(int id);
+    protected override IQueryable<UserSettings> GetTrackedQuery() =>
+        context.UserSettings.AsQueryable();
 
-    protected virtual async Task SyncToDatabaseAsync()
+    public override List<UserSettings> GetAll()
     {
-        try
+        lock (CacheLock)
         {
-            await _context.SaveChangesAsync();
-        }
-        catch (Exception ex)
-        {
-            // Логируем ошибку, но не прерываем работу приложения
-            Console.WriteLine($"Ошибка синхронизации с БД: {ex.Message}");
+            if (IsDirty || Cache == null)
+            {
+                var settings = GetTrackedQuery().FirstOrDefault();
+                if (settings == null)
+                {
+                    settings = new UserSettings();
+                    GetDbSet().Add(settings);
+                    context.SaveChanges();
+                }
+
+                Cache = [settings];
+                IsDirty = false;
+            }
+
+            return Cache.ToList();
         }
     }
-}
-public static class ModelExtensions
-{
-    public static TaskItem Clone(this TaskItem task)
+
+    public override UserSettings? GetById(int id) => GetAll().FirstOrDefault();
+
+    public UserSettings GetUserSettings() => GetAll().First();
+
+    public bool GetAutoRecalculateSetting() => GetUserSettings().AutoRecalculateOnAdd;
+
+    public void UpdateDayStartHour(int hour)
     {
-        return new TaskItem
-        {
-            Id = task.Id,
-            Title = task.Title,
-            Description = task.Description,
-            UserPriority = task.UserPriority,
-            Status = task.Status,
-            Interest = task.Interest,
-            Complexity = task.Complexity,
-            EstimatedHours = task.EstimatedHours,
-            PlannedDate = task.PlannedDate,
-            IsRecurring = task.IsRecurring,
-            Recurrence = task.Recurrence,
-            RecurrenceEndDate = task.RecurrenceEndDate,
-            ParentTaskId = task.ParentTaskId,
-            Tags = new List<string>(task.Tags),
-            DisplayType = task.DisplayType,
-            CreatedDate = task.CreatedDate
-        };
+        UpdatePartial(1, settings => { settings.DayStartHour = Math.Clamp(hour, 0, 23); });
     }
 
-    public static UserSettings Clone(this UserSettings settings)
+    public void UpdateAutoRecalculate(bool autoRecalculate)
     {
-        return new UserSettings
+        UpdatePartial(1, settings => { settings.AutoRecalculateOnAdd = autoRecalculate; });
+    }
+
+    public override void Add(UserSettings entity)
+    {
+        // Для настроек используем Update вместо Add
+        Update(entity);
+    }
+
+    public override void Delete(int id)
+    {
+        var settings = GetTrackedById(id);
+        if (settings != null)
         {
-            Id = settings.Id,
-            DayStartHour = settings.DayStartHour,
-            AutoRecalculateOnAdd = settings.AutoRecalculateOnAdd,
-            AutoCompleteGuaranteed = settings.AutoCompleteGuaranteed,
-            RemoveUrgentIfNotDone = settings.RemoveUrgentIfNotDone
-        };
+            // Сброс к значениям по умолчанию вместо удаления
+            var defaultSettings = new UserSettings { Id = settings.Id };
+            context.Entry(settings).CurrentValues.SetValues(defaultSettings);
+            settings.LastChangesOn = DateTime.UtcNow;
+            context.SaveChanges();
+            MarkDirty();
+        }
     }
 }

@@ -60,9 +60,9 @@
     private string _priority3Dates = string.Empty;
     private string _priority5Dates = string.Empty;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        Settings = await SettingsRepo.GetUserSettingsAsync();
+        Settings = SettingsRepo.GetUserSettings();
         // Инициализация дат из настроек
         InitializePriorityDates();
     }
@@ -77,14 +77,14 @@
         _priority5Dates = "";
     }
 
-    private async Task SavePriorityDates()
+    private void SavePriorityDates()
     {
         try
         {
             // Логика объединения всех дат в Settings.PriorityBoostDates
             Settings.PriorityBoostDates = $"{_priority1Dates},{_priority3Dates},{_priority5Dates}";
             
-            await SettingsRepo.UpdateAsync(Settings);
+             SettingsRepo.Update(Settings);
             Snackbar.Add("Даты приоритетов сохранены", Severity.Success);
         }
         catch (Exception ex)

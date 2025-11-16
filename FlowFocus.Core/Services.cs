@@ -6,79 +6,84 @@ namespace FlowFocus.Core;
 
 public interface IRepository<T> where T : class
 {
-    Task<T?> GetByIdAsync(int id);
-    Task<IEnumerable<T>> GetAllAsync();
-    Task AddAsync(T entity);
-    Task UpdateAsync(T entity);
-    Task DeleteAsync(int id);
-    Task<bool> ExistsAsync(int id);
+    List<T> GetAll();
+    T? GetById(int id);
+    void Add(T entity);
+    void Update(T entity);
+    void Delete(int id);
+    void SaveChanges();
 }
 
 public interface ITaskRepository : IRepository<TaskItem>
 {
-    Task<IEnumerable<TaskItem>> GetByStatusAsync(TaskStatus status);
-    Task<IEnumerable<TaskItem>> GetByDateAsync(DateTime date);
-    Task<IEnumerable<TaskItem>> GetByPriorityRangeAsync(int minPriority, int maxPriority);
-    Task<IEnumerable<TaskItem>> GetWithDependenciesAsync();
-    Task<IEnumerable<TaskItem>> GetNotConfiguredAsync();
-    Task<IEnumerable<TaskItem>> GetRecurringTasksAsync();
-    Task<IEnumerable<TaskItem>> GetChildTasksAsync(int parentTaskId);
-    Task UpdateStatusAsync(int taskId, TaskStatus status);
-    Task ProcessDayStartAsync();
+    List<TaskItem> GetByStatus(TaskStatus status);
+    List<TaskItem> GetByDate(DateTime date);
+    List<TaskItem> GetByPriorityRange(int minPriority, int maxPriority);
+    List<TaskItem> GetWithDependencies();
+    List<TaskItem> GetNotConfigured();
+    List<TaskItem> GetRecurringTasks();
+    List<TaskItem> GetChildTasks(int parentTaskId);
+    void UpdateStatus(int taskId, TaskStatus status);
+    void ProcessDayStart();
 }
 
 public interface IDependencyRepository : IRepository<Dependency>
 {
-    Task<IEnumerable<Dependency>> GetDependenciesForTaskAsync(int taskId);
-    Task<IEnumerable<Dependency>> GetDependentTasksAsync(int taskId);
-    Task<bool> HasCircularDependencyAsync(int sourceTaskId, int targetTaskId);
-    Task RemoveDependenciesForTaskAsync(int taskId);
-    Task<IEnumerable<Dependency>> GetBlockingDependenciesAsync(int taskId);
+    List<Dependency> GetDependenciesForTask(int taskId);
+    List<Dependency> GetDependentTasks(int taskId);
+    bool HasCircularDependency(int sourceTaskId, int targetTaskId);
+    void RemoveDependenciesForTask(int taskId);
+    List<Dependency> GetBlockingDependencies(int taskId);
 }
 
 public interface ISettingsRepository : IRepository<UserSettings>
 {
-    Task<UserSettings> GetUserSettingsAsync();
-    Task<bool> GetAutoRecalculateSettingAsync();
-    Task UpdateDayStartHourAsync(int hour);
+    UserSettings GetUserSettings();
+    bool GetAutoRecalculateSetting();
+    void UpdateDayStartHour(int hour);
 }
 
 public interface IPlannerService
 {
-    Task<IEnumerable<TaskItem>> PlanTasksForDayAsync(DateTime date);
-    Task RecalculatePrioritiesAsync();
-    Task<bool> ValidateDependenciesAsync(int taskId);
-    Task<double> CalculateDailyLoadAsync(DateTime date);
-    Task BalanceTaskLoadAsync(DateTime date); // Добавлен отсутствующий метод
+    List<TaskItem> PlanTasksForDay(DateTime date);
+    void RecalculatePriorities();
+    bool ValidateDependencies(int taskId);
+    double CalculateDailyLoad(DateTime date);
+    void BalanceTaskLoad(DateTime date);
 }
 
 public interface INotificationService
 {
-    Task CheckDailyWarningsAsync();
-    Task CheckTimeShortageAsync(DateTime date);
-    Task CheckBlockedTasksAsync();
-    Task<List<string>> GetNotificationsAsync(); // Исправлен тип возвращаемого значения
+    void CheckDailyWarnings();
+    void CheckTimeShortage(DateTime date);
+    void CheckBlockedTasks();
+    List<string> GetNotifications();
 }
 
 public interface IRecurringTaskService
 {
-    Task ProcessRecurringTasksAsync();
-    Task CreateNextRecurrenceAsync(TaskItem task);
+    void ProcessRecurringTasks();
+    void CreateNextRecurrence(TaskItem task);
 }
 
-public class NotificationService(
-    ITaskRepository taskRepository,
-    IDependencyRepository dependencyRepository,
-    ISettingsRepository settingsRepository)
-    : INotificationService
+public class NotificationService : INotificationService
 {
-    private readonly IDependencyRepository _dependencyRepository = dependencyRepository;
-    private readonly List<string> _notifications = [];
+    private readonly ITaskRepository _taskRepository;
+    private readonly IDependencyRepository _dependencyRepository;
+    private readonly ISettingsRepository _settingsRepository;
+    private readonly List<string> _notifications = new();
 
-    public async Task CheckDailyWarningsAsync()
+    public NotificationService(ITaskRepository taskRepository, IDependencyRepository dependencyRepository, ISettingsRepository settingsRepository)
+    {
+        _taskRepository = taskRepository;
+        _dependencyRepository = dependencyRepository;
+        _settingsRepository = settingsRepository;
+    }
+
+    public void CheckDailyWarnings()
     {
         _notifications.Clear();
-        var settings = await settingsRepository.GetUserSettingsAsync();
+        var settings = _settingsRepository.GetUserSettings();
         var currentTime = DateTime.Now;
         var dayStart = new DateTime(currentTime.Year, currentTime.Month, currentTime.Day, settings.DayStartHour, 0, 0);
         var dayEnd = dayStart.AddHours(24);
@@ -90,7 +95,7 @@ public class NotificationService(
 
         if (currentTime.TimeOfDay < TimeSpan.FromHours(settings.DayStartHour + 2))
         {
-            var todayTasks = await taskRepository.GetByDateAsync(DateTime.Today);
+            var todayTasks = _taskRepository.GetByDate(DateTime.Today);
             var highPriorityTasks = todayTasks.Where(t => t.UserPriority <= 3).ToList();
 
             if (highPriorityTasks.Any())
@@ -100,12 +105,12 @@ public class NotificationService(
         }
     }
 
-    public async Task CheckTimeShortageAsync(DateTime date)
+    public void CheckTimeShortage(DateTime date)
     {
-        var tasks = await taskRepository.GetByDateAsync(date);
+        var tasks = _taskRepository.GetByDate(date);
         var activeTasks = tasks.Where(t => t.Status != TaskStatus.Completed).ToList();
         var totalTime = activeTasks.Sum(t => t.EstimatedHours);
-        var settings = await settingsRepository.GetUserSettingsAsync();
+        var settings = _settingsRepository.GetUserSettings();
 
         if (totalTime > settings.DailyTimeLimit * 1.2)
         {
@@ -115,14 +120,13 @@ public class NotificationService(
         var totalComplexity = activeTasks.Sum(t => t.Complexity);
         if (totalComplexity > settings.DailyComplexityLimit * 1.2)
         {
-            _notifications.Add(
-                $"Превышен дневной лимит сложности на {totalComplexity - settings.DailyComplexityLimit} единиц");
+            _notifications.Add($"Превышен дневной лимит сложности на {totalComplexity - settings.DailyComplexityLimit} единиц");
         }
     }
 
-    public async Task CheckBlockedTasksAsync()
+    public void CheckBlockedTasks()
     {
-        var tasks = await taskRepository.GetAllAsync();
+        var tasks = _taskRepository.GetAll();
         var blockedTasks = tasks.Where(t =>
             t.Status == TaskStatus.Planned &&
             !t.CanBeStarted()
@@ -134,44 +138,47 @@ public class NotificationService(
         }
     }
 
-    public async Task<List<string>> GetNotificationsAsync()
+    public List<string> GetNotifications()
     {
-        await CheckDailyWarningsAsync();
-        await CheckTimeShortageAsync(DateTime.Today);
-        await CheckBlockedTasksAsync();
-
-        return _notifications;
+        CheckDailyWarnings();
+        CheckTimeShortage(DateTime.Today);
+        CheckBlockedTasks();
+        return _notifications.ToList();
     }
 }
-public abstract class BasePlannerService(
-    ITaskRepository taskRepository,
-    IDependencyRepository dependencyRepository,
-    ISettingsRepository settingsRepository)
-    : IPlannerService
+
+public abstract class BasePlannerService : IPlannerService
 {
-    protected readonly ITaskRepository _taskRepository = taskRepository;
-    protected readonly IDependencyRepository _dependencyRepository = dependencyRepository;
-    protected readonly ISettingsRepository _settingsRepository = settingsRepository;
+    protected readonly ITaskRepository _taskRepository;
+    protected readonly IDependencyRepository _dependencyRepository;
+    protected readonly ISettingsRepository _settingsRepository;
 
-    public abstract Task<IEnumerable<TaskItem>> PlanTasksForDayAsync(DateTime date);
-    public abstract Task RecalculatePrioritiesAsync();
-
-    public virtual async Task<bool> ValidateDependenciesAsync(int taskId)
+    protected BasePlannerService(ITaskRepository taskRepository, IDependencyRepository dependencyRepository, ISettingsRepository settingsRepository)
     {
-        return !await HasCircularDependency(taskId, []);
+        _taskRepository = taskRepository;
+        _dependencyRepository = dependencyRepository;
+        _settingsRepository = settingsRepository;
     }
 
-    public virtual async Task<double> CalculateDailyLoadAsync(DateTime date)
+    public abstract List<TaskItem> PlanTasksForDay(DateTime date);
+    public abstract void RecalculatePriorities();
+
+    public virtual bool ValidateDependencies(int taskId)
     {
-        var tasks = await _taskRepository.GetByDateAsync(date);
+        return !HasCircularDependency(taskId, new HashSet<int>());
+    }
+
+    public virtual double CalculateDailyLoad(DateTime date)
+    {
+        var tasks = _taskRepository.GetByDate(date);
         return tasks.Where(t => t.Status != TaskStatus.Completed)
             .Sum(t => t.EstimatedHours);
     }
 
-    public virtual async Task BalanceTaskLoadAsync(DateTime date)
+    public virtual void BalanceTaskLoad(DateTime date)
     {
-        var tasks = (await _taskRepository.GetByDateAsync(date)).ToList();
-        var settings = await _settingsRepository.GetUserSettingsAsync();
+        var tasks = _taskRepository.GetByDate(date).ToList();
+        var settings = _settingsRepository.GetUserSettings();
 
         var complexTasks = tasks.Where(t => t.Complexity >= 70).ToList();
 
@@ -185,20 +192,21 @@ public abstract class BasePlannerService(
             foreach (var task in tasksToMove)
             {
                 task.PlannedDate = date.AddDays(1);
-                await _taskRepository.UpdateAsync(task);
+                _taskRepository.Update(task);
             }
+            _taskRepository.SaveChanges();
         }
     }
 
-    private async Task<bool> HasCircularDependency(int taskId, HashSet<int> visited)
+    private bool HasCircularDependency(int taskId, HashSet<int> visited)
     {
         if (!visited.Add(taskId))
             return true;
 
-        var dependencies = await _dependencyRepository.GetDependenciesForTaskAsync(taskId);
+        var dependencies = _dependencyRepository.GetDependenciesForTask(taskId);
         foreach (var dependency in dependencies.Where(d => d.Type == DependencyType.Blocking))
         {
-            if (await HasCircularDependency(dependency.TargetTaskId, visited))
+            if (HasCircularDependency(dependency.TargetTaskId, visited))
                 return true;
         }
 
@@ -207,16 +215,17 @@ public abstract class BasePlannerService(
     }
 }
 
-public class BasicPlannerService(
-    ITaskRepository taskRepository,
-    IDependencyRepository dependencyRepository,
-    ISettingsRepository settingsRepository)
-    : BasePlannerService(taskRepository, dependencyRepository, settingsRepository)
+public class BasicPlannerService : BasePlannerService
 {
-    public override async Task<IEnumerable<TaskItem>> PlanTasksForDayAsync(DateTime date)
+    public BasicPlannerService(ITaskRepository taskRepository, IDependencyRepository dependencyRepository, ISettingsRepository settingsRepository)
+        : base(taskRepository, dependencyRepository, settingsRepository)
     {
-        var allTasks = await _taskRepository.GetAllAsync();
-        var settings = await _settingsRepository.GetUserSettingsAsync();
+    }
+
+    public override List<TaskItem> PlanTasksForDay(DateTime date)
+    {
+        var allTasks = _taskRepository.GetAll();
+        var settings = _settingsRepository.GetUserSettings();
 
         var availableTasks = allTasks
             .Where(t => t.Status is TaskStatus.Planned or TaskStatus.NotConfigured)
@@ -243,10 +252,10 @@ public class BasicPlannerService(
         return result;
     }
 
-    public override async Task RecalculatePrioritiesAsync()
+    public override void RecalculatePriorities()
     {
-        var tasks = await _taskRepository.GetAllAsync();
-        var settings = await _settingsRepository.GetUserSettingsAsync();
+        var tasks = _taskRepository.GetAll();
+        var settings = _settingsRepository.GetUserSettings();
 
         foreach (var task in tasks)
         {
@@ -263,22 +272,6 @@ public class BasicPlannerService(
                     <= 7 => Math.Min(calculatedPriority, 5),
                     _ => calculatedPriority
                 };
-            }
-
-            // Учет специальных дат повышения приоритета
-            if (!string.IsNullOrEmpty(settings.PriorityBoostDates))
-            {
-                var boostDates = settings.PriorityBoostDates.Split(',')
-                    .Select(d => d.Trim())
-                    .Where(d => DateTime.TryParseExact(d, "dd.MM", null, System.Globalization.DateTimeStyles.None,
-                        out _))
-                    .ToList();
-
-                var todayString = DateTime.Today.ToString("dd.MM");
-                if (boostDates.Contains(todayString) && calculatedPriority > 5)
-                {
-                    calculatedPriority = 5;
-                }
             }
 
             // Учет блокировок
@@ -302,8 +295,9 @@ public class BasicPlannerService(
             }
 
             task.CalculatedPriority = calculatedPriority;
-            await _taskRepository.UpdateAsync(task);
+            _taskRepository.Update(task);
         }
+        _taskRepository.SaveChanges();
     }
 
     private double GetTaskScore(TaskItem task, DateTime date)
@@ -328,9 +322,9 @@ public class BasicPlannerService(
 
 public interface IProcrastinationService
 {
-    Task<bool> CanProcrastinateTaskAsync(int taskId);
-    Task ProcrastinateTaskAsync(int taskId);
-    Task<IEnumerable<TaskItem>> GetProcrastinationCandidatesAsync();
+    bool CanProcrastinateTask(int taskId);
+    void ProcrastinateTask(int taskId);
+    List<TaskItem> GetProcrastinationCandidates();
 }
 
 public class ProcrastinationService : IProcrastinationService
@@ -344,118 +338,129 @@ public class ProcrastinationService : IProcrastinationService
         _settingsRepository = settingsRepository;
     }
 
-    public async Task<bool> CanProcrastinateTaskAsync(int taskId)
+    public bool CanProcrastinateTask(int taskId)
     {
-        var task = await _taskRepository.GetByIdAsync(taskId);
-        var settings = await _settingsRepository.GetUserSettingsAsync();
+        var task = _taskRepository.GetById(taskId);
+        var settings = _settingsRepository.GetUserSettings();
         
         return task != null && 
                task.CanBeProcrastinated() &&
                settings.ShowProcrastinationButton;
     }
 
-    public async Task ProcrastinateTaskAsync(int taskId)
+    public void ProcrastinateTask(int taskId)
     {
-        var task = await _taskRepository.GetByIdAsync(taskId);
+        var task = _taskRepository.GetById(taskId);
         if (task == null) return;
 
         task.ProcrastinationCount++;
         task.LastProcrastinatedDate = DateTime.UtcNow;
         task.PlannedDate = DateTime.Today.AddDays(1);
         
-        await _taskRepository.UpdateAsync(task);
+        _taskRepository.Update(task);
+        _taskRepository.SaveChanges();
     }
 
-    public async Task<IEnumerable<TaskItem>> GetProcrastinationCandidatesAsync()
+    public List<TaskItem> GetProcrastinationCandidates()
     {
-        var tasks = await _taskRepository.GetAllAsync();
-        return tasks.Where(t => t.CanBeProcrastinated());
+        var tasks = _taskRepository.GetAll();
+        return tasks.Where(t => t.CanBeProcrastinated()).ToList();
     }
 }
-// Расширенный планировщик с улучшенной балансировкой
-// public class AdvancedPlannerService : BasePlannerService
-// {
-//     public AdvancedPlannerService(
-//         ITaskRepository taskRepository,
-//         IDependencyRepository dependencyRepository,
-//         ISettingsRepository settingsRepository)
-//         : base(taskRepository, dependencyRepository, settingsRepository)
-//     {
-//     }
-//
-//     public override async Task<IEnumerable<TaskItem>> PlanTasksForDayAsync(DateTime date)
-//     {
-//         var allTasks = await _taskRepository.GetAllAsync();
-//         var settings = await _settingsRepository.GetUserSettingsAsync();
-//
-//         var availableTasks = allTasks
-//             .Where(t => t.Status is TaskStatus.Planned or TaskStatus.NotConfigured)
-//             .Where(t => t.CanBeStarted())
-//             .OrderByDescending(t => GetAdvancedTaskScore(t, date))
-//             .ThenBy(t => t.Complexity)
-//             .ThenByDescending(t => t.Interest);
-//
-//         var result = new List<TaskItem>();
-//         double totalTime = 0;
-//         var totalComplexity = 0;
-//         var complexTasksCount = 0;
-//
-//         foreach (var task in availableTasks)
-//         {
-//             // Проверка лимита сложных задач
-//             if (task.Complexity >= 70)
-//             {
-//                 if (complexTasksCount >= settings.MaxComplexTasksPerDay)
-//                     continue;
-//                 complexTasksCount++;
-//             }
-//
-//             if (totalTime + task.EstimatedHours <= settings.DailyTimeLimit &&
-//                 totalComplexity + task.Complexity <= settings.DailyComplexityLimit)
-//             {
-//                 result.Add(task);
-//                 totalTime += task.EstimatedHours;
-//                 totalComplexity += task.Complexity;
-//             }
-//         }
-//
-//         return result;
-//     }
-//
-//     private double GetAdvancedTaskScore(TaskItem task, DateTime date)
-//     {
-//         var baseScore = (double)task.CalculatedPriority;
-//
-//         // Усиленный учет дедлайна
-//         if (task.Deadline.HasValue)
-//         {
-//             var daysUntilDeadline = (task.Deadline.Value - date).TotalDays;
-//             baseScore *= GetDeadlineMultiplier(daysUntilDeadline);
-//         }
-//
-//         // Баланс интересности и сложности
-//         var balanceFactor = (task.Interest / 10.0) * (1 - task.Complexity / 100.0);
-//         baseScore *= (1 + balanceFactor * 0.5);
-//
-//         // Бонус за избранное
-//         if (task.IsFavorite) baseScore *= 1.2;
-//
-//         // Штраф за частую прокрастинацию
-//         if (task.ProcrastinationCount > 0)
-//             baseScore *= Math.Max(0.5, 1 - (task.ProcrastinationCount * 0.1));
-//
-//         return baseScore;
-//     }
-//
-//     private double GetDeadlineMultiplier(double daysUntilDeadline)
-//     {
-//         return daysUntilDeadline switch
-//         {
-//             <= 0 => 3.0, // Просроченные
-//             <= 1 => 2.5, // Сегодня
-//             <= 3 => 2.0, // Скоро
-//             <= 7 => 1.5, // На неделе
-//             _ => 1.0
-//         };
-//     }
-// }
+public class RecurringTaskService(ITaskRepository taskRepository) : IRecurringTaskService
+{
+    public void ProcessRecurringTasks()
+    {
+        var recurringTasks = taskRepository.GetRecurringTasks();
+        var today = DateTime.Today;
+
+        foreach (var task in recurringTasks.Where(t => t.Recurrence != null))
+        {
+            if (ShouldCreateRecurrence(task, today))
+            {
+                CreateNextRecurrence(task);
+            }
+        }
+    }
+
+    public void CreateNextRecurrence(TaskItem task)
+    {
+        if (task.Recurrence == null) return;
+
+        var nextDate = CalculateNextDate(task.Recurrence, DateTime.Today);
+        if (nextDate.HasValue && (!task.RecurrenceEndDate.HasValue || nextDate <= task.RecurrenceEndDate))
+        {
+            var newTask = new TaskItem
+            {
+                Title = task.Title,
+                Description = task.Description,
+                UserPriority = task.UserPriority,
+                Status = TaskStatus.Planned,
+                Interest = task.Interest,
+                Complexity = task.Complexity,
+                EstimatedHours = task.EstimatedHours,
+                PlannedDate = nextDate,
+                IsRecurring = true,
+                Recurrence = task.Recurrence,
+                RecurrenceEndDate = task.RecurrenceEndDate,
+                ParentTaskId = task.Id,
+                Tags = new List<string>(task.Tags),
+                DisplayType = task.DisplayType
+            };
+
+            taskRepository.Add(newTask);
+            taskRepository.SaveChanges();
+        }
+    }
+
+    private bool ShouldCreateRecurrence(TaskItem task, DateTime today)
+    {
+        if (task.Recurrence == null) return false;
+
+        var lastOccurrence = task.PlannedDate ?? task.CreatedDate.Date;
+        var nextDate = CalculateNextDate(task.Recurrence, lastOccurrence);
+
+        return nextDate.HasValue && nextDate.Value.Date <= today.Date;
+    }
+
+    private DateTime? CalculateNextDate(RecurrencePattern pattern, DateTime lastDate)
+    {
+        return pattern.Type switch
+        {
+            RecurrenceType.Daily => lastDate.AddDays(pattern.Interval),
+            RecurrenceType.Weekly => CalculateNextWeeklyDate(pattern, lastDate),
+            RecurrenceType.Monthly => CalculateNextMonthlyDate(pattern, lastDate),
+            RecurrenceType.Yearly => lastDate.AddYears(pattern.Interval),
+            _ => null
+        };
+    }
+
+    private DateTime? CalculateNextWeeklyDate(RecurrencePattern pattern, DateTime lastDate)
+    {
+        var nextDate = lastDate.AddDays(7 * pattern.Interval);
+        if (pattern.DaysOfWeek?.Any() == true)
+        {
+            for (var i = 0; i < 7; i++)
+            {
+                var candidate = nextDate.AddDays(i);
+                if (pattern.DaysOfWeek.Contains(candidate.DayOfWeek))
+                    return candidate;
+            }
+        }
+
+        return nextDate;
+    }
+
+    private DateTime? CalculateNextMonthlyDate(RecurrencePattern pattern, DateTime lastDate)
+    {
+        var nextDate = lastDate.AddMonths(pattern.Interval);
+        if (pattern.DayOfMonth.HasValue)
+        {
+            var daysInMonth = DateTime.DaysInMonth(nextDate.Year, nextDate.Month);
+            var day = Math.Min(pattern.DayOfMonth.Value, daysInMonth);
+            return new DateTime(nextDate.Year, nextDate.Month, day);
+        }
+
+        return nextDate;
+    }
+}

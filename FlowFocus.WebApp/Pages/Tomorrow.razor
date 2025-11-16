@@ -46,12 +46,12 @@
     private List<TaskItem> _tomorrowTasks = [];
     private bool _isLoading = true;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        await LoadTomorrowTasks();
+        LoadTomorrowTasks();
     }
 
-    private async Task LoadTomorrowTasks()
+    private void LoadTomorrowTasks()
     {
         _isLoading = true;
         StateHasChanged();
@@ -59,7 +59,7 @@
         try
         {
             var tomorrow = DateTime.Today.AddDays(1);
-            _tomorrowTasks = (await TaskRepo.GetByDateAsync(tomorrow)).ToList();
+            _tomorrowTasks = ( TaskRepo.GetByDate(tomorrow)).ToList();
         }
         catch (Exception ex)
         {
@@ -72,21 +72,21 @@
         }
     }
 
-    private async Task PlanTomorrowTasks()
+    private void PlanTomorrowTasks()
     {
         try
         {
             var tomorrow = DateTime.Today.AddDays(1);
-            var plannedTasks = (await PlannerService.PlanTasksForDayAsync(tomorrow)).ToArray();
+            var plannedTasks = ( PlannerService.PlanTasksForDay(tomorrow)).ToArray();
             
             foreach (var task in plannedTasks)
             {
                 task.PlannedDate = tomorrow;
-                await TaskRepo.UpdateAsync(task);
+                 TaskRepo.Update(task);
             }
 
             Snackbar.Add($"Запланировано {plannedTasks.Length} задач на завтра", Severity.Success);
-            await LoadTomorrowTasks();
+            LoadTomorrowTasks();
         }
         catch (Exception ex)
         {
