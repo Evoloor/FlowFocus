@@ -1,7 +1,7 @@
 @inject IDependencyRepository DependencyRepo
 
 <MudPaper Class="pa-4" Elevation="1">
-    <MudText Typo="Typo.h6" Class="mb-4">Зависимости задачи: @Task?.Title</MudText>
+    <MudText Typo="Typo.h6" Class="mb-4">Зависимости задачи: @CurrentTask?.Title</MudText>
     
     @if (_dependencies.Any())
     {
@@ -24,15 +24,15 @@
 </MudPaper>
 
 @code {
-    [Parameter] public TaskItem? Task { get; set; }
+    [Parameter] public TaskItem? CurrentTask { get; set; }
     
     private List<Dependency> _dependencies = [];
 
     protected override void OnParametersSet()
     {
-        if (Task != null)
+        if (CurrentTask != null)
         {
-            _dependencies = DependencyRepo.GetDependenciesForTask(Task.Id).ToList();
+            _dependencies = DependencyRepo.GetDependenciesForTask(CurrentTask.Id).ToList();
         }
     }
 

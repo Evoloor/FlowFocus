@@ -175,7 +175,7 @@
 
     [Parameter] public UserSettings Settings { get; set; } = new();
 
-    public PriorityService PriorityService { get; init; } = PriorityService.Shared;
+    public PriorityService PriorityServiceObj { get; init; } = PriorityService.Shared;
 
     // Вычисляемые свойства
     private int TotalTasks => TodayTasks.Count;

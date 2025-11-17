@@ -2,7 +2,7 @@
 @inject IDependencyRepository DependencyRepo
 @inject ISnackbar Snackbar
 
-<MudPaper Class="pa-3" Elevation="0" Outlined="true">
+<MudPaper Class="pa-3" Elevation="0" Outlined>
     <MudText Typo="Typo.subtitle2" Class="mb-3">Связи с другими задачами</MudText>
     
     <MudItem xs="12" Class="mb-3">
@@ -11,7 +11,7 @@
                   Variant="Variant.Outlined"
                   ToStringFunc="task => task?.Title ?? string.Empty"
                   SearchFunc="SearchTasks"
-                  Clearable="true">
+                  Clearable>
             @foreach (var task in _availableTasks)
             {
                 <MudSelectItem T="TaskItem" Value="task">@task.Title</MudSelectItem>
@@ -56,7 +56,7 @@
 </MudPaper>
 
 @code {
-    [Parameter] public TaskItem Task { get; set; } = null!;
+    [Parameter] public TaskItem CurrentTask { get; set; } = null!;
     
     private List<TaskItem> _availableTasks = [];
     private TaskItem? _selectedRelatedTask;
@@ -66,7 +66,7 @@
     protected override void OnInitialized()
     {
         var allTasks = TaskRepo.GetAll();
-        _availableTasks = allTasks.Where(t => t.Id != Task.Id).ToList();
+        _availableTasks = allTasks.Where(t => t.Id != CurrentTask.Id).ToList();
     }
 
     private void AddRelation()

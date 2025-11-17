@@ -89,7 +89,7 @@
                     @foreach (var task in _todayTasks)
                     {
                         <MudItem xs="12" Class="mb-3">
-                            <TaskCard Task="task" 
+                            <TaskCard CurrentTask="task" 
                                      OnTaskUpdated="HandleTaskUpdated"
                                      OnTaskDeleted="HandleTaskDeleted" />
                         </MudItem>
@@ -105,7 +105,7 @@
 @code {
     private List<TaskItem> _todayTasks = [];
     private bool _isLoading = true;
-    private UserSettings _settings = new UserSettings();
+    private UserSettings _settings = new();
     private List<string> _notifications = [];
 
 

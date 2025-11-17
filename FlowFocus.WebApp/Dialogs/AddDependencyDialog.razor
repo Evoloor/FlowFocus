@@ -14,7 +14,7 @@
                           Variant="Variant.Outlined"
                           ToStringFunc="task => task?.Title ?? string.Empty"
                           SearchFunc="SearchTasks"
-                          Clearable="true">
+                          Clearable>
                     @foreach (var task in _availableTasks)
                     {
                         <MudSelectItem T="TaskItem" Value="task">@task.Title</MudSelectItem>

@@ -3,7 +3,7 @@
 @inject IDialogService DialogServiceObj
 @inject ISnackbar Snackbar
 
-<MudPaper Class="pa-3" Elevation="0" Outlined="true">
+<MudPaper Class="pa-3" Elevation="0" Outlined>
     <div class="d-flex justify-space-between align-center mb-3">
         <MudText Typo="Typo.subtitle2">Зависимости задачи</MudText>
         <MudButton Variant="Variant.Outlined"
@@ -41,7 +41,7 @@
 </MudPaper>
 
 @code {
-    [Parameter] public required TaskItem Task { get; set; } = null!;
+    [Parameter] public required TaskItem CurrentTask { get; set; } = null!;
 
     private List<Dependency> _dependencies = [];
 
@@ -52,7 +52,7 @@
 
     private void LoadDependencies()
     {
-        _dependencies = DependencyRepo.GetDependenciesForTask(Task.Id).ToList();
+        _dependencies = DependencyRepo.GetDependenciesForTask(CurrentTask.Id).ToList();
         StateHasChanged();
     }
 
@@ -70,7 +70,7 @@
     {
         var parameters = new DialogParameters
         {
-            [nameof(AddDependencyDialog.SourceTask)] = Task
+            [nameof(AddDependencyDialog.SourceTask)] = CurrentTask
         };
 
         var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };

@@ -146,24 +146,25 @@ public class PriorityColorGradient
 }
 public class PriorityService
 {
+    private const int DefaultMinPriority = 0;
+    private const int DefaultMaxPriority = 35;
+    public int MinPriority => DefaultMinPriority;
+    public int MaxPriority => DefaultMaxPriority;
     private readonly Color _defaultColor = Color.DodgerBlue;
     private readonly PriorityColorGradient _gradient = new(
-        (0, Color.DarkRed),
-        (5, Color.DarkOrange),
-        (15, Color.ForestGreen),
+        (DefaultMinPriority, Color.DarkRed),
+        ((int)Priority.Important, Color.DarkOrange),
+        ((int)Priority.Default, Color.ForestGreen),
         ((int)Priority.SelfDevelopment, Color.DodgerBlue),
-        (35, Color.Indigo)
+        (DefaultMaxPriority, Color.Indigo)
     );
 
     public static PriorityService Shared { get; } = new();
-
     public Color GetColor(Priority priority) => GetColor((int)priority);
-
     public Color GetColor(int? priority)
     {
         return priority is null ? _defaultColor : _gradient.GetColor(priority.Value);
     }
-
     public string GetName(Priority priority) => priority switch
     {
         Priority.Guaranteed => "Гарантировано",
@@ -176,4 +177,19 @@ public class PriorityService
         Priority.Dreams => "Мечты",
         _ => $"Приоритет {priority}"
     };
+
+    public bool HasReferenceValue(int? userPriority)
+    {
+        return userPriority.HasValue && Enum.IsDefined(typeof(Priority), userPriority);
+    }
+    public bool TryGetPriorityName(int? userPriority, out string priorityName)
+    {
+        if (HasReferenceValue(userPriority))
+        {
+            priorityName = GetName((Priority)userPriority.Value);
+            return true;
+        }
+        priorityName = $"Приоритет {userPriority}";
+        return false;
+    }
 }
