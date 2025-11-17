@@ -67,7 +67,6 @@
 
     protected override void OnInitialized()
     {
-        // Load all tasks except the current one
         var allTasks = TaskRepo.GetAll();
         _availableTasks = allTasks.Where(t => t.Id != SourceTask.Id).ToList();
     }

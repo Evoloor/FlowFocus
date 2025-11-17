@@ -43,17 +43,14 @@ public class TaskItem : IAuditEntity
     public List<string> Tags { get; set; } = [];
 
     public TaskStatus Status { get; set; } = TaskStatus.NotConfigured;
-    public int UserPriority { get; set; } = 5;
-    public int CalculatedPriority { get; set; }
+    public int? UserPriority { get; set; }
+    public int? CalculatedPriority { get; set; }
 
-    public int Interest { get; set; } = 5;
-    public int Complexity { get; set; } = 5;
-    public double EstimatedHours { get; set; } = 1.0;
-
+    public int? Interest { get; set; }
+    public int? Complexity { get; set; }
+    public double? EstimatedHours { get; set; }
     public DateTime? Deadline { get; set; }
     public DateTime? PlannedDate { get; set; }
-    public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
-
     public bool IsFavorite { get; set; }
     public bool IsRecurring { get; set; }
     public RecurrencePattern? Recurrence { get; set; }
@@ -62,22 +59,20 @@ public class TaskItem : IAuditEntity
 
     public DisplayType DisplayType { get; set; } = DisplayType.Independent;
 
-    // Новые поля согласно ТЗ
     public bool IsProcrastinationResistant { get; set; }
     public DateTime? LastProcrastinatedDate { get; set; }
     public int ProcrastinationCount { get; set; }
 
     public List<Dependency> Dependencies { get; set; } = [];
     public List<Dependency> DependentTasks { get; set; } = [];
+    public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
 
-    // Метод для проверки, можно ли выполнить задачу
     public bool CanBeStarted()
     {
-        var blockingDeps = Dependencies?.Where(d => d.Type == DependencyType.Blocking) ?? new List<Dependency>();
-        return !blockingDeps.Any() || blockingDeps.All(d => d.TargetTask?.Status == TaskStatus.Completed);
+        var blockingDeps = Dependencies.Where(d => d.Type == DependencyType.Blocking).ToArray();
+        return blockingDeps.Length is 0 || blockingDeps.All(d => d.TargetTask?.Status is TaskStatus.Completed);
     }
 
-    // Новый метод: проверка условий для прокрастинации
     public bool CanBeProcrastinated()
     {
         return Status == TaskStatus.Planned &&
@@ -100,7 +95,6 @@ public class Dependency : IAuditEntity
     public string? ConditionGroup { get; set; }
     public int ConditionOrder { get; set; }
 
-    // Navigation properties
     public TaskItem? SourceTask { get; set; }
     public TaskItem? TargetTask { get; set; }
 }
@@ -109,7 +103,7 @@ public class UserSettings : IAuditEntity
 {
     public int Id { get; set; } = 1;
     public DateTime LastChangesOn { get; set; }
-    public int DayStartHour { get; set; } = 6;
+    public int DayStartHour { get; set; } = 5;
     public double DailyTimeLimit { get; set; } = 8.0;
     public int DailyComplexityLimit { get; set; } = 50;
     public bool AutoRecalculateOnAdd { get; set; } = true;
@@ -119,7 +113,6 @@ public class UserSettings : IAuditEntity
     public bool RemoveUrgentIfNotDone { get; set; } = true;
     public bool ShowProcrastinationButton { get; set; } = true;
     public bool AutoBalanceTasks { get; set; } = true;
-    public int MaxComplexTasksPerDay { get; set; } = 3;
     public string? CustomPriorityReferences { get; set; }
 }
 

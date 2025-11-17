@@ -146,6 +146,7 @@ public class PriorityColorGradient
 }
 public class PriorityService
 {
+    private readonly Color _defaultColor = Color.DodgerBlue;
     private readonly PriorityColorGradient _gradient = new(
         (0, Color.DarkRed),
         (5, Color.DarkOrange),
@@ -158,7 +159,10 @@ public class PriorityService
 
     public Color GetColor(Priority priority) => GetColor((int)priority);
 
-    public Color GetColor(int priority) => _gradient.GetColor(priority);
+    public Color GetColor(int? priority)
+    {
+        return priority is null ? _defaultColor : _gradient.GetColor(priority.Value);
+    }
 
     public string GetName(Priority priority) => priority switch
     {

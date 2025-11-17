@@ -49,7 +49,6 @@ public interface IPlannerService
     void RecalculatePriorities();
     bool ValidateDependencies(int taskId);
     double CalculateDailyLoad(DateTime date);
-    void BalanceTaskLoad(DateTime date);
 }
 
 public interface INotificationService
@@ -148,40 +147,16 @@ public abstract class BasePlannerService(
 
     public abstract List<TaskItem> PlanTasksForDay(DateTime date);
     public abstract void RecalculatePriorities();
-
     public virtual bool ValidateDependencies(int taskId)
     {
         return !HasCircularDependency(taskId, []);
     }
-
     public virtual double CalculateDailyLoad(DateTime date)
     {
         var tasks = TaskRepository.GetByDate(date);
         return tasks.Where(t => t.Status != TaskStatus.Completed)
-            .Sum(t => t.EstimatedHours);
+            .Sum(t => t.EstimatedHours ?? 0);
     }
-
-    public virtual void BalanceTaskLoad(DateTime date)
-    {
-        var tasks = TaskRepository.GetByDate(date).ToList();
-
-        var complexTasks = tasks.Where(t => t.Complexity >= 70).ToList();
-
-        // Балансировка: не более 30% сложных задач в день
-        var maxComplexTasks = (int)Math.Ceiling(tasks.Count * 0.3);
-        if (complexTasks.Count <= maxComplexTasks) return;
-        var tasksToMove = complexTasks.OrderBy(t => t.UserPriority)
-            .Take(complexTasks.Count - maxComplexTasks);
-
-        foreach (var task in tasksToMove)
-        {
-            task.PlannedDate = date.AddDays(1);
-            TaskRepository.Update(task);
-        }
-
-        TaskRepository.SaveChanges();
-    }
-
     private bool HasCircularDependency(int taskId, HashSet<int> visited)
     {
         if (!visited.Add(taskId))
@@ -227,8 +202,8 @@ public class BasicPlannerService(
                 totalComplexity + task.Complexity <= settings.DailyComplexityLimit)
             {
                 result.Add(task);
-                totalTime += task.EstimatedHours;
-                totalComplexity += task.Complexity;
+                totalTime += task.EstimatedHours ?? 0;
+                totalComplexity += task.Complexity?? 0;
             }
         }
 
@@ -242,20 +217,18 @@ public class BasicPlannerService(
         {
             var calculatedPriority = task.UserPriority;
 
-            // Учет дедлайна
             if (task.Deadline.HasValue)
             {
                 var daysUntilDeadline = (task.Deadline.Value - DateTime.Today).TotalDays;
                 calculatedPriority = daysUntilDeadline switch
                 {
-                    <= 1 => Math.Min(calculatedPriority, 1),
-                    <= 3 => Math.Min(calculatedPriority, 3),
-                    <= 7 => Math.Min(calculatedPriority, 5),
+                    <= 1 => Math.Min(calculatedPriority??0, 1),
+                    <= 3 => Math.Min(calculatedPriority??0, 3),
+                    <= 7 => Math.Min(calculatedPriority??0, 5),
                     _ => calculatedPriority
                 };
             }
 
-            // Учет блокировок
             var blockingDependencies = task.Dependencies
                 .Where(d => d.Type == DependencyType.Blocking)
                 .ToList();
@@ -267,7 +240,7 @@ public class BasicPlannerService(
 
                 if (completedBlockers == blockingDependencies.Count)
                 {
-                    calculatedPriority = Math.Max(1, calculatedPriority - 2);
+                    calculatedPriority = Math.Max(1, calculatedPriority??0 - 2);
                 }
                 else
                 {
@@ -284,7 +257,7 @@ public class BasicPlannerService(
 
     private double GetTaskScore(TaskItem task, DateTime date)
     {
-        var score = (double)task.CalculatedPriority;
+        var score = task.CalculatedPriority ?? 0.0;
 
         if (task.Deadline.HasValue)
         {
@@ -293,8 +266,8 @@ public class BasicPlannerService(
             else if (daysUntilDeadline <= 3) score *= 1.5;
         }
 
-        var balanceFactor = task.Interest / 10.0 * (1 - task.Complexity / 100.0);
-        score *= 1 + balanceFactor * 0.3;
+        var balanceFactor = task.Interest / 10.0 * (1 - task.Complexity??1 / 100.0);
+        score *= 1 + balanceFactor??0 * 0.3;
 
         if (task.IsFavorite) score *= 1.1;
 

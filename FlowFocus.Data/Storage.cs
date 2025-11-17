@@ -53,12 +53,6 @@ public class StorageContext : DbContext
                         ? null
                         : JsonSerializer.Deserialize<RecurrencePattern>(v, (JsonSerializerOptions?)null)
                 );
-
-            // Индексы
-            entity.HasIndex(t => t.Status);
-            entity.HasIndex(t => t.PlannedDate);
-            entity.HasIndex(t => t.UserPriority);
-            entity.HasIndex(t => t.ParentTaskId);
         });
 
         // Dependency configuration
@@ -69,7 +63,6 @@ public class StorageContext : DbContext
             entity.Property(d => d.Type).HasConversion<string>();
             entity.Property(d => d.Logic).HasConversion<string>();
 
-            // Relationships
             entity.HasOne(d => d.SourceTask)
                 .WithMany(t => t.Dependencies)
                 .HasForeignKey(d => d.SourceTaskId)
@@ -107,7 +100,7 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
     {
         lock (CacheLock)
         {
-            if (IsDirty || Cache == null)
+            if (IsDirty || Cache is null)
             {
                 Cache = GetBaseQuery().ToList();
                 IsDirty = false;
@@ -165,7 +158,6 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
             {
                 Console.WriteLine($"Updating entity {typeof(T).Name} with ID {entity.Id}");
 
-                // Получаем отслеживаемую сущность из БД
                 var trackedEntity = GetTrackedById(entity.Id);
                 if (trackedEntity == null)
                 {
@@ -195,13 +187,11 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
         lock (CacheLock)
         {
             var entity = GetTrackedById(id);
-            if (entity != null)
-            {
-                updateAction(entity);
-                entity.LastChangesOn = DateTime.UtcNow;
-                context.SaveChanges();
-                MarkDirty();
-            }
+            if (entity == null) return;
+            updateAction(entity);
+            entity.LastChangesOn = DateTime.UtcNow;
+            context.SaveChanges();
+            MarkDirty();
         }
     }
 
@@ -211,12 +201,10 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
         {
             // Используем отслеживаемый запрос для удаления
             var entity = GetTrackedQuery().FirstOrDefault(e => e.Id == id);
-            if (entity != null)
-            {
-                GetDbSet().Remove(entity);
-                context.SaveChanges();
-                MarkDirty();
-            }
+            if (entity == null) return;
+            GetDbSet().Remove(entity);
+            context.SaveChanges();
+            MarkDirty();
         }
     }
 
@@ -302,19 +290,19 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
             var originalStatus = task.Status;
 
             // Обработка гарантированных задач
-            if (settings.AutoCompleteGuaranteed && task.UserPriority == 0 && task.Status != TaskStatus.Completed)
+            if (settings.AutoCompleteGuaranteed && task is { UserPriority: 0, Status: not TaskStatus.Completed })
             {
                 task.Status = TaskStatus.Completed;
                 modified = true;
             }
             // Обработка неотложных задач
-            else if (settings.RemoveUrgentIfNotDone && task.UserPriority == 1 && task.Status != TaskStatus.Completed)
+            else if (settings.RemoveUrgentIfNotDone && task is { UserPriority: 1, Status: not TaskStatus.Completed })
             {
                 task.Status = TaskStatus.Irrelevant;
                 modified = true;
             }
             // Перенос активных задач
-            else if (task.Status == TaskStatus.Active)
+            else if (task.Status is TaskStatus.Active)
             {
                 task.PlannedDate = today;
                 modified = true;
@@ -356,14 +344,10 @@ public class DependencyRepository(StorageContext context) : CachedRepository<Dep
 
     public bool HasCircularDependency(int sourceTaskId, int targetTaskId)
     {
-        // Для проверки зависимостей используем неотслеживаемый запрос
         var hasDirectCircular = GetBaseQuery()
             .Any(d => d.SourceTaskId == targetTaskId && d.TargetTaskId == sourceTaskId);
 
-        if (hasDirectCircular)
-            return true;
-
-        return CheckTransitiveDependency(targetTaskId, sourceTaskId, []);
+        return hasDirectCircular || CheckTransitiveDependency(targetTaskId, sourceTaskId, []);
     }
 
     private bool CheckTransitiveDependency(int currentTaskId, int targetTaskId, HashSet<int> visited)
@@ -408,7 +392,6 @@ public class DependencyRepository(StorageContext context) : CachedRepository<Dep
     public List<Dependency> GetBlockingDependencies(int taskId)
         => GetAll().Where(d => d.SourceTaskId == taskId && d.Type == DependencyType.Blocking).ToList();
 
-    // Новые методы для работы с зависимостями
     public void AddDependency(int sourceTaskId, int targetTaskId, DependencyType type,
         DependencyLogic logic = DependencyLogic.And)
     {
@@ -491,14 +474,12 @@ public class SettingsRepository(StorageContext context) : CachedRepository<UserS
     public override void Delete(int id)
     {
         var settings = GetTrackedById(id);
-        if (settings != null)
-        {
-            // Сброс к значениям по умолчанию вместо удаления
-            var defaultSettings = new UserSettings { Id = settings.Id };
-            _context.Entry(settings).CurrentValues.SetValues(defaultSettings);
-            settings.LastChangesOn = DateTime.UtcNow;
-            _context.SaveChanges();
-            MarkDirty();
-        }
+        if (settings == null) return;
+        // Сброс к значениям по умолчанию вместо удаления
+        var defaultSettings = new UserSettings { Id = settings.Id };
+        _context.Entry(settings).CurrentValues.SetValues(defaultSettings);
+        settings.LastChangesOn = DateTime.UtcNow;
+        _context.SaveChanges();
+        MarkDirty();
     }
 }

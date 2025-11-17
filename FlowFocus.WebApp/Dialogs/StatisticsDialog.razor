@@ -182,8 +182,8 @@
     private int CompletedCount => TodayTasks.Count(t => t.Status == TaskStatus.Completed);
     private int InterestingCount => TodayTasks.Count(t => t.Interest >= 7);
     private int ComplexCount => TodayTasks.Count(t => t.Complexity >= 70);
-    private double TotalHours => TodayTasks.Where(t => t.Status != TaskStatus.Completed).Sum(t => t.EstimatedHours);
-    private int TotalComplexity => TodayTasks.Where(t => t.Status != TaskStatus.Completed).Sum(t => t.Complexity);
+    private double TotalHours => TodayTasks.Where(t => t.Status != TaskStatus.Completed).Sum(t => t.EstimatedHours ?? 0);
+    private int TotalComplexity => TodayTasks.Where(t => t.Status != TaskStatus.Completed).Sum(t => t.Complexity ?? 0);
     private int HighPriorityCount => TodayTasks.Count(t => t.UserPriority <= 3);
     private int FavoriteCount => TodayTasks.Count(t => t.IsFavorite);
     private int ActiveCount => TodayTasks.Count(t => t.Status == TaskStatus.Active);
@@ -191,32 +191,31 @@
     private double CompletionPercent => TotalTasks > 0 ? CompletedCount * 100.0 / TotalTasks : 0;
     private bool HasOverload => TotalHours > Settings.DailyTimeLimit || TotalComplexity > Settings.DailyComplexityLimit;
     private bool IsUnbalanced => InterestingCount == 0 || ComplexCount > TotalTasks * 0.4;
-    private double TimeUsagePercent => Settings.DailyTimeLimit > 0 ? Math.Min(TotalHours / Settings.DailyTimeLimit * 100, 100) : 0;
-    private double ComplexityUsagePercent => Settings.DailyComplexityLimit > 0 ? Math.Min(TotalComplexity * 100.0 / Settings.DailyComplexityLimit, 100) : 0;
-
 
     private void Close()
     {
         MudDialog?.Close();
     }
 
+    /*
+    private double TimeUsagePercent => Settings.DailyTimeLimit > 0 ? Math.Min(TotalHours / Settings.DailyTimeLimit * 100, 100) : 0;
+    private double ComplexityUsagePercent => Settings.DailyComplexityLimit > 0 ? Math.Min(TotalComplexity * 100.0 / Settings.DailyComplexityLimit, 100) : 0;
     private List<PriorityGroup> PriorityDistribution => TodayTasks
-        .GroupBy(t => t.UserPriority)
-        .Select(g => new PriorityGroup { Priority = g.Key, Count = g.Count() })
-        .OrderBy(g => g.Priority)
-        .ToList();
-
-    /*private Color GetTimeProgressColor()
-    {
-        return TimeUsagePercent switch
-        {
-            < 80 => Color.Success,
-            < 100 => Color.Warning,
-            _ => Color.Error
-        };
-    }*/
-
-    /*private Color GetComplexityProgressColor()
+         .Where(t=>t.UserPriority is not null)
+         .GroupBy(t => t.UserPriority)
+         .Select(g => new PriorityGroup { Priority = g.Key, Count = g.Count() })
+         .OrderBy(g => g.Priority)
+         .ToList();
+     private Color GetTimeProgressColor()
+     {
+         return TimeUsagePercent switch
+         {
+             < 80 => Color.Success,
+             < 100 => Color.Warning,
+             _ => Color.Error
+         };
+     }
+     private Color GetComplexityProgressColor()
     {
         return ComplexityUsagePercent switch
         {
@@ -224,12 +223,10 @@
             < 100 => Color.Warning,
             _ => Color.Error
         };
-    }*/
-
+    }
     private class PriorityGroup
     {
         public int Priority { get; init; }
         public int Count { get; init; }
-    }
-
+    }*/
 }

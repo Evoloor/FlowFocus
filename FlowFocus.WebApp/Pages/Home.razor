@@ -1,5 +1,4 @@
-﻿<!-- === FILE: FlowFocus.WebApp/Pages/Home.razor === -->
-@page "/"
+﻿@page "/"
 @using FlowFocus.WebApp.Components
 @using FlowFocus.WebApp.Dialogs
 @inject ITaskRepository TaskRepo
@@ -40,13 +39,6 @@
                               OnClick="@RecalculatePriorities"
                               Size="Size.Small">
                         Пересчитать
-                    </MudButton>
-                    <MudButton Variant="Variant.Outlined"
-                              Color="Color.Secondary"
-                              StartIcon="@Icons.Material.Filled.AutoFixHigh"
-                              OnClick="@BalanceTasks"
-                              Size="Size.Small">
-                        Балансировать
                     </MudButton>
                     <MudButton Variant="Variant.Outlined"
                                Color="Color.Info"
@@ -180,20 +172,6 @@
         catch (Exception ex)
         {
             Snackbar.Add($"Ошибка пересчета: {ex.Message}", Severity.Error);
-        }
-    }
-
-    private void BalanceTasks() // Новый метод для балансировки
-    {
-        try
-        {
-            PlannerService.BalanceTaskLoad(DateTime.Today);
-            Snackbar.Add("Задачи сбалансированы", Severity.Success);
-            LoadTodayTasks();
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Ошибка балансировки: {ex.Message}", Severity.Error);
         }
     }
 

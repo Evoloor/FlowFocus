@@ -37,7 +37,7 @@ app.Services.InitializeDatabase();
 app.Run();
 
 
-public static class ServiceExtensions
+internal static class ServiceExtensions
 {
     public static IServiceCollection AddDataLayer(this IServiceCollection services)
     {
