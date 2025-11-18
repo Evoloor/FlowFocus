@@ -2,6 +2,7 @@
 @inject ITaskRepository TaskRepo
 @inject IPlannerService PlannerService
 @inject ISettingsRepository SettingsRepo
+@inject IDialogService DialogServiceObj
 @inject ISnackbar Snackbar
 
 <MudDialog>
@@ -38,7 +39,7 @@
                            MultiSelection="false"
                            Clearable
                            Value="@(PriorityServiceObj.HasReferenceValue(CurrentTask.UserPriority) ? (Priority)CurrentTask.UserPriority!.Value : null)"
-                           SelectedValuesChanged="@(selected=>CurrentTask.UserPriority = (int?)selected?.FirstOrDefault())"
+                           SelectedValuesChanged="@(selected => CurrentTask.UserPriority = (int?)selected?.FirstOrDefault())"
                            Label="Референс приоритета"
                            Variant="Variant.Outlined">
                     <MudSelectItem T="Priority?" Value="null">@string.Empty</MudSelectItem>
@@ -96,6 +97,21 @@
                               Variant="Variant.Outlined"
                               Clearable/>
             </MudItem>
+            <!-- Неактуальная -->
+            @if(CurrentTask.Status is TaskStatus.Planned)
+            {
+                <MudItem xs="12">
+                    <MudCheckBox Value="CurrentTask.Status is TaskStatus.Irrelevant"
+                                 ValueChanged="@IrrelevancyChanged"
+                                 ></MudCheckBox>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Default"
+                               Size="Size.Small"
+                               OnClick="@(() => MarkAsIrrelevant(CurrentTask))">
+                        Неактуально
+                    </MudButton>
+                </MudItem>
+            }
 
             <!-- Связи с другими задачами -->
             @if (IsEdit)
@@ -144,11 +160,10 @@
 
     protected override void OnParametersSet()
     {
-        if (ExistingTask != null)
-        {
-            // Create a copy to avoid direct mutation
-            CurrentTask = new(ExistingTask);
-        }
+        if (ExistingTask == null) return;
+        // Create a copy to avoid direct mutation
+        CurrentTask = new(ExistingTask);
+        _statusBeforeEdit = ExistingTask.Status;
     }
 
     private void SaveTask()
@@ -162,6 +177,7 @@
             }
             else
             {
+                CurrentTask.Status = TaskStatus.Planned;
                 TaskRepo.Add(CurrentTask);
                 Snackbar.Add("Задача создана", Severity.Success);
 
@@ -184,6 +200,36 @@
     private void Cancel()
     {
         MudDialog.Cancel();
+    }
+
+    private async Task MarkAsIrrelevant(TaskItem task)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(ConfirmDialog.Title)] = "Отметка как неактуальной",
+            [nameof(ConfirmDialog.Content)] = $"Отметить задачу \"{task.Title}\" как неактуальную?",
+            [nameof(ConfirmDialog.ConfirmText)] = "Отметить"
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogServiceObj.ShowAsync<ConfirmDialog>("Подтверждение", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            task.Status = TaskStatus.Irrelevant;
+            TaskRepo.Update(task);
+            Snackbar.Add("Задача отмечена как неактуальная", Severity.Info);
+        }
+    }
+
+    private TaskStatus? _statusBeforeEdit;
+    private void IrrelevancyChanged(bool newIsIrrelevant)
+    {
+        if (newIsIrrelevant)
+            CurrentTask.Status = TaskStatus.Irrelevant;
+        else
+            CurrentTask.Status = _statusBeforeEdit ?? TaskStatus.Planned;
     }
 
 }

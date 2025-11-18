@@ -302,7 +302,7 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
                 modified = true;
             }
             // Перенос активных задач
-            else if (task.Status is TaskStatus.Active)
+            else if (task.Status is TaskStatus.Planned)
             {
                 task.PlannedDate = today;
                 modified = true;

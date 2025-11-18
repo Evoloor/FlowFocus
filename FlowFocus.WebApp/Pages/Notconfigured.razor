@@ -9,20 +9,8 @@
 <MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
     <MudGrid>
         <MudItem xs="12" Class="mb-4">
-            <div class="d-flex justify-space-between align-center">
-                <div>
-                    <MudText Typo="Typo.h4" Class="mb-1">Ненастроенные задачи</MudText>
-                    <MudText Color="Color.Secondary">Задачи, требующие подтверждения и настройки</MudText>
-                </div>
-                <MudButton Variant="Variant.Outlined" 
-                          Color="Color.Error"
-                          StartIcon="@Icons.Material.Filled.ClearAll"
-                          OnClick="@MarkAllAsIrrelevant"
-                          Disabled="@(!_notConfiguredTasks.Any())"
-                          Size="Size.Small">
-                    Отметить все неактуальными
-                </MudButton>
-            </div>
+            <MudText Typo="Typo.h4" Class="mb-1">Ненастроенные задачи</MudText>
+            <MudText Color="Color.Secondary">Задачи, требующие подтверждения и настройки</MudText>
         </MudItem>
 
         <MudItem xs="12">
@@ -33,10 +21,10 @@
             else if (!_notConfiguredTasks.Any())
             {
                 <MudPaper Class="py-12 text-center">
-                    <MudIcon Icon="@Icons.Material.Filled.DoneAll" 
-                            Color="Color.Success" 
-                            Size="Size.Large" 
-                            Class="mb-3" />
+                    <MudIcon Icon="@Icons.Material.Filled.DoneAll"
+                             Color="Color.Success"
+                             Size="Size.Large"
+                             Class="mb-3"/>
                     <MudText Typo="Typo.h6" Color="Color.Secondary">Все задачи настроены!</MudText>
                     <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
                         Новые ненастроенные задачи появятся здесь после быстрого добавления
@@ -61,17 +49,11 @@
                                     </MudText>
                                 </MudCardContent>
                                 <MudCardActions>
-                                    <MudButton Variant="Variant.Filled" 
-                                              Color="Color.Primary"
-                                              Size="Size.Small"
-                                              OnClick="@(() => ConfigureTask(task))">
+                                    <MudButton Variant="Variant.Filled"
+                                               Color="Color.Primary"
+                                               Size="Size.Small"
+                                               OnClick="@(() => ConfigureTask(task))">
                                         Настроить
-                                    </MudButton>
-                                    <MudButton Variant="Variant.Text" 
-                                              Color="Color.Default"
-                                              Size="Size.Small"
-                                              OnClick="@(() => MarkAsIrrelevant(task))">
-                                        Неактуально
                                     </MudButton>
                                 </MudCardActions>
                             </MudCard>
@@ -125,55 +107,8 @@
 
         if (result is { Canceled: false })
         {
-             LoadNotConfiguredTasks();
+            LoadNotConfiguredTasks();
         }
     }
 
-    private async Task MarkAsIrrelevant(TaskItem task)
-    {
-        var parameters = new DialogParameters
-        {
-            [nameof(ConfirmDialog.Title)] = "Отметка как неактуальной",
-            [nameof(ConfirmDialog.Content)] = $"Отметить задачу \"{task.Title}\" как неактуальную?",
-            [nameof(ConfirmDialog.ConfirmText)] = "Отметить"
-        };
-
-        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall };
-        var dialog = await DialogServiceObj.ShowAsync<ConfirmDialog>("Подтверждение", parameters, options);
-        var result = await dialog.Result;
-
-        if (result is { Canceled: false })
-        {
-            task.Status = TaskStatus.Irrelevant;
-             TaskRepo.Update(task);
-            Snackbar.Add("Задача отмечена как неактуальная", Severity.Info);
-             LoadNotConfiguredTasks();
-        }
-    }
-
-    private async Task MarkAllAsIrrelevant()
-    {
-        var parameters = new DialogParameters
-        {
-            [nameof(ConfirmDialog.Title)] = "Массовое действие",
-            [nameof(ConfirmDialog.Content)] = $"Отметить все {_notConfiguredTasks.Count} задач как неактуальные?",
-            [nameof(ConfirmDialog.ConfirmText)] = "Отметить все"
-        };
-
-        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall };
-        var dialog = await DialogServiceObj.ShowAsync<ConfirmDialog>("Подтверждение", parameters, options);
-        var result = await dialog.Result;
-
-        if (result is { Canceled: false })
-        {
-            foreach (var task in _notConfiguredTasks)
-            {
-                task.Status = TaskStatus.Irrelevant;
-                 TaskRepo.Update(task);
-            }
-
-            Snackbar.Add($"Все задачи отмечены как неактуальные", Severity.Info);
-             LoadNotConfiguredTasks();
-        }
-    }
 }

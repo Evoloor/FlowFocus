@@ -41,7 +41,6 @@ public class TaskItem : IAuditEntity
 
     public string? Description { get; set; }
     public List<string> Tags { get; set; } = [];
-
     public TaskStatus Status { get; set; } = TaskStatus.NotConfigured;
     public int? UserPriority { get; set; }
     public int? CalculatedPriority { get; set; }
