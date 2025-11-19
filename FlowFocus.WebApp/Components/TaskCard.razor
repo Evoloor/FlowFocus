@@ -18,8 +18,8 @@
                 <!-- Заголовок и чекбокс -->
                 <div class="d-flex align-center mb-2">
                     <MudCheckBox T="bool" @bind-Checked="_isCompleted"
-                                 Color="Color.Success"
-                                 OnCheckedChanged="HandleCompletionChange"/>
+                                 ValueChanged="HandleCompletionChange"
+                                 Color="Color.Success"/>
                     <MudText Typo="Typo.h6" Class="@($"ml-2 {GetTitleClass()} flex-grow-1")" Style="font-size: 1rem;">@CurrentTask.Title</MudText>
                 </div>
 
@@ -67,6 +67,14 @@
             <!-- Кнопки действий внизу -->
             <div class="d-flex justify-space-between align-center pa-3 border-top">
                 <div class="d-flex gap-1">
+                    @if (ShowConfigureButton)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.BuildCircle" 
+                                       Size="Size.Small"
+                                       Color="Color.Primary"
+                                       OnClick="@(() => ConfigureTask(CurrentTask))"
+                                       Title="Настроить задачу"/>
+                    }
                     <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
                                    OnClick="@(() => EditTask(CurrentTask))"/>
                     @if (CurrentTask.IsFavorite)
@@ -142,6 +150,14 @@ else
 
                     <!-- Кнопки действий -->
                     <div class="d-flex flex-column gap-1">
+                        @if (ShowConfigureButton)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.BuildCircle" 
+                                           Size="Size.Small"
+                                           Color="Color.Primary"
+                                           OnClick="@(() => ConfigureTask(CurrentTask))"
+                                           Title="Настроить задачу"/>
+                        }
                         <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
                                        OnClick="@(() => EditTask(CurrentTask))"/>
                         <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
@@ -194,7 +210,8 @@ else
     [Parameter] public TaskItem CurrentTask { get; set; } = null!;
     [Parameter] public EventCallback<TaskItem> OnTaskUpdated { get; set; }
     [Parameter] public EventCallback<TaskItem> OnTaskDeleted { get; set; }
-    [Parameter] public bool IsGridView { get; set; } // Новый параметр для определения режима отображения
+    [Parameter] public bool IsGridView { get; set; }
+    [Parameter] public bool ShowConfigureButton { get; set; } // Новый параметр для кнопки настройки
     
     private PriorityService PriorityServiceObj => PriorityService.Shared;
     private bool _isCompleted;
@@ -234,6 +251,23 @@ else
         }
     }
 
+    private async Task ConfigureTask(TaskItem task)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(TaskEditDialog.ExistingTask)] = task
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogServiceObj.ShowAsync<TaskEditDialog>("Настройка задачи", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await OnTaskUpdated.InvokeAsync(task);
+        }
+    }
+
     private async Task DeleteTask(TaskItem task)
     {
         var parameters = new DialogParameters
@@ -263,4 +297,24 @@ else
         Snackbar.Add(task.IsFavorite ? "Добавлено в избранное" : "Убрано из избранного", Severity.Info);
     }
 
+    private async Task HandleCompletionChange(bool isCompleted)
+    {
+        _isCompleted = isCompleted;
+        CurrentTask.Status = isCompleted ? TaskStatus.Completed : TaskStatus.Planned;
+        
+        try
+        {
+            TaskRepo.Update(CurrentTask);
+            await OnTaskUpdated.InvokeAsync(CurrentTask);
+            Snackbar.Add(isCompleted ? "Задача завершена!" : "Задача возобновлена", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка обновления статуса: {ex.Message}", Severity.Error);
+            // Откатываем изменение
+            _isCompleted = !isCompleted;
+            CurrentTask.Status = isCompleted ? TaskStatus.Planned : TaskStatus.Completed;
+            StateHasChanged();
+        }
+    }
 }

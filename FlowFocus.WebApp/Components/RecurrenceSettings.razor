@@ -63,7 +63,7 @@
 
 @code {
     [Parameter]
-    public RecurrencePattern RecurrencePattern { get; set; } = new();
+    public RecurrencePattern RecurrencePattern { get; set; } = new() {Type = RecurrenceType.Daily};
     
     [Parameter]
     public EventCallback<RecurrencePattern> RecurrencePatternChanged { get; set; }

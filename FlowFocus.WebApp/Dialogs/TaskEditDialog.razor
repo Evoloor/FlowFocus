@@ -120,7 +120,7 @@
                     <TaskRelationsEditor CurrentTask="CurrentTask"/>
                 </MudItem>
             }
-            <MudItem xs="12">
+            @*<MudItem xs="12">
                 <MudSwitch T="bool" @bind-Checked="CurrentTask.IsRecurring"
                            Color="Color.Info">
                     Повторяющаяся задача
@@ -132,7 +132,7 @@
                 <MudItem xs="12">
                     <RecurrenceSettings @bind-RecurrencePattern="CurrentTask.Recurrence"/>
                 </MudItem>
-            }
+            }*@
         </MudGrid>
     </DialogContent>
     <DialogActions>
