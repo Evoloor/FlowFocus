@@ -18,13 +18,6 @@
                               Variant="Variant.Outlined"/>
             </MudItem>
 
-            <!-- Дата -->
-            <MudItem xs="12" sm="6">
-                <MudDatePicker T="DateTime?" @bind-Date="CurrentTask.PlannedDate"
-                               Label="Дата выполнения"
-                               Variant="Variant.Outlined"/>
-            </MudItem>
-
             <!-- Дедлайн -->
             <MudItem xs="12" sm="6">
                 <MudDatePicker T="DateTime?" @bind-Date="CurrentTask.Deadline"
@@ -79,7 +72,7 @@
             </MudItem>
 
             <!-- Время выполнения -->
-            <MudItem xs="12">
+            <MudItem xs="12" sm="6">
                 <MudNumericField T="double?" @bind-Value="CurrentTask.EstimatedHours"
                                  Label="Время выполнения (часы)"
                                  Min="0.5"
@@ -88,6 +81,12 @@
                                  Variant="Variant.Outlined"/>
             </MudItem>
 
+            <!-- Неактуальная -->
+            <MudItem xs="12" sm="4">
+                <MudCheckBox T="bool" Value="@(CurrentTask.Status is TaskStatus.Irrelevant)"
+                             ValueChanged="@IrrelevancyChanged" Label="Неактуально"/>
+            </MudItem>
+            
             <!-- Описание -->
             <MudItem xs="12">
                 <MudTextField T="string?" @bind-Value="CurrentTask.Description"
@@ -96,15 +95,7 @@
                               Variant="Variant.Outlined"
                               Clearable/>
             </MudItem>
-            <!-- Неактуальная -->
-            @if (CurrentTask.Status is TaskStatus.Planned)
-            {
-                <MudItem xs="12">
-                    <MudCheckBox T="bool" Value="@(CurrentTask.Status is TaskStatus.Irrelevant)"
-                                 ValueChanged="@IrrelevancyChanged" Label="Неактуально"/>
-                </MudItem>
-            }
-
+            
             <!-- Связи с другими задачами -->
             @if (IsEdit)
             {
