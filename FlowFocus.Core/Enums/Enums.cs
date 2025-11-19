@@ -44,3 +44,10 @@ public enum RecurrenceType
     Monthly,
     Yearly
 }
+
+public enum DisplayMode
+{
+    List,
+    Grid,
+    Compact
+}
