@@ -31,6 +31,13 @@
                     <MudText Color="Color.Secondary">@DateTime.Now.ToString("dd MMMM yyyy")</MudText>
                 </div>
                 <div class="d-flex gap-2">
+                    <!-- Кнопка переключения вида -->
+                    <MudIconButton Icon="@(_isGridView ? Icons.Material.Filled.ViewList : Icons.Material.Filled.GridView)"
+                                   Color="Color.Primary"
+                                   OnClick="@ToggleView"
+                                   Size="Size.Small"
+                                   Title="@(_isGridView ? "Список" : "Сетка")" />
+                    
                     <MudButton Variant="Variant.Outlined"
                                Color="Color.Primary"
                                StartIcon="@Icons.Material.Filled.Refresh"
@@ -42,6 +49,7 @@
                                Color="Color.Info"
                                StartIcon="@Icons.Material.Filled.PlayArrow"
                                OnClick="@ProcessDayStart"
+                               Disabled
                                Size="Size.Small">
                         Начать день
                     </MudButton>
@@ -64,6 +72,13 @@
         <!-- Стандартный заголовок для других страниц -->
         <MudItem xs="12" Class="d-flex justify-space-between align-center mb-4">
             <MudText Typo="Typo.h4">@Title</MudText>
+            
+            <!-- Кнопка переключения вида для других страниц -->
+            <MudIconButton Icon="@(_isGridView ? Icons.Material.Filled.ViewList : Icons.Material.Filled.GridView)"
+                           Color="Color.Primary"
+                           OnClick="@ToggleView"
+                           Size="Size.Small"
+                           Title="@(_isGridView ? "Список" : "Сетка")" />
         </MudItem>
     }
 
@@ -129,11 +144,31 @@
         }
         else
         {
-            foreach (var task in FilteredTasks)
+            @if (_isGridView)
             {
-                <TaskCard CurrentTask="task"
-                          OnTaskUpdated="HandleTaskUpdated"
-                          OnTaskDeleted="HandleTaskDeleted"/>
+                <!-- Отображение в виде сетки -->
+                <MudGrid>
+                    @foreach (var task in FilteredTasks)
+                    {
+                        <MudItem xs="12" sm="6" md="4" lg="3" Class="mb-3">
+                            <TaskCard CurrentTask="task"
+                                      IsGridView="true"
+                                      OnTaskUpdated="HandleTaskUpdated"
+                                      OnTaskDeleted="HandleTaskDeleted"/>
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+            else
+            {
+                <!-- Отображение в виде списка -->
+                @foreach (var task in FilteredTasks)
+                {
+                    <TaskCard CurrentTask="task"
+                              IsGridView="false"
+                              OnTaskUpdated="HandleTaskUpdated"
+                              OnTaskDeleted="HandleTaskDeleted"/>
+                }
             }
         }
     </MudItem>
@@ -155,6 +190,7 @@
     private bool _isLoading = true;
     private List<string> _notifications = [];
     private UserSettings _settings = new();
+    private bool _isGridView = false; // По умолчанию список
 
     private TaskStatus? _selectedStatus;
     private string _searchText = string.Empty;
@@ -180,10 +216,15 @@
         }
     }
 
+    private void ToggleView()
+    {
+        _isGridView = !_isGridView;
+        StateHasChanged();
+        LoadTasks();
+    }
     private void LoadTasks()
     {
         _isLoading = true;
-        StateHasChanged();
 
         try
         {
