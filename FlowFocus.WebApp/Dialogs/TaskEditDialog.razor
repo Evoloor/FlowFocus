@@ -98,12 +98,11 @@
                               Clearable/>
             </MudItem>
             <!-- Неактуальная -->
-            @if(CurrentTask.Status is TaskStatus.Planned)
+            @if (CurrentTask.Status is TaskStatus.Planned)
             {
                 <MudItem xs="12">
                     <MudCheckBox T="bool" Value="@(CurrentTask.Status is TaskStatus.Irrelevant)"
-                                 ValueChanged="@IrrelevancyChanged"
-                                 ></MudCheckBox>
+                                 ValueChanged="@IrrelevancyChanged"/>
                     <MudButton Variant="Variant.Outlined"
                                Color="Color.Default"
                                Size="Size.Small"
@@ -170,13 +169,28 @@
     {
         try
         {
+            // Валидация
+            if (string.IsNullOrWhiteSpace(CurrentTask.Title))
+            {
+                Snackbar.Add("Название задачи обязательно", Severity.Warning);
+                return;
+            }
+
             if (IsEdit)
             {
+                // Проверяем, что задача имеет валидный ID для редактирования
+                if (CurrentTask.Id <= 0)
+                {
+                    Snackbar.Add("Ошибка: неверный идентификатор задачи", Severity.Error);
+                    return;
+                }
+
                 TaskRepo.Update(CurrentTask);
                 Snackbar.Add("Задача обновлена", Severity.Success);
             }
             else
             {
+                // Новая задача
                 CurrentTask.Status = TaskStatus.Planned;
                 TaskRepo.Add(CurrentTask);
                 Snackbar.Add("Задача создана", Severity.Success);
@@ -193,7 +207,8 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Ошибка: {ex.Message}; {ex.InnerException?.Message}", Severity.Error);
+            Snackbar.Add($"Ошибка: {ex.Message}", Severity.Error);
+            Console.WriteLine($"Save task error: {ex}");
         }
     }
 
@@ -224,6 +239,7 @@
     }
 
     private TaskStatus? _statusBeforeEdit;
+
     private void IrrelevancyChanged(bool newIsIrrelevant)
     {
         if (newIsIrrelevant)

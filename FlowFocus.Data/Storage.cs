@@ -116,10 +116,12 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
         return GetAll().FirstOrDefault(e => e.Id == id);
     }
 
-    // Метод для получения отслеживаемой сущности (только для операций изменения)
     protected T? GetTrackedById(int id)
     {
-        return GetTrackedQuery().FirstOrDefault(e => e.Id == id);
+        if (id > 0) return GetTrackedQuery().FirstOrDefault(e => e.Id == id);
+        Console.WriteLine($"Warning: Attempting to get entity with invalid ID: {id}");
+        return null;
+
     }
 
     public virtual void Add(T entity)
@@ -157,6 +159,12 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
             try
             {
                 Console.WriteLine($"Updating entity {typeof(T).Name} with ID {entity.Id}");
+
+                // Проверка на валидный ID
+                if (entity.Id <= 0)
+                {
+                    throw new InvalidOperationException($"Invalid entity ID: {entity.Id}. Entity must have a valid ID > 0 for update.");
+                }
 
                 var trackedEntity = GetTrackedById(entity.Id);
                 if (trackedEntity == null)
