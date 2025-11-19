@@ -15,7 +15,8 @@
         <div class="task-content">
             <!-- Заголовок и чекбокс -->
             <div class="task-header">
-                <MudCheckBox T="bool" @bind-Checked="_isCompleted"
+                <MudCheckBox T="bool"
+                             Value="@(CurrentTask.Status == TaskStatus.Completed)"
                              ValueChanged="HandleCompletionChange"
                              Color="Color.Success"/>
                 <MudText Class="@($"task-title {GetTitleClass()}")">@CurrentTask.Title</MudText>
@@ -101,10 +102,129 @@
         </div>
     </div>
 </MudCard>
+
+@code {
+    [Parameter] public TaskItem CurrentTask { get; set; } = null!;
+    [Parameter] public EventCallback<TaskItem> OnTaskUpdated { get; set; }
+    [Parameter] public EventCallback<TaskItem> OnTaskDeleted { get; set; }
+    [Parameter] public DisplayMode DisplayMode { get; set; }
+
+    private PriorityService PriorityServiceObj => PriorityService.Shared;
+
+    private string GetTaskCardClass()
+    {
+        var classes = new List<string>();
+
+        switch (CurrentTask.Status)
+        {
+            case TaskStatus.Completed:
+                classes.Add("completed");
+                break;
+            case TaskStatus.Irrelevant:
+                classes.Add("irrelevant");
+                break;
+            case TaskStatus.NotConfigured:
+            case TaskStatus.Planned:
+            default:
+                break;
+        }
+
+        return string.Join(" ", classes);
+    }
+
+    private string GetTitleClass() => CurrentTask.Status == TaskStatus.Completed ? "text-strikethrough" : "";
+    private string GetDescriptionClass() => CurrentTask.Status == TaskStatus.Completed ? "text-strikethrough" : "";
+
+    private async Task EditTask(TaskItem task)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(TaskEditDialog.ExistingTask)] = task
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogServiceObj.ShowAsync<TaskEditDialog>("Редактировать задачу", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await OnTaskUpdated.InvokeAsync(task);
+        }
+    }
+
+    private async Task ConfigureTask(TaskItem task)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(TaskEditDialog.ExistingTask)] = task
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogServiceObj.ShowAsync<TaskEditDialog>("Настройка задачи", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await OnTaskUpdated.InvokeAsync(task);
+        }
+    }
+
+    private async Task DeleteTask(TaskItem task)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(ConfirmDialog.Title)] = "Удаление задачи",
+            [nameof(ConfirmDialog.Content)] = $"Вы уверены, что хотите удалить задачу \"{task.Title}\"?",
+            [nameof(ConfirmDialog.ConfirmText)] = "Удалить"
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall };
+        var dialog = await DialogServiceObj.ShowAsync<ConfirmDialog>("Подтверждение", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            TaskRepo.Delete(task.Id);
+            Snackbar.Add("Задача удалена", Severity.Success);
+            await OnTaskDeleted.InvokeAsync(task);
+        }
+    }
+
+    private async Task ToggleFavorite(TaskItem task)
+    {
+        task.IsFavorite = !task.IsFavorite;
+        TaskRepo.Update(task);
+        await OnTaskUpdated.InvokeAsync(task);
+        Snackbar.Add(task.IsFavorite ? "Добавлено в избранное" : "Убрано из избранного", Severity.Info);
+    }
+
+    private async Task HandleCompletionChange(bool isCompleted)
+    {
+        CurrentTask.Status = isCompleted ? TaskStatus.Completed : TaskStatus.Planned;
+
+        try
+        {
+            TaskRepo.Update(CurrentTask);
+            await OnTaskUpdated.InvokeAsync(CurrentTask);
+            Snackbar.Add(isCompleted ? "Задача завершена!" : "Задача возобновлена", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка обновления статуса: {ex.Message}", Severity.Error);
+            // Откатываем изменение
+            CurrentTask.Status = isCompleted ? TaskStatus.Planned : TaskStatus.Completed;
+            StateHasChanged();
+        }
+    }
+
+}
+
 <style>
     /* Базовые стили */
     .task-card {
         transition: transform 0.2s ease-in-out;
+        position: relative;
+        overflow: hidden;
     }
 
     .task-card:hover {
@@ -264,122 +384,163 @@
         display: none; /* Скрываем вертикальные метки */
     }
 
-    /* Состояния задачи */
-    .completed .mud-text {
+    /* === СТИЛИ ДЛЯ ЗАВЕРШЁННЫХ ЗАДАЧ === */
+    .task-card.completed {
+        background: linear-gradient(135deg, var(--completed-bg) 0%, var(--completed-bg-secondary) 100%);
+        border: 1px solid var(--completed-border);
+    }
+
+    .task-card.completed .priority-indicator {
+        background-color: var(--completed-priority) !important;
+        opacity: 0.6;
+    }
+
+    .task-card.completed .task-title,
+    .task-card.completed .task-description,
+    .task-card.completed .mud-text {
         text-decoration: line-through;
-        color: var(--mud-palette-text-disabled);
+        color: var(--completed-text);
+        opacity: 0.7;
+    }
+
+    .task-card.completed .deadline .mud-text {
+        color: var(--completed-deadline) !important;
+    }
+
+    .task-card.completed .task-actions {
+        border-color: var(--completed-border);
+    }
+
+    .task-card.completed .mud-icon-button {
+        color: var(--completed-icon);
+    }
+
+    .task-card.completed .mud-icon-button:hover {
+        background-color: var(--completed-hover);
+    }
+
+    .task-card.completed .mud-checkbox {
+        color: var(--completed-checkbox);
+    }
+
+    /* === СТИЛИ ДЛЯ НЕАКТУАЛЬНЫХ ЗАДАЧ === */
+    .task-card.irrelevant {
+        background: linear-gradient(135deg, var(--irrelevant-bg) 0%, var(--irrelevant-bg-secondary) 100%);
+        border: 1px solid var(--irrelevant-border);
+        position: relative;
+    }
+
+    .task-card.irrelevant::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--irrelevant-overlay);
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    .task-card.irrelevant > * {
+        position: relative;
+        z-index: 2;
+    }
+
+    .task-card.irrelevant .priority-indicator {
+        background-color: var(--irrelevant-priority) !important;
+        opacity: 0.4;
+    }
+
+    .task-card.irrelevant .task-title,
+    .task-card.irrelevant .task-description,
+    .task-card.irrelevant .mud-text {
+        color: var(--irrelevant-text);
+        opacity: 0.6;
+    }
+
+    .task-card.irrelevant .deadline .mud-text {
+        color: var(--irrelevant-deadline) !important;
+    }
+
+    .task-card.irrelevant .task-actions {
+        border-color: var(--irrelevant-border);
+    }
+
+    .task-card.irrelevant .mud-icon-button {
+        color: var(--irrelevant-icon);
+        opacity: 0.7;
+    }
+
+    .task-card.irrelevant .mud-icon-button:hover {
+        background-color: var(--irrelevant-hover);
+        opacity: 1;
+    }
+
+    .task-card.irrelevant .mud-checkbox {
+        color: var(--irrelevant-checkbox);
+        opacity: 0.5;
+    }
+
+    /* === ЦВЕТОВЫЕ ПЕРЕМЕННЫЕ ДЛЯ СВЕТЛОЙ ТЕМЫ === */
+    .mud-theme-light {
+        --completed-bg: #f8fff9;
+        --completed-bg-secondary: #f0f8f0;
+        --completed-border: #e0f0e0;
+        --completed-priority: #3dcb6c;
+        --completed-text: #78909C;
+        --completed-deadline: #90A4AE;
+        --completed-icon: #78909C;
+        --completed-hover: #e8f5e8;
+        --completed-checkbox: #3dcb6c;
+        --completed-overlay: none;
+
+        --irrelevant-bg: #f9f9f9;
+        --irrelevant-bg-secondary: #f0f0f0;
+        --irrelevant-border: #e8e8e8;
+        --irrelevant-priority: #92929f;
+        --irrelevant-text: #b0b0b0;
+        --irrelevant-deadline: #c0c0c0;
+        --irrelevant-icon: #b0b0b0;
+        --irrelevant-hover: #f0f0f0;
+        --irrelevant-checkbox: #92929f;
+        --irrelevant-overlay: repeating-linear-gradient(
+            45deg,
+            transparent,
+            transparent 5px,
+            rgba(0, 0, 0, 0.02) 5px,
+            rgba(0, 0, 0, 0.02) 10px
+        );
+    }
+
+    /* === ЦВЕТОВЫЕ ПЕРЕМЕННЫЕ ДЛЯ ТЁМНОЙ ТЕМЫ === */
+    .mud-theme-dark {
+        --completed-bg: #1a2a1a;
+        --completed-bg-secondary: #152315;
+        --completed-border: #2a3a2a;
+        --completed-priority: #3dcb6c;
+        --completed-text: #78909C;
+        --completed-deadline: #546E7A;
+        --completed-icon: #74718e;
+        --completed-hover: #2a3a2a;
+        --completed-checkbox: #3dcb6c;
+        --completed-overlay: none;
+
+        --irrelevant-bg: #1a1a1a;
+        --irrelevant-bg-secondary: #151515;
+        --irrelevant-border: #2a2a2a;
+        --irrelevant-priority: #74718e;
+        --irrelevant-text: #605f6d;
+        --irrelevant-deadline: #555555;
+        --irrelevant-icon: #605f6d;
+        --irrelevant-hover: #2a2a2a;
+        --irrelevant-checkbox: #74718e;
+        --irrelevant-overlay: repeating-linear-gradient(
+            45deg,
+            transparent,
+            transparent 5px,
+            rgba(255, 255, 255, 0.02) 5px,
+            rgba(255, 255, 255, 0.02) 10px
+        );
     }
 </style>
-
-@code {
-    [Parameter] public TaskItem CurrentTask { get; set; } = null!;
-    [Parameter] public EventCallback<TaskItem> OnTaskUpdated { get; set; }
-    [Parameter] public EventCallback<TaskItem> OnTaskDeleted { get; set; }
-    [Parameter] public DisplayMode DisplayMode { get; set; }
-
-    private PriorityService PriorityServiceObj => PriorityService.Shared;
-    private bool _isCompleted;
-
-    protected override void OnParametersSet()
-    {
-        _isCompleted = CurrentTask.Status == TaskStatus.Completed;
-    }
-
-    private string GetTaskCardClass()
-    {
-        return CurrentTask.Status switch
-        {
-            TaskStatus.Completed => "completed",
-            TaskStatus.Irrelevant => "irrelevant",
-            _ => ""
-        };
-    }
-
-    private string GetTitleClass() => CurrentTask.Status == TaskStatus.Completed ? "text-strikethrough" : "";
-    private string GetDescriptionClass() => CurrentTask.Status == TaskStatus.Completed ? "text-strikethrough" : "";
-
-    private async Task EditTask(TaskItem task)
-    {
-        var parameters = new DialogParameters
-        {
-            [nameof(TaskEditDialog.ExistingTask)] = task
-        };
-
-        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
-        var dialog = await DialogServiceObj.ShowAsync<TaskEditDialog>("Редактировать задачу", parameters, options);
-        var result = await dialog.Result;
-
-        if (result is { Canceled: false })
-        {
-            await OnTaskUpdated.InvokeAsync(task);
-        }
-    }
-
-    private async Task ConfigureTask(TaskItem task)
-    {
-        var parameters = new DialogParameters
-        {
-            [nameof(TaskEditDialog.ExistingTask)] = task
-        };
-
-        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
-        var dialog = await DialogServiceObj.ShowAsync<TaskEditDialog>("Настройка задачи", parameters, options);
-        var result = await dialog.Result;
-
-        if (result is { Canceled: false })
-        {
-            await OnTaskUpdated.InvokeAsync(task);
-        }
-    }
-
-    private async Task DeleteTask(TaskItem task)
-    {
-        var parameters = new DialogParameters
-        {
-            [nameof(ConfirmDialog.Title)] = "Удаление задачи",
-            [nameof(ConfirmDialog.Content)] = $"Вы уверены, что хотите удалить задачу \"{task.Title}\"?",
-            [nameof(ConfirmDialog.ConfirmText)] = "Удалить"
-        };
-
-        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall };
-        var dialog = await DialogServiceObj.ShowAsync<ConfirmDialog>("Подтверждение", parameters, options);
-        var result = await dialog.Result;
-
-        if (result is { Canceled: false })
-        {
-            TaskRepo.Delete(task.Id);
-            Snackbar.Add("Задача удалена", Severity.Success);
-            await OnTaskDeleted.InvokeAsync(task);
-        }
-    }
-
-    private async Task ToggleFavorite(TaskItem task)
-    {
-        task.IsFavorite = !task.IsFavorite;
-        TaskRepo.Update(task);
-        await OnTaskUpdated.InvokeAsync(task);
-        Snackbar.Add(task.IsFavorite ? "Добавлено в избранное" : "Убрано из избранного", Severity.Info);
-    }
-
-    private async Task HandleCompletionChange(bool isCompleted)
-    {
-        _isCompleted = isCompleted;
-        CurrentTask.Status = isCompleted ? TaskStatus.Completed : TaskStatus.Planned;
-
-        try
-        {
-            TaskRepo.Update(CurrentTask);
-            await OnTaskUpdated.InvokeAsync(CurrentTask);
-            Snackbar.Add(isCompleted ? "Задача завершена!" : "Задача возобновлена", Severity.Success);
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Ошибка обновления статуса: {ex.Message}", Severity.Error);
-            // Откатываем изменение
-            _isCompleted = !isCompleted;
-            CurrentTask.Status = isCompleted ? TaskStatus.Planned : TaskStatus.Completed;
-            StateHasChanged();
-        }
-    }
-
-}
