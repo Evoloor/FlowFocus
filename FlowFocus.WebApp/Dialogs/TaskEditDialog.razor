@@ -101,7 +101,7 @@
             @if(CurrentTask.Status is TaskStatus.Planned)
             {
                 <MudItem xs="12">
-                    <MudCheckBox Value="CurrentTask.Status is TaskStatus.Irrelevant"
+                    <MudCheckBox T="bool" Value="@(CurrentTask.Status is TaskStatus.Irrelevant)"
                                  ValueChanged="@IrrelevancyChanged"
                                  ></MudCheckBox>
                     <MudButton Variant="Variant.Outlined"

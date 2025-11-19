@@ -1,47 +1,97 @@
 @using FlowFocus.WebApp.Dialogs
 @inject ITaskRepository TaskRepo
 @inject IDialogService DialogServiceObj
+@inject INotificationService NotificationService
+@inject ISettingsRepository SettingsRepo
+@inject IPlannerService PlannerService
+@inject IRecurringTaskService RecurringTaskService
+@inject ISnackbar Snackbar
 
 <MudGrid>
-    <MudItem xs="12" Class="d-flex justify-space-between align-center mb-4">
-        <MudText Typo="Typo.h4">@Title</MudText>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" 
-                  StartIcon="@Icons.Material.Filled.Add"
-                  OnClick="@ShowCreateDialog">
-            Новая задача
-        </MudButton>
-    </MudItem>
+    <!-- Уведомления -->
+    @if (ShowNotifications && _notifications.Any())
+    {
+        <MudItem xs="12" Class="mb-4">
+            @foreach (var notification in _notifications)
+            {
+                <MudAlert Severity="Severity.Warning" Class="mb-2" Variant="Variant.Filled">
+                    <MudText Typo="Typo.body2">@notification</MudText>
+                </MudAlert>
+            }
+        </MudItem>
+    }
 
-    <MudItem xs="12" Class="mb-3">
-        <MudGrid>
-            <MudItem xs="12" sm="6" md="3">
-                <MudSelect T="TaskStatus?" @bind-Value="_selectedStatus" Label="Статус" Clearable>
-                    <MudSelectItem T="TaskStatus?" Value="null">Все</MudSelectItem>
-                    @foreach (var status in Enum.GetValues<TaskStatus>())
+    <!-- Заголовок и кнопки дня -->
+    @if (ShowDayActions)
+    {
+        <MudItem xs="12" Class="mb-4">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudText Typo="Typo.h4" Class="mb-1">@Title</MudText>
+                    <MudText Color="Color.Secondary">@DateTime.Now.ToString("dd MMMM yyyy")</MudText>
+                </div>
+                <div class="d-flex gap-2">
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Refresh"
+                               OnClick="@RecalculatePriorities"
+                               Size="Size.Small">
+                        Пересчитать
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Info"
+                               StartIcon="@Icons.Material.Filled.PlayArrow"
+                               OnClick="@ProcessDayStart"
+                               Size="Size.Small">
+                        Начать день
+                    </MudButton>
+                    @if (ShowStatisticsButton)
                     {
-                        <MudSelectItem T="TaskStatus?" Value="status">@status</MudSelectItem>
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Info"
+                                   StartIcon="@Icons.Material.Filled.Analytics"
+                                   OnClick="@ShowStatistics"
+                                   Size="Size.Small">
+                            Статистика
+                        </MudButton>
                     }
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" sm="6" md="3">
-                <MudTextField @bind-Value="_searchText" Label="Поиск" Immediate/>
-            </MudItem>
-            <MudItem xs="12" sm="6" md="3">
-                <MudSelect T="SortField" @bind-Value="_sortBy" Label="Сортировка">
-                    <MudSelectItem T="SortField" Value="SortField.Priority">По приоритету</MudSelectItem>
-                    <MudSelectItem T="SortField" Value="SortField.Deadline">По сроку</MudSelectItem>
-                    <MudSelectItem T="SortField" Value="SortField.Interest">По интересу</MudSelectItem>
-                    <MudSelectItem T="SortField" Value="SortField.Complexity">По сложности</MudSelectItem>
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" sm="6" md="3" Class="d-flex align-end">
-                <MudButton Variant="Variant.Outlined" OnClick="@LoadTasks" 
-                          Class="ml-auto" Size="Size.Small">
-                    Обновить
-                </MudButton>
-            </MudItem>
-        </MudGrid>  
-    </MudItem>
+                </div>
+            </div>
+        </MudItem>
+    }
+    else
+    {
+        <!-- Стандартный заголовок для других страниц -->
+        <MudItem xs="12" Class="d-flex justify-space-between align-center mb-4">
+            <MudText Typo="Typo.h4">@Title</MudText>
+        </MudItem>
+    }
+
+    <!-- Фильтры (только если не ShowDayActions) -->
+    @if (!ShowDayActions)
+    {
+        <MudItem xs="12" Class="mb-3">
+            <MudGrid>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudTextField @bind-Value="_searchText" Label="Поиск" Immediate/>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudSelect T="SortField" @bind-Value="_sortBy" Label="Сортировка">
+                        <MudSelectItem T="SortField" Value="SortField.Priority">По приоритету</MudSelectItem>
+                        <MudSelectItem T="SortField" Value="SortField.Deadline">По сроку</MudSelectItem>
+                        <MudSelectItem T="SortField" Value="SortField.Interest">По интересу</MudSelectItem>
+                        <MudSelectItem T="SortField" Value="SortField.Complexity">По сложности</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3" Class="d-flex align-end">
+                    <MudButton Variant="Variant.Outlined" OnClick="@LoadTasks"
+                               Class="ml-auto" Size="Size.Small">
+                        Обновить
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudItem>
+    }
 
     <MudItem xs="12">
         @if (_isLoading)
@@ -50,32 +100,61 @@
         }
         else if (!FilteredTasks.Any())
         {
-            <MudPaper Class="py-12 text-center">
-                <MudText Typo="Typo.h6" Color="Color.Secondary">Задачи не найдены</MudText>
-            </MudPaper>
+            @if (ShowEmptyState)
+            {
+                <MudPaper Class="py-12 text-center">
+                    @if (ShowDayActions)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle"
+                                 Color="Color.Success"
+                                 Size="Size.Large"
+                                 Class="mb-3"/>
+                        <MudText Typo="Typo.h6" Color="Color.Secondary">Все задачи выполнены!</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+                            Добавьте новые задачи или проверьте планировщик
+                        </MudText>
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   Class="mt-3"
+                                   OnClick="@PlanForToday">
+                            Запланировать на сегодня
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h6" Color="Color.Secondary">Задачи не найдены</MudText>
+                    }
+                </MudPaper>
+            }
         }
         else
         {
             foreach (var task in FilteredTasks)
             {
-                <TaskCard CurrentTask="task" 
-                         OnTaskUpdated="HandleTaskUpdated"
-                         OnTaskDeleted="HandleTaskDeleted" />
+                <TaskCard CurrentTask="task"
+                          OnTaskUpdated="HandleTaskUpdated"
+                          OnTaskDeleted="HandleTaskDeleted"/>
             }
         }
     </MudItem>
 </MudGrid>
 
 @code {
-    [Parameter]
-    public EventCallback OnTasksUpdated { get; set; }
+    [Parameter] public EventCallback OnTasksUpdated { get; set; }
     [Parameter] public string Title { get; set; } = "Задачи";
     [Parameter] public TaskStatus? FilterStatus { get; set; }
     [Parameter] public DateTime? FilterDate { get; set; }
+    [Parameter] public bool ShowNotifications { get; set; }
+    [Parameter] public bool ShowDayActions { get; set; }
+    [Parameter] public bool ShowStatisticsButton { get; set; }
+    [Parameter] public bool ShowEmptyState { get; set; } = true;
+    [Parameter] public bool AutoLoadNotifications { get; set; }
 
     private List<TaskItem> _tasks = [];
     private List<TaskItem> FilteredTasks => GetFilteredTasks();
     private bool _isLoading = true;
+    private List<string> _notifications = [];
+    private UserSettings _settings = new();
 
     private TaskStatus? _selectedStatus;
     private string _searchText = string.Empty;
@@ -83,6 +162,13 @@
 
     protected override void OnInitialized()
     {
+        _settings = SettingsRepo.GetUserSettings();
+
+        if (AutoLoadNotifications)
+        {
+            LoadNotifications();
+        }
+
         LoadTasks();
     }
 
@@ -92,7 +178,6 @@
         {
             _selectedStatus = FilterStatus;
         }
-        LoadTasks();
     }
 
     private void LoadTasks()
@@ -122,6 +207,18 @@
         }
     }
 
+    private void LoadNotifications()
+    {
+        try
+        {
+            _notifications = NotificationService.GetNotifications();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Ошибка загрузки уведомлений: {ex.Message}");
+        }
+    }
+
     private List<TaskItem> GetFilteredTasks()
     {
         var query = _tasks.AsEnumerable();
@@ -133,7 +230,7 @@
 
         if (!string.IsNullOrWhiteSpace(_searchText))
         {
-            query = query.Where(t => 
+            query = query.Where(t =>
                 t.Title.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
                 t.Description?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) == true ||
                 t.Tags.Any(tag => tag.Contains(_searchText, StringComparison.OrdinalIgnoreCase))
@@ -166,12 +263,89 @@
 
     private void HandleTaskUpdated(TaskItem task)
     {
-         LoadTasks();
+        LoadTasks();
+        if (AutoLoadNotifications)
+        {
+            LoadNotifications();
+        }
+
+        OnTasksUpdated.InvokeAsync();
     }
 
     private void HandleTaskDeleted(TaskItem task)
     {
-         LoadTasks();
+        LoadTasks();
+        if (AutoLoadNotifications)
+        {
+            LoadNotifications();
+        }
+
+        OnTasksUpdated.InvokeAsync();
+    }
+
+    private async Task ProcessDayStart()
+    {
+        try
+        {
+            TaskRepo.ProcessDayStart();
+            RecurringTaskService.ProcessRecurringTasks();
+            Snackbar.Add("День начат! Обработаны повторяющиеся задачи", Severity.Success);
+            LoadTasks();
+            LoadNotifications();
+            await OnTasksUpdated.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка начала дня: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task RecalculatePriorities()
+    {
+        try
+        {
+            PlannerService.RecalculatePriorities();
+            Snackbar.Add("Приоритеты пересчитаны", Severity.Success);
+            LoadTasks();
+            await OnTasksUpdated.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка пересчета: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task PlanForToday()
+    {
+        try
+        {
+            var plannedTasks = PlannerService.PlanTasksForDay(DateTime.Today);
+            foreach (var task in plannedTasks)
+            {
+                task.PlannedDate = DateTime.Today;
+                TaskRepo.Update(task);
+            }
+
+            Snackbar.Add($"Запланировано {plannedTasks.Count()} задач на сегодня", Severity.Success);
+            LoadTasks();
+            await OnTasksUpdated.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка планирования: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ShowStatistics()
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(StatisticsDialog.TodayTasks)] = _tasks,
+            [nameof(StatisticsDialog.Settings)] = _settings
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        await DialogServiceObj.ShowAsync<StatisticsDialog>("Статистика дня", parameters, options);
     }
 
     private enum SortField
@@ -181,4 +355,5 @@
         Interest,
         Complexity
     }
+
 }
