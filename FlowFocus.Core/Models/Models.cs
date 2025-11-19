@@ -18,7 +18,10 @@ public class TaskItem : IAuditEntity
 
     public TaskItem(TaskItem task, bool copyId = true)
     {
-        Id = task.Id;
+        if(copyId)
+        {
+            Id = task.Id;
+        }
         Title = task.Title;
         Description = task.Description;
         UserPriority = task.UserPriority;

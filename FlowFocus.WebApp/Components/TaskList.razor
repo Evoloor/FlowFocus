@@ -160,7 +160,6 @@
                         <MudItem xs="12" sm="6" md="4" lg="3" Class="mb-3">
                             <TaskCard CurrentTask="task"
                                       IsGridView="true"
-                                      ShowConfigureButton="ShowConfigureButton"
                                       OnTaskUpdated="HandleTaskUpdated"
                                       OnTaskDeleted="HandleTaskDeleted"/>
                         </MudItem>
@@ -174,7 +173,6 @@
                 {
                     <TaskCard CurrentTask="task"
                               IsGridView="false"
-                              ShowConfigureButton="ShowConfigureButton"
                               OnTaskUpdated="HandleTaskUpdated"
                               OnTaskDeleted="HandleTaskDeleted"/>
                 }
@@ -193,7 +191,6 @@
     [Parameter] public bool ShowStatisticsButton { get; set; }
     [Parameter] public bool ShowEmptyState { get; set; } = true;
     [Parameter] public bool AutoLoadNotifications { get; set; }
-    [Parameter] public bool ShowConfigureButton { get; set; } // Новый параметр для кнопки настройки
 
     private List<TaskItem> _tasks = [];
     private List<TaskItem> FilteredTasks => GetFilteredTasks();

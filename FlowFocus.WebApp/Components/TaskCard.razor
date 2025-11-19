@@ -42,18 +42,27 @@
 
                 <!-- Метки (компактные) -->
                 <div class="d-flex flex-column gap-1 mt-2">
-                    <div class="d-flex justify-space-between">
-                        <MudText Typo="Typo.caption" Color="Color.Primary">Приоритет:</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Primary">@CurrentTask.UserPriority</MudText>
-                    </div>
-                    <div class="d-flex justify-space-between">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Сложность:</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">@CurrentTask.Complexity</MudText>
-                    </div>
-                    <div class="d-flex justify-space-between">
-                        <MudText Typo="Typo.caption" Color="Color.Tertiary">Интерес:</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Tertiary">@CurrentTask.Interest/10</MudText>
-                    </div>
+                    @if(CurrentTask.UserPriority.HasValue)
+                    {
+                        <div class="d-flex justify-space-between">
+                            <MudText Typo="Typo.caption" Color="Color.Primary">Приоритет:</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Primary">@CurrentTask.UserPriority</MudText>
+                        </div>
+                    }
+                    @if(CurrentTask.Complexity.HasValue)
+                    {
+                        <div class="d-flex justify-space-between">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Сложность:</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@CurrentTask.Complexity</MudText>
+                        </div>
+                    }
+                    @if(CurrentTask.Interest.HasValue)
+                    {
+                        <div class="d-flex justify-space-between">
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">Интерес:</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">@CurrentTask.Interest/10</MudText>
+                        </div>
+                    }
                     @if (CurrentTask.EstimatedHours > 0)
                     {
                         <div class="d-flex justify-space-between">
@@ -67,16 +76,18 @@
             <!-- Кнопки действий внизу -->
             <div class="d-flex justify-space-between align-center pa-3 border-top">
                 <div class="d-flex gap-1">
-                    @if (ShowConfigureButton)
+                    @if (CurrentTask.Status is TaskStatus.NotConfigured)
                     {
                         <MudIconButton Icon="@Icons.Material.Filled.BuildCircle" 
                                        Size="Size.Small"
                                        Color="Color.Primary"
-                                       OnClick="@(() => ConfigureTask(CurrentTask))"
-                                       Title="Настроить задачу"/>
+                                       OnClick="@(() => ConfigureTask(CurrentTask))"/>
                     }
-                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
-                                   OnClick="@(() => EditTask(CurrentTask))"/>
+                    else
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                       OnClick="@(() => EditTask(CurrentTask))"/>
+                    }
                     @if (CurrentTask.IsFavorite)
                     {
                         <MudIconButton Icon="@Icons.Material.Filled.Star" Size="Size.Small"
@@ -130,15 +141,24 @@ else
 
                         <!-- Метки -->
                         <div class="d-flex align-center gap-2 mt-2 flex-wrap">
-                            <MudChip T="string" Size="Size.Small">
-                                Приоритет: @CurrentTask.UserPriority
-                            </MudChip>
-                            <MudChip T="string" Size="Size.Small" Color="Color.Secondary">
-                                Сложность: @CurrentTask.Complexity
-                            </MudChip>
-                            <MudChip T="string" Size="Size.Small" Color="Color.Tertiary">
-                                Интерес: @CurrentTask.Interest/10
-                            </MudChip>
+                            @if(CurrentTask.UserPriority.HasValue)
+                            {
+                                <MudChip T="string" Size="Size.Small">
+                                    Приоритет: @CurrentTask.UserPriority
+                                </MudChip>
+                            }
+                            @if(CurrentTask.Complexity.HasValue)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Secondary">
+                                    Сложность: @CurrentTask.Complexity
+                                </MudChip>
+                            }
+                            @if(CurrentTask.Interest.HasValue)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Tertiary">
+                                    Интерес: @CurrentTask.Interest/10
+                                </MudChip>
+                            }
                             @if (CurrentTask.EstimatedHours > 0)
                             {
                                 <MudChip T="string" Size="Size.Small" Color="Color.Info">
@@ -150,16 +170,18 @@ else
 
                     <!-- Кнопки действий -->
                     <div class="d-flex flex-column gap-1">
-                        @if (ShowConfigureButton)
+                        @if (CurrentTask.Status is TaskStatus.NotConfigured)
                         {
                             <MudIconButton Icon="@Icons.Material.Filled.BuildCircle" 
                                            Size="Size.Small"
                                            Color="Color.Primary"
-                                           OnClick="@(() => ConfigureTask(CurrentTask))"
-                                           Title="Настроить задачу"/>
+                                           OnClick="@(() => ConfigureTask(CurrentTask))"/>
                         }
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
-                                       OnClick="@(() => EditTask(CurrentTask))"/>
+                        else
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                           OnClick="@(() => EditTask(CurrentTask))"/>
+                        }
                         <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
                                        Color="Color.Error" OnClick="@(() => DeleteTask(CurrentTask))"/>
                         @if (CurrentTask.IsFavorite)
@@ -211,7 +233,6 @@ else
     [Parameter] public EventCallback<TaskItem> OnTaskUpdated { get; set; }
     [Parameter] public EventCallback<TaskItem> OnTaskDeleted { get; set; }
     [Parameter] public bool IsGridView { get; set; }
-    [Parameter] public bool ShowConfigureButton { get; set; } // Новый параметр для кнопки настройки
     
     private PriorityService PriorityServiceObj => PriorityService.Shared;
     private bool _isCompleted;

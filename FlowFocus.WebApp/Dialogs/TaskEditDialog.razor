@@ -2,7 +2,6 @@
 @inject ITaskRepository TaskRepo
 @inject IPlannerService PlannerService
 @inject ISettingsRepository SettingsRepo
-@inject IDialogService DialogServiceObj
 @inject ISnackbar Snackbar
 
 <MudDialog>
@@ -102,13 +101,7 @@
             {
                 <MudItem xs="12">
                     <MudCheckBox T="bool" Value="@(CurrentTask.Status is TaskStatus.Irrelevant)"
-                                 ValueChanged="@IrrelevancyChanged"/>
-                    <MudButton Variant="Variant.Outlined"
-                               Color="Color.Default"
-                               Size="Size.Small"
-                               OnClick="@(() => MarkAsIrrelevant(CurrentTask))">
-                        Неактуально
-                    </MudButton>
+                                 ValueChanged="@IrrelevancyChanged" Label="Неактуально"/>
                 </MudItem>
             }
 
@@ -215,27 +208,6 @@
     private void Cancel()
     {
         MudDialog.Cancel();
-    }
-
-    private async Task MarkAsIrrelevant(TaskItem task)
-    {
-        var parameters = new DialogParameters
-        {
-            [nameof(ConfirmDialog.Title)] = "Отметка как неактуальной",
-            [nameof(ConfirmDialog.Content)] = $"Отметить задачу \"{task.Title}\" как неактуальную?",
-            [nameof(ConfirmDialog.ConfirmText)] = "Отметить"
-        };
-
-        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall };
-        var dialog = await DialogServiceObj.ShowAsync<ConfirmDialog>("Подтверждение", parameters, options);
-        var result = await dialog.Result;
-
-        if (result is { Canceled: false })
-        {
-            task.Status = TaskStatus.Irrelevant;
-            TaskRepo.Update(task);
-            Snackbar.Add("Задача отмечена как неактуальная", Severity.Info);
-        }
     }
 
     private TaskStatus? _statusBeforeEdit;
