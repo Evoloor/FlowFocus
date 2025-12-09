@@ -1,4 +1,3 @@
-using FlowFocus.Core;
 using FlowFocus.Data;
 using FlowFocus.WebApp;
 using Microsoft.EntityFrameworkCore;
@@ -44,15 +43,8 @@ internal static class ServiceExtensions
         services.AddDbContext<StorageContext>();
         
         // Репозитории
-        services.AddScoped<ITaskRepository, TaskRepository>();
-        services.AddScoped<IDependencyRepository, DependencyRepository>();
-        services.AddScoped<ISettingsRepository, SettingsRepository>();
 
         // Сервисы
-        services.AddScoped<IRecurringTaskService, RecurringTaskService>();
-        services.AddScoped<IPlannerService, BasicPlannerService>();
-        services.AddScoped<INotificationService, NotificationService>();
-        services.AddScoped<IProcrastinationService, ProcrastinationService>();
 
         return services;
     }

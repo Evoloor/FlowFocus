@@ -1,8 +1,0 @@
-@page "/tomorrow"
-@using FlowFocus.WebApp.Components
-
-<PageTitle>FlowFocus - Завтра</PageTitle>
-
-<TaskList Title="Задачи на завтра" 
-          FilterDate="@DateTime.Today.AddDays(1)"
-          OnTasksUpdated="StateHasChanged" />

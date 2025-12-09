@@ -49,9 +49,4 @@
     <AdditionalFiles Include="Pages\Settings.razor" />
     <AdditionalFiles Include="Pages\Tomorrow.razor" />
   </ItemGroup>
-
-
-  <ItemGroup>
-    <Folder Include="UtilitySharp\" />
-  </ItemGroup>
 </Project>
