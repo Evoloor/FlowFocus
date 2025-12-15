@@ -131,7 +131,7 @@
                                              Icon="@Icons.Material.Filled.Add"
                                              IconColor="Color.Primary"
                                              Style="@($"background-color: {tag.BackgroundColor}40; color: #333; border-color: {tag.BackgroundColor}; cursor: pointer;")"
-                                             OnClick="@(() => AddTag(tag))"
+                                             OnClick="@(async () => await AddTag(tag))"
                                              Class="suggested-tag-chip">
                                         @tag.Name
                                     </MudChip>
@@ -723,13 +723,39 @@
             .Take(10);
     }
 
-    private void AddTag(Tag tag)
+    private async Task AddTag(Tag tag)
     {
         if (_selectedTagIds.Contains(tag.Id)) return;
 
         _selectedTags.Add(tag);
         _selectedTagIds.Add(tag.Id);
         TagSessionService.MarkTagUsed(tag);
+        
+        // Обновляем предложенные теги после добавления
+        await RefreshSuggestedTags();
+    }
+    
+    private async Task RefreshSuggestedTags()
+    {
+        // Получаем новые предлагаемые теги (исключая уже добавленные)
+        var allSuggested = TagSessionService.GetSuggestedTags(10); // Берем больше, чтобы было из чего выбирать
+        _suggestedTags = allSuggested.Where(t => !_selectedTagIds.Contains(t.Id)).Take(5).ToList();
+        
+        // Если не хватает до 5, добавляем популярные теги
+        if (_suggestedTags.Count < 5)
+        {
+            var popular = TagRepo.GetPopularTags(10);
+            foreach (var tag in popular)
+            {
+                if (_suggestedTags.Count >= 5) break;
+                if (!_selectedTagIds.Contains(tag.Id) && !_suggestedTags.Any(t => t.Id == tag.Id))
+                {
+                    _suggestedTags.Add(tag);
+                }
+            }
+        }
+        
+        await InvokeAsync(StateHasChanged);
     }
 
     private void RemoveTag(Tag tag)
@@ -760,13 +786,13 @@
         if (existingTag != null)
         {
             // Используем существующий тег
-            AddTag(existingTag);
+            await AddTag(existingTag);
         }
         else
         {
             // Создаем новый тег только если его точно нет
             var newTag = TagRepo.GetOrCreate(tagName);
-            AddTag(newTag);
+            await AddTag(newTag);
         }
 
         _newTagInput = string.Empty;
@@ -776,7 +802,7 @@
     
     private async Task SelectExistingTag(Tag tag)
     {
-        AddTag(tag);
+        await AddTag(tag);
         _newTagInput = string.Empty;
         _tagSearchResults = [];
         await InvokeAsync(StateHasChanged);

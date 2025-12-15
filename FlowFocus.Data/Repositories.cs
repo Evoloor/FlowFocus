@@ -72,6 +72,8 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
         
         // Удаляем теги, которых нет в source
         var tagsToRemove = tracked.Tags.Where(tt => !sourceTagIds.Contains(tt.TagId)).ToList();
+        var removedTagIds = tagsToRemove.Select(tt => tt.TagId).ToList();
+        
         foreach (var tag in tagsToRemove)
         {
             Context.TaskTags.Remove(tag);
@@ -88,6 +90,13 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
                     TagId = sourceTag.TagId
                 });
             }
+        }
+        
+        // Проверяем и удаляем неиспользуемые теги
+        if (removedTagIds.Any())
+        {
+            var tagRepo = new TagRepository(Context);
+            tagRepo.CleanupUnusedTags(removedTagIds);
         }
     }
     
@@ -405,6 +414,35 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
             .ThenBy(t => t.Interest ?? 0)
             .FirstOrDefault();
     }
+    
+    public override void Delete(int id)
+    {
+        lock (CacheLock)
+        {
+            // Получаем задачу с тегами перед удалением
+            var task = GetTrackedQuery()
+                .Include(t => t.Tags)
+                .FirstOrDefault(e => e.Id == id);
+                
+            if (task == null) return;
+            
+            // Сохраняем ID тегов для проверки после удаления
+            var tagIds = task.Tags.Select(tt => tt.TagId).ToList();
+            
+            // Удаляем задачу
+            GetDbSet().Remove(task);
+            Context.SaveChanges();
+            
+            // Проверяем и удаляем неиспользуемые теги
+            if (tagIds.Any())
+            {
+                var tagRepo = new TagRepository(Context);
+                tagRepo.CleanupUnusedTags(tagIds);
+            }
+            
+            MarkDirty();
+        }
+    }
 }
 
 /// <summary>
@@ -531,6 +569,33 @@ public class TagRepository(StorageContext context) : CachedRepository<Tag>(conte
             tag.UsageCount++;
             tag.LastUsedDate = DateTime.UtcNow;
         });
+    }
+    
+    public void CleanupUnusedTags(List<int> tagIds)
+    {
+        if (tagIds == null || !tagIds.Any()) return;
+        
+        lock (CacheLock)
+        {
+            foreach (var tagId in tagIds)
+            {
+                // Проверяем, есть ли еще ссылки на этот тег
+                var hasReferences = Context.TaskTags.Any(tt => tt.TagId == tagId);
+                
+                if (!hasReferences)
+                {
+                    // Тег больше не используется, удаляем его
+                    var tag = Context.Tags.Find(tagId);
+                    if (tag != null)
+                    {
+                        Context.Tags.Remove(tag);
+                    }
+                }
+            }
+            
+            Context.SaveChanges();
+            MarkDirty();
+        }
     }
 
     private static readonly string[] PastelColors =

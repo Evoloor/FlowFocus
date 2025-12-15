@@ -100,6 +100,9 @@ public interface ITagRepository : IRepository<Tag>
 
     /// <summary>Обновить статистику использования тега</summary>
     void IncrementUsage(int tagId);
+    
+    /// <summary>Проверить и удалить неиспользуемые теги</summary>
+    void CleanupUnusedTags(List<int> tagIds);
 }
 
 /// <summary>
