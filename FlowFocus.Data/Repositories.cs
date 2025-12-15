@@ -66,17 +66,21 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
     
     private void UpdateTags(TaskItem tracked, TaskItem source)
     {
-        // Удаляем старые теги
-        var tagsToRemove = tracked.Tags.Where(tt => !source.Tags.Any(st => st.TagId == tt.TagId)).ToList();
+        // Получаем список ID тегов из source
+        var sourceTagIds = source.Tags.Select(st => st.TagId).ToHashSet();
+        var trackedTagIds = tracked.Tags.Select(tt => tt.TagId).ToHashSet();
+        
+        // Удаляем теги, которых нет в source
+        var tagsToRemove = tracked.Tags.Where(tt => !sourceTagIds.Contains(tt.TagId)).ToList();
         foreach (var tag in tagsToRemove)
         {
             Context.TaskTags.Remove(tag);
         }
         
-        // Добавляем новые теги
+        // Добавляем новые теги, которых нет в tracked
         foreach (var sourceTag in source.Tags)
         {
-            if (!tracked.Tags.Any(tt => tt.TagId == sourceTag.TagId))
+            if (!trackedTagIds.Contains(sourceTag.TagId))
             {
                 Context.TaskTags.Add(new TaskTag
                 {

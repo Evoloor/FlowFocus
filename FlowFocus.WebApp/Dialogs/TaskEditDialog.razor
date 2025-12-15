@@ -142,19 +142,21 @@
                         @* Место для создания новых тегов или использования существующих с автодополнением *@
                         <div class="tag-input-container mb-3">
                             <div class="d-flex gap-2 align-end">
-                                <MudTextField T="string" @bind-Value="_newTagInput"
+                                <MudTextField T="string" 
+                                             @bind-Value="_newTagInput"
+                                             @bind-Value:after="OnTagInputChanged"
                                              Label="Создать новый тег или выбрать существующий"
                                              Variant="Variant.Outlined"
                                              Margin="Margin.Dense"
                                              OnKeyDown="@OnTagKeyDown"
-                                             OnInput="@OnTagInput"
+                                             Immediate="true"
                                              Clearable="true"
                                              Class="flex-grow-1" />
                                 <MudButton Variant="Variant.Filled"
                                          Color="Color.Primary"
                                          StartIcon="@Icons.Material.Filled.Add"
                                          OnClick="@AddNewTag"
-                                         Disabled="@string.IsNullOrWhiteSpace(_newTagInput)"
+                                         Disabled="@IsAddTagButtonDisabled"
                                          Class="tag-add-button">
                                     Добавить
                                 </MudButton>
@@ -183,13 +185,26 @@
                                 </div>
                             }
                             
-                            @* Подсказка о создании нового тега *@
-                            @if (!string.IsNullOrWhiteSpace(_newTagInput) && !_tagSearchResults.Any(t => t.Name.Equals(_newTagInput.Trim(), StringComparison.OrdinalIgnoreCase)))
+                            @* Подсказка о создании/использовании тега *@
+                            @if (!string.IsNullOrWhiteSpace(_newTagInput))
                             {
-                                <MudText Typo="Typo.caption" Class="mt-1 text-info">
-                                    <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="me-1" />
-                                    Будет создан новый тег "@_newTagInput.Trim()"
-                                </MudText>
+                                var trimmedInput = _newTagInput.Trim();
+                                var exactMatch = _tagSearchResults.FirstOrDefault(t => t.Name.Equals(trimmedInput, StringComparison.OrdinalIgnoreCase));
+                                
+                                @if (exactMatch != null)
+                                {
+                                    <MudText Typo="Typo.caption" Class="mt-1 text-success">
+                                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Class="me-1" />
+                                        Будет использован существующий тег "@exactMatch.Name"
+                                    </MudText>
+                                }
+                                else if (!string.IsNullOrWhiteSpace(trimmedInput))
+                                {
+                                    <MudText Typo="Typo.caption" Class="mt-1 text-info">
+                                        <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="me-1" />
+                                        Будет создан новый тег "@trimmedInput"
+                                    </MudText>
+                                }
                             }
                         </div>
 
@@ -585,9 +600,17 @@
 
     private void LoadExistingTaskData()
     {
-        // Загружаем теги
-        _selectedTags = _task.Tags.Select(tt => tt.Tag).ToList();
-        _selectedTagIds = _selectedTags.Select(t => t.Id).ToHashSet();
+        // Загружаем теги из оригинальной задачи (конструктор копирования не копирует навигационные свойства)
+        if (ExistingTask != null && ExistingTask.Tags.Any())
+        {
+            _selectedTags = ExistingTask.Tags.Select(tt => tt.Tag).Where(t => t != null).ToList();
+            _selectedTagIds = _selectedTags.Select(t => t.Id).ToHashSet();
+        }
+        else
+        {
+            _selectedTags = [];
+            _selectedTagIds = [];
+        }
 
         // Загружаем подзадачи
         _subtasks = _task.Subtasks.Select(s => new SubtaskDto
@@ -662,17 +685,30 @@
         return tags.Select(t => t.Name);
     }
     
-    private async Task OnTagInput(ChangeEventArgs e)
+    private bool IsAddTagButtonDisabled 
     {
-        var searchValue = e.Value?.ToString()?.Trim();
-        if (string.IsNullOrWhiteSpace(searchValue))
+        get
+        {
+            if (string.IsNullOrWhiteSpace(_newTagInput)) return true;
+            var trimmed = _newTagInput.Trim();
+            return string.IsNullOrWhiteSpace(trimmed);
+        }
+    }
+    
+    private async Task OnTagInputChanged()
+    {
+        // Обновляем UI для кнопки
+        await InvokeAsync(StateHasChanged);
+        
+        if (string.IsNullOrWhiteSpace(_newTagInput))
         {
             _tagSearchResults = [];
             return;
         }
 
-        // Ищем теги по введенному тексту
-        _tagSearchResults = TagRepo.SearchByName(searchValue, 10);
+        // Ищем теги по введенному тексту (даже если это один символ)
+        // Поиск работает по мере ввода для авто-дополнения
+        _tagSearchResults = TagRepo.SearchByName(_newTagInput, 10);
         await InvokeAsync(StateHasChanged);
     }
 
@@ -712,12 +748,14 @@
     
     private async Task AddNewTag()
     {
-        if (string.IsNullOrWhiteSpace(_newTagInput?.Trim())) return;
+        if (string.IsNullOrWhiteSpace(_newTagInput)) return;
 
         var tagName = _newTagInput.Trim();
+        if (string.IsNullOrWhiteSpace(tagName)) return;
         
-        // Проверяем, есть ли уже такой тег в результатах поиска
-        var existingTag = _tagSearchResults.FirstOrDefault(t => t.Name.Equals(tagName, StringComparison.OrdinalIgnoreCase));
+        // Всегда проверяем существование тега в базе данных (не только в результатах поиска)
+        // Это гарантирует уникальность - нельзя создать два идентичных тега
+        var existingTag = TagRepo.GetByName(tagName);
         
         if (existingTag != null)
         {
@@ -726,7 +764,7 @@
         }
         else
         {
-            // Создаем новый тег
+            // Создаем новый тег только если его точно нет
             var newTag = TagRepo.GetOrCreate(tagName);
             AddTag(newTag);
         }
