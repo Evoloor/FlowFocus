@@ -8,6 +8,7 @@
 <MudPaper Class="quick-add-panel" Elevation="2">
     <div class="quick-add-content">
         <MudTextField T="string" @bind-Value="_taskTitle"
+                      @key="_fieldKey"
                       Placeholder="Введите название задачи..."
                       Variant="Variant.Outlined"
                       Margin="Margin.Dense"
@@ -53,6 +54,7 @@
 
 @code {
     private string _taskTitle = string.Empty;
+    private int _fieldKey = 0;
 
     private bool IsValid => !string.IsNullOrWhiteSpace(_taskTitle?.Trim());
 
@@ -65,6 +67,7 @@
         else if (e.Key == "Escape")
         {
             _taskTitle = string.Empty;
+            _fieldKey++; // Принудительно пересоздаём компонент для очистки поля
             await InvokeAsync(StateHasChanged);
         }
     }
@@ -84,6 +87,8 @@
         Snackbar.Add("Задача добавлена в ненастроенные", Severity.Success);
 
         _taskTitle = string.Empty;
+        _fieldKey++; // Принудительно пересоздаём компонент для очистки поля
+        await InvokeAsync(StateHasChanged);
 
         // Проверяем авто-распределение
         var settings = SettingsRepo.GetUserSettings();
@@ -93,7 +98,6 @@
         }
 
         NotificationService.NotifyTasksChanged();
-        await InvokeAsync(StateHasChanged);
     }
 
     private async Task OpenEditDialog()
@@ -119,6 +123,8 @@
         if (result is { Canceled: false })
         {
             _taskTitle = string.Empty;
+            _fieldKey++; // Принудительно пересоздаём компонент для очистки поля
+            await InvokeAsync(StateHasChanged);
             Snackbar.Add("Задача создана", Severity.Success);
             NotificationService.NotifyTasksChanged();
         }

@@ -429,8 +429,7 @@
             Отмена
         </MudButton>
         <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                   OnClick="@SaveTask"
-                   Disabled="@(!_isFormValid)">
+                   OnClick="@SaveTask">
             @(IsEdit ? "Сохранить" : "Создать")
         </MudButton>
     </DialogActions>
