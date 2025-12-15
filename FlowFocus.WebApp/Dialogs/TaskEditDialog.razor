@@ -2,6 +2,7 @@
 @using FlowFocus.Core.Enums
 @using FlowFocus.Core.Models
 @using FlowFocus.Core.Services
+@using FlowFocus.WebApp.Dialogs
 @inject ITaskRepository TaskRepo
 @inject ISettingsRepository SettingsRepo
 @inject IPriorityRepository PriorityRepo
@@ -62,7 +63,8 @@
                 @if (!IsSubtaskMode)
                 {
                     <MudItem xs="12" sm="6">
-                        <MudSelect T="int?" @bind-Value="_task.PriorityId"
+                        <MudSelect T="int?" @Value="_task.PriorityId"
+                                   ValueChanged="@OnPriorityChanged"
                                    Label="Приоритет"
                                    Variant="Variant.Outlined"
                                    Clearable="true"
@@ -121,17 +123,21 @@
                         <MudText Typo="Typo.subtitle2" Class="mb-2">Теги</MudText>
                         
                         @* Предлагаемые теги *@
-                        <div class="suggested-tags mb-2">
-                            @foreach (var tag in _suggestedTags.Where(t => !_selectedTagIds.Contains(t.Id)))
-                            {
-                                <MudChip T="string" Size="Size.Small"
-                                         Icon="@Icons.Material.Filled.Add"
-                                         Style="@($"background-color: {tag.BackgroundColor}; color: #333;")"
-                                         OnClick="@(() => AddTag(tag))">
-                                    @tag.Name
-                                </MudChip>
-                            }
-                        </div>
+                        @if (_suggestedTags.Any(t => !_selectedTagIds.Contains(t.Id)))
+                        {
+                            <MudText Typo="Typo.caption" Class="mb-1 text-muted">Предлагаемые:</MudText>
+                            <div class="suggested-tags mb-2">
+                                @foreach (var tag in _suggestedTags.Where(t => !_selectedTagIds.Contains(t.Id)))
+                                {
+                                    <MudChip T="string" Size="Size.Small"
+                                             Icon="@Icons.Material.Filled.Add"
+                                             Style="@($"background-color: {tag.BackgroundColor}; color: #333; cursor: pointer;")"
+                                             OnClick="@(() => AddTag(tag))">
+                                        @tag.Name
+                                    </MudChip>
+                                }
+                            </div>
+                        }
 
                         @* Поле для нового тега *@
                         <MudAutocomplete T="string" @bind-Value="_newTagInput"
@@ -174,22 +180,27 @@
 
                                 @foreach (var escalation in _escalations)
                                 {
+                                    var isEscalationDateDisabled = escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date < DateTime.Today;
                                     <div class="escalation-row mb-2">
                                         <MudSelect T="int" @bind-Value="escalation.TargetPriorityId"
                                                    Label="Приоритет"
                                                    Variant="Variant.Outlined"
                                                    Margin="Margin.Dense"
-                                                   Dense="true">
+                                                   Dense="true"
+                                                   Disabled="@IsEscalationPriorityDisabled(escalation)">
                                             @foreach (var p in GetAvailablePrioritiesForEscalation())
                                             {
                                                 <MudSelectItem Value="p.Id">@p.Name</MudSelectItem>
                                             }
                                         </MudSelect>
-                                        <MudDatePicker T="DateTime?" @bind-Date="escalation.EscalationDate"
-                                                       Label="Дата"
-                                                       Variant="Variant.Outlined"
-                                                       Margin="Margin.Dense"
-                                                       MinDate="@DateTime.Today.AddDays(1)" />
+                                        <MudTooltip Text="@(isEscalationDateDisabled ? "Дата повышения не может быть в прошлом" : "")">
+                                            <MudDatePicker T="DateTime?" @bind-Date="escalation.EscalationDate"
+                                                           Label="Дата"
+                                                           Variant="Variant.Outlined"
+                                                           Margin="Margin.Dense"
+                                                           MinDate="@DateTime.Today"
+                                                           Disabled="@isEscalationDateDisabled" />
+                                        </MudTooltip>
                                         <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                                        Size="Size.Small"
                                                        Color="Color.Error"
@@ -298,8 +309,8 @@
                                 }
                                 else
                                 {
-                                    <MudAlert Severity="Severity.Info" Dense="true">
-                                        Достигнут лимит связей (@AppConfig.MaxTaskRelations)
+                                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                                        Достигнут лимит связей (@AppConfig.MaxTaskRelations). Удалите существующие связи для добавления новых.
                                     </MudAlert>
                                 }
 
@@ -422,6 +433,7 @@
     private MudForm _form = null!;
     private bool _isFormValid;
     private TaskItem _task = new();
+    private TaskItem? _originalTask; // Для отслеживания изменений
     private List<PriorityLevel> _priorities = new();
     private List<Tag> _suggestedTags = new();
     private List<Tag> _selectedTags = new();
@@ -454,6 +466,7 @@
         if (ExistingTask != null)
         {
             _task = new TaskItem(ExistingTask);
+            _originalTask = new TaskItem(ExistingTask); // Сохраняем оригинал для сравнения
             LoadExistingTaskData();
         }
         else
@@ -464,6 +477,7 @@
                 Status = TaskStatus.Planned,
                 CreatedDate = DateTime.UtcNow
             };
+            _originalTask = null;
         }
 
         // Конвертируем время
@@ -614,21 +628,58 @@
 
     private async Task EditSubtask(SubtaskDto subtask)
     {
-        var parameters = new DialogParameters<TaskEditDialog>
+        var parameters = new DialogParameters<SubtaskEditDialog>
         {
-            { x => x.IsSubtaskMode, true },
-            { x => x.InitialTitle, subtask.Title }
+            { x => x.ExistingSubtask, subtask }
         };
 
         var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<TaskEditDialog>("Редактировать подзадачу", parameters, options);
-        // Simplified - in real impl would update subtask
+        var dialog = await DialogService.ShowAsync<SubtaskEditDialog>("Редактировать подзадачу", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: SubtaskDto updatedSubtask })
+        {
+            // Обновляем подзадачу в списке
+            var index = _subtasks.IndexOf(subtask);
+            if (index >= 0)
+            {
+                _subtasks[index] = updatedSubtask;
+            }
+        }
     }
 
     private void AddRelation()
     {
-        if (_relations.Count >= AppConfig.MaxTaskRelations) return;
+        if (_relations.Count >= AppConfig.MaxTaskRelations)
+        {
+            Snackbar.Add($"Достигнут лимит связей ({AppConfig.MaxTaskRelations})", Severity.Warning);
+            return;
+        }
         _relations.Add(new RelationDto { Type = RelationType.RelatedTo });
+    }
+
+    private void OnPriorityChanged(int? newPriorityId)
+    {
+        _task.PriorityId = newPriorityId;
+        // Автоматически удаляем рудиментные повышения при изменении приоритета
+        CleanupRedundantEscalations();
+        StateHasChanged();
+    }
+
+    private bool IsEscalationPriorityDisabled(EscalationDto escalation)
+    {
+        // Проверяем, что приоритет не выше текущего
+        var currentPriorityOrder = _task.PriorityId.HasValue
+            ? _priorities.FirstOrDefault(p => p.Id == _task.PriorityId)?.Order ?? 99
+            : 99;
+        
+        var escalationPriority = _priorities.FirstOrDefault(p => p.Id == escalation.TargetPriorityId);
+        return escalationPriority != null && escalationPriority.Order >= currentPriorityOrder;
+    }
+
+    private bool IsEscalationDateDisabled(EscalationDto escalation)
+    {
+        return escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date < DateTime.Today;
     }
 
     private void AddEscalation()
@@ -710,8 +761,8 @@
                 Snackbar.Add("Задача создана", Severity.Success);
             }
 
-            // Авто-распределение
-            if (_settings?.AutoDistributeEnabled == true)
+            // Авто-распределение - только если изменились приоритет или дата
+            if (_settings?.AutoDistributeEnabled == true && ShouldRecalculate())
             {
                 PlannerService.RecalculateAll(_settings);
             }
@@ -852,11 +903,14 @@
         }
 
         // Проверка дат: дедлайн блокера <= дедлайн блокируемой
-        if (blocker.UserAssignedDate.HasValue && blocked.UserAssignedDate.HasValue)
+        var blockerDate = blocker.UserAssignedDate ?? blocker.ActualAssignedDate;
+        var blockedDate = blocked.UserAssignedDate ?? blocked.ActualAssignedDate;
+        
+        if (blockerDate.HasValue && blockedDate.HasValue)
         {
-            if (blocker.UserAssignedDate.Value.Date > blocked.UserAssignedDate.Value.Date)
+            if (blockerDate.Value.Date > blockedDate.Value.Date)
             {
-                errors.Add($"Дата блокера \"{blocker.Title}\" ({blocker.UserAssignedDate.Value:dd.MM.yyyy}) должна быть не позже даты блокируемой задачи");
+                errors.Add($"Дата блокера \"{blocker.Title}\" ({blockerDate.Value:dd.MM.yyyy}) должна быть не позже даты блокируемой задачи ({blockedDate.Value:dd.MM.yyyy})");
             }
         }
 
@@ -892,22 +946,25 @@
              (r.Type == RelationType.BlockedBy && newRelation.Type == RelationType.Blocks)));
     }
 
+    /// <summary>
+    /// Проверка необходимости пересчёта при авто-распределении
+    /// </summary>
+    private bool ShouldRecalculate()
+    {
+        if (_originalTask == null) return true; // Новая задача - всегда пересчитываем
+
+        // Пересчитываем если изменились приоритет или дата назначения
+        return _originalTask.PriorityId != _task.PriorityId ||
+               _originalTask.UserAssignedDate != _task.UserAssignedDate ||
+               _originalTask.ActualAssignedDate != _task.ActualAssignedDate;
+    }
+
     private void Cancel()
     {
         MudDialog.Cancel();
     }
 
     // === DTO классы ===
-    private class SubtaskDto
-    {
-        public int? Id { get; set; }
-        public string Title { get; set; } = string.Empty;
-        public bool IsFavorite { get; set; }
-        public int? Interest { get; set; }
-        public int? Complexity { get; set; }
-        public int? EstimatedMinutes { get; set; }
-        public bool IsDeleted { get; set; }
-    }
 
     private class RelationDto
     {

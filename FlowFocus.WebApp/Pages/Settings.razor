@@ -378,6 +378,12 @@
             _settings.DailyTimeLimit = _dailyTimeHours * 60;
             SettingsRepo.UpdateSettings(_settings);
 
+            // Обновляем Order у всех приоритетов согласно текущему порядку
+            for (int i = 0; i < _priorityItems.Count; i++)
+            {
+                _priorityItems[i].Order = i + 1;
+            }
+
             // Сохраняем приоритеты
             foreach (var item in _priorityItems)
             {
@@ -401,7 +407,7 @@
                 }
             }
 
-            // Переупорядочиваем
+            // Переупорядочиваем (на случай если порядок не совпал)
             PriorityRepo.Reorder(_priorityItems.Where(p => p.Id > 0).Select(p => p.Id).ToList());
 
             NotificationService.NotifySettingsChanged();

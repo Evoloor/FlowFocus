@@ -1,0 +1,152 @@
+@using FlowFocus.Core
+@using FlowFocus.Core.Enums
+@using FlowFocus.Core.Models
+@using FlowFocus.WebApp.Dialogs
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Редактировать подзадачу</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isFormValid">
+            <MudGrid Spacing="2">
+                @* Название *@
+                <MudItem xs="12">
+                    <MudTextField T="string" @bind-Value="_subtask.Title"
+                                  Label="Название *"
+                                  Required="true"
+                                  RequiredError="Название обязательно"
+                                  Variant="Variant.Outlined"
+                                  Immediate="true" />
+                </MudItem>
+
+                @* Избранное *@
+                <MudItem xs="12" sm="6">
+                    <MudCheckBox T="bool" @bind-Value="_subtask.IsFavorite"
+                                 Label="Избранное"
+                                 Color="Color.Warning"
+                                 CheckedIcon="@Icons.Material.Filled.Star"
+                                 UncheckedIcon="@Icons.Material.Outlined.StarBorder" />
+                </MudItem>
+
+                @* Интересность *@
+                <MudItem xs="12" sm="4">
+                    <MudNumericField T="int?" @bind-Value="_subtask.Interest"
+                                     Label="Интересность"
+                                     Min="1" Max="10"
+                                     Variant="Variant.Outlined" />
+                </MudItem>
+
+                @* Сложность *@
+                <MudItem xs="12" sm="4">
+                    <MudNumericField T="int?" @bind-Value="_subtask.Complexity"
+                                     Label="Сложность"
+                                     Min="1" Max="100"
+                                     Variant="Variant.Outlined" />
+                </MudItem>
+
+                @* Время выполнения *@
+                <MudItem xs="12" sm="4">
+                    <div class="d-flex gap-2">
+                        <MudNumericField T="int?" @bind-Value="_estimatedValue"
+                                         Label="Время"
+                                         Min="1"
+                                         Variant="Variant.Outlined"
+                                         Class="flex-grow-1" />
+                        <MudSelect T="TimeFormat" @bind-Value="_timeFormat"
+                                   Label="Формат"
+                                   Variant="Variant.Outlined"
+                                   Style="width: 100px">
+                            <MudSelectItem Value="TimeFormat.Minutes">мин</MudSelectItem>
+                            <MudSelectItem Value="TimeFormat.Hours">ч</MudSelectItem>
+                        </MudSelect>
+                    </div>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="@Cancel" Color="Color.Default">
+            Отмена
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="@SaveSubtask"
+                   Disabled="@(!_isFormValid)">
+            Сохранить
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public SubtaskDto? ExistingSubtask { get; set; }
+
+    [Parameter]
+    public string? InitialTitle { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isFormValid;
+    private SubtaskDto _subtask = new();
+    private int? _estimatedValue;
+    private TimeFormat _timeFormat = TimeFormat.Minutes;
+
+    protected override void OnInitialized()
+    {
+        if (ExistingSubtask != null)
+        {
+            _subtask = new SubtaskDto
+            {
+                Id = ExistingSubtask.Id,
+                Title = ExistingSubtask.Title,
+                IsFavorite = ExistingSubtask.IsFavorite,
+                Interest = ExistingSubtask.Interest,
+                Complexity = ExistingSubtask.Complexity,
+                EstimatedMinutes = ExistingSubtask.EstimatedMinutes
+            };
+        }
+        else
+        {
+            _subtask = new SubtaskDto
+            {
+                Title = InitialTitle ?? string.Empty
+            };
+        }
+
+        // Конвертируем время
+        if (_subtask.EstimatedMinutes != null)
+        {
+            if (_subtask.EstimatedMinutes >= 60 && _subtask.EstimatedMinutes % 60 == 0)
+            {
+                _estimatedValue = _subtask.EstimatedMinutes / 60;
+                _timeFormat = TimeFormat.Hours;
+            }
+            else
+            {
+                _estimatedValue = _subtask.EstimatedMinutes;
+                _timeFormat = TimeFormat.Minutes;
+            }
+        }
+    }
+
+    private void SaveSubtask()
+    {
+        // Конвертируем время
+        _subtask.EstimatedMinutes = _timeFormat switch
+        {
+            TimeFormat.Hours => _estimatedValue * 60,
+            _ => _estimatedValue
+        };
+
+        MudDialog.Close(DialogResult.Ok(_subtask));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}
+

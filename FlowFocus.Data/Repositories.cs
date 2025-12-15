@@ -70,6 +70,7 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
 
     public int GetNotConfiguredCount()
     {
+        // Исключаем подзадачи из подсчёта
         return GetAll().Count(t => t.ParentTaskId == null && t.Status == TaskStatus.NotConfigured);
     }
 
@@ -117,11 +118,94 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
 
     public void CompleteTask(int taskId)
     {
-        UpdatePartial(taskId, task =>
+        var task = GetById(taskId);
+        if (task == null) return;
+
+        UpdatePartial(taskId, t =>
         {
-            task.Status = TaskStatus.Completed;
-            task.CompletedDate = DateTime.UtcNow;
+            t.Status = TaskStatus.Completed;
+            t.CompletedDate = DateTime.UtcNow;
         });
+
+        // Создаём следующую копию для повторяющихся задач
+        if (task.IsRecurring && task.RecurrenceType != RecurrenceType.None)
+        {
+            CreateNextRecurrence(task);
+        }
+    }
+
+    /// <summary>
+    /// Создать следующую копию повторяющейся задачи
+    /// </summary>
+    private void CreateNextRecurrence(TaskItem sourceTask)
+    {
+        var nextDate = CalculateNextRecurrenceDate(sourceTask);
+        if (nextDate == null) return;
+
+        var newTask = new TaskItem
+        {
+            Title = sourceTask.Title,
+            Description = sourceTask.Description,
+            Status = TaskStatus.Planned,
+            PriorityId = sourceTask.PriorityId,
+            Interest = sourceTask.Interest,
+            Complexity = sourceTask.Complexity,
+            EstimatedMinutes = sourceTask.EstimatedMinutes,
+            IsFavorite = sourceTask.IsFavorite,
+            HideUnderSpoiler = sourceTask.HideUnderSpoiler,
+            UserAssignedDate = nextDate,
+            ActualAssignedDate = nextDate,
+            IsRecurring = true,
+            RecurrenceType = sourceTask.RecurrenceType,
+            RecurrenceInterval = sourceTask.RecurrenceInterval,
+            RecurrenceWeekDays = sourceTask.RecurrenceWeekDays,
+            RecurrenceSourceId = sourceTask.RecurrenceSourceId ?? sourceTask.Id,
+            CreatedDate = DateTime.UtcNow
+        };
+
+        Add(newTask);
+    }
+
+    /// <summary>
+    /// Рассчитать следующую дату повторения
+    /// </summary>
+    private DateTime? CalculateNextRecurrenceDate(TaskItem task)
+    {
+        var completedDate = task.CompletedDate ?? DateTime.UtcNow;
+        var baseDate = completedDate.Date;
+
+        return task.RecurrenceType switch
+        {
+            RecurrenceType.Daily => baseDate.AddDays(1),
+            RecurrenceType.EveryNDays => baseDate.AddDays(task.RecurrenceInterval ?? 1),
+            RecurrenceType.WeekDays => CalculateNextWeekDayDate(baseDate, task.RecurrenceWeekDays ?? 0),
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Рассчитать следующую дату для повторения по дням недели
+    /// </summary>
+    private DateTime CalculateNextWeekDayDate(DateTime baseDate, int weekDaysMask)
+    {
+        var currentDay = (int)baseDate.DayOfWeek;
+        // Конвертируем DayOfWeek (0=Sunday) в нашу маску (1=Monday)
+        var maskDay = currentDay == 0 ? 64 : (1 << (currentDay - 1));
+
+        // Ищем следующий день недели из маски
+        for (int i = 1; i <= 7; i++)
+        {
+            var nextDay = (currentDay + i) % 7;
+            var nextMaskDay = nextDay == 0 ? 64 : (1 << (nextDay - 1));
+            
+            if ((weekDaysMask & nextMaskDay) != 0)
+            {
+                return baseDate.AddDays(i);
+            }
+        }
+
+        // Если не нашли, возвращаем через неделю
+        return baseDate.AddDays(7);
     }
 
     public void MarkIrrelevant(int taskId)
