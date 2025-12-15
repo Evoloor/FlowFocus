@@ -1,12 +1,14 @@
 @using FlowFocus.Core
 @using FlowFocus.Core.Enums
 @using FlowFocus.Core.Models
+@using FlowFocus.Core.Services
 @inject ITaskRepository TaskRepo
 @inject ISettingsRepository SettingsRepo
 @inject IPriorityRepository PriorityRepo
 @inject ITagRepository TagRepo
 @inject ITagSessionService TagSessionService
 @inject IPlannerService PlannerService
+@inject INotificationService NotificationService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
@@ -667,6 +669,17 @@
     {
         try
         {
+            // Валидация
+            var validationErrors = ValidateTask();
+            if (validationErrors.Any())
+            {
+                foreach (var error in validationErrors)
+                {
+                    Snackbar.Add(error, Severity.Warning);
+                }
+                return;
+            }
+
             // Конвертируем время
             _task.EstimatedMinutes = _timeFormat switch
             {
@@ -678,6 +691,12 @@
             if (_task.UserAssignedDate != null)
             {
                 _task.ActualAssignedDate = _task.UserAssignedDate;
+            }
+
+            // Устанавливаем статус Planned для настроенных задач
+            if (_task.Status == TaskStatus.NotConfigured && !IsSubtaskMode)
+            {
+                _task.Status = TaskStatus.Planned;
             }
 
             if (IsEdit)
@@ -697,6 +716,7 @@
                 PlannerService.RecalculateAll(_settings);
             }
 
+            NotificationService.NotifyTasksChanged();
             MudDialog.Close(DialogResult.Ok(_task));
         }
         catch (Exception ex)
@@ -705,12 +725,190 @@
         }
     }
 
+    /// <summary>
+    /// Валидация данных задачи
+    /// </summary>
+    private List<string> ValidateTask()
+    {
+        var errors = new List<string>();
+
+        // Валидация повышений приоритета
+        ValidateEscalations(errors);
+
+        // Валидация связей
+        ValidateRelations(errors);
+
+        return errors;
+    }
+
+    /// <summary>
+    /// Валидация таблицы повышения приоритета
+    /// </summary>
+    private void ValidateEscalations(List<string> errors)
+    {
+        if (!_escalations.Any()) return;
+
+        var currentPriorityOrder = _task.PriorityId.HasValue
+            ? _priorities.FirstOrDefault(p => p.Id == _task.PriorityId)?.Order ?? 99
+            : 99;
+
+        // Сортируем по дате
+        var sortedEscalations = _escalations
+            .Where(e => e.EscalationDate.HasValue)
+            .OrderBy(e => e.EscalationDate)
+            .ToList();
+
+        var prevPriorityOrder = currentPriorityOrder;
+        var prevDate = DateTime.Today;
+
+        foreach (var escalation in sortedEscalations)
+        {
+            var targetPriority = _priorities.FirstOrDefault(p => p.Id == escalation.TargetPriorityId);
+            if (targetPriority == null) continue;
+
+            // Проверяем, что приоритет повышается (order уменьшается)
+            if (targetPriority.Order >= prevPriorityOrder)
+            {
+                errors.Add($"Повышение приоритета должно быть последовательным: {targetPriority.Name} не выше текущего");
+            }
+
+            // Проверяем, что дата не в прошлом
+            if (escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date < DateTime.Today)
+            {
+                errors.Add($"Дата повышения {escalation.EscalationDate.Value:dd.MM.yyyy} уже прошла");
+            }
+
+            // Проверяем последовательность дат
+            if (escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date <= prevDate)
+            {
+                errors.Add("Даты повышений должны быть последовательными");
+            }
+
+            prevPriorityOrder = targetPriority.Order;
+            prevDate = escalation.EscalationDate?.Date ?? prevDate;
+        }
+
+        // Удаляем рудиментные (уже не нужные) повышения
+        CleanupRedundantEscalations();
+    }
+
+    /// <summary>
+    /// Удаление рудиментных повышений
+    /// </summary>
+    private void CleanupRedundantEscalations()
+    {
+        var currentPriorityOrder = _task.PriorityId.HasValue
+            ? _priorities.FirstOrDefault(p => p.Id == _task.PriorityId)?.Order ?? 99
+            : 99;
+
+        // Удаляем повышения, которые не выше текущего приоритета
+        _escalations.RemoveAll(e =>
+        {
+            var targetPriority = _priorities.FirstOrDefault(p => p.Id == e.TargetPriorityId);
+            return targetPriority != null && targetPriority.Order >= currentPriorityOrder;
+        });
+    }
+
+    /// <summary>
+    /// Валидация связей между задачами
+    /// </summary>
+    private void ValidateRelations(List<string> errors)
+    {
+        foreach (var relation in _relations.Where(r => r.TargetTask != null))
+        {
+            // Проверка блокирующих связей
+            if (relation.Type == RelationType.Blocks || relation.Type == RelationType.BlockedBy)
+            {
+                ValidateBlockingRelation(relation, errors);
+            }
+
+            // Проверка на циклические ссылки
+            if (HasCircularReference(relation))
+            {
+                errors.Add($"Обнаружена циклическая зависимость с задачей \"{relation.TargetTask!.Title}\"");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Валидация блокирующей связи
+    /// </summary>
+    private void ValidateBlockingRelation(RelationDto relation, List<string> errors)
+    {
+        var targetTask = relation.TargetTask;
+        if (targetTask == null) return;
+
+        // Определяем блокирующую и блокируемую задачи
+        TaskItem blocker, blocked;
+        if (relation.Type == RelationType.Blocks)
+        {
+            blocker = _task;
+            blocked = targetTask;
+        }
+        else // BlockedBy
+        {
+            blocker = targetTask;
+            blocked = _task;
+        }
+
+        // Проверка дат: дедлайн блокера <= дедлайн блокируемой
+        if (blocker.UserAssignedDate.HasValue && blocked.UserAssignedDate.HasValue)
+        {
+            if (blocker.UserAssignedDate.Value.Date > blocked.UserAssignedDate.Value.Date)
+            {
+                errors.Add($"Дата блокера \"{blocker.Title}\" ({blocker.UserAssignedDate.Value:dd.MM.yyyy}) должна быть не позже даты блокируемой задачи");
+            }
+        }
+
+        // Проверка приоритетов: приоритет блокера не слабее блокируемой
+        var blockerPriorityOrder = blocker.PriorityId.HasValue
+            ? _priorities.FirstOrDefault(p => p.Id == blocker.PriorityId)?.Order ?? 99
+            : 99;
+        var blockedPriorityOrder = blocked.PriorityId.HasValue
+            ? _priorities.FirstOrDefault(p => p.Id == blocked.PriorityId)?.Order ?? 99
+            : 99;
+
+        if (blockerPriorityOrder > blockedPriorityOrder)
+        {
+            var blockerPriority = _priorities.FirstOrDefault(p => p.Id == blocker.PriorityId)?.Name ?? "не задан";
+            var blockedPriority = _priorities.FirstOrDefault(p => p.Id == blocked.PriorityId)?.Name ?? "не задан";
+            errors.Add($"Приоритет блокера \"{blocker.Title}\" ({blockerPriority}) не должен быть слабее блокируемой задачи ({blockedPriority})");
+        }
+    }
+
+    /// <summary>
+    /// Проверка на циклические ссылки
+    /// </summary>
+    private bool HasCircularReference(RelationDto newRelation)
+    {
+        if (newRelation.TargetTask == null) return false;
+        if (newRelation.TargetTask.Id == _task.Id) return true;
+
+        // Простая проверка на прямую обратную ссылку
+        var targetRelations = newRelation.TargetTask.Relations;
+        return targetRelations.Any(r =>
+            r.TargetTaskId == _task.Id &&
+            ((r.Type == RelationType.Blocks && newRelation.Type == RelationType.BlockedBy) ||
+             (r.Type == RelationType.BlockedBy && newRelation.Type == RelationType.Blocks)));
+    }
+
     private void Cancel()
     {
         MudDialog.Cancel();
     }
 
     // === DTO классы ===
+    private class SubtaskDto
+    {
+        public int? Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public bool IsFavorite { get; set; }
+        public int? Interest { get; set; }
+        public int? Complexity { get; set; }
+        public int? EstimatedMinutes { get; set; }
+        public bool IsDeleted { get; set; }
+    }
+
     private class RelationDto
     {
         public int? Id { get; set; }

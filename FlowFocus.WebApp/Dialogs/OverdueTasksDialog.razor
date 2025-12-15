@@ -1,10 +1,12 @@
 @using FlowFocus.Core
 @using FlowFocus.Core.Enums
 @using FlowFocus.Core.Models
+@using FlowFocus.Core.Services
 @using FlowFocus.WebApp.Components
 @inject ITaskRepository TaskRepo
 @inject ISettingsRepository SettingsRepo
 @inject IPlannerService PlannerService
+@inject INotificationService NotificationService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
@@ -185,17 +187,20 @@
         PlannerService.RecalculateAll(_settings);
         Snackbar.Add("Задачи перераспределены", Severity.Success);
 
+        NotificationService.NotifyTasksChanged();
         await OnTasksUpdated.InvokeAsync();
         await OnClose.InvokeAsync();
     }
 
     private async Task CheckAndClose()
     {
+        NotificationService.NotifyTasksChanged();
         await OnTasksUpdated.InvokeAsync();
 
         // Автозакрытие если все задачи обработаны
         if (!OverdueTasks.Any())
         {
+            Snackbar.Add("Все просроченные задачи обработаны", Severity.Success);
             await OnClose.InvokeAsync();
         }
     }

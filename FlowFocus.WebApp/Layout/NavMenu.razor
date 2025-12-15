@@ -1,5 +1,8 @@
 ﻿@using FlowFocus.Core
+@using FlowFocus.Core.Services
 @inject ITaskRepository TaskRepo
+@inject INotificationService NotificationService
+@implements IDisposable
 
 <MudNavMenu>
     <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Today">
@@ -19,8 +22,7 @@
             <span>Ненастроенные</span>
             @if (_notConfiguredCount > 0)
             {
-                <MudBadge Content="@_notConfiguredCount" Color="Color.Error" Overlap="false" Class="nav-badge">
-                </MudBadge>
+                <MudBadge Content="@_notConfiguredCount" Color="Color.Error" Overlap="false" Class="nav-badge" />
             }
         </div>
     </MudNavLink>
@@ -48,18 +50,22 @@
     protected override void OnInitialized()
     {
         RefreshCount();
+        NotificationService.OnTasksChanged += OnTasksChanged;
     }
 
-    protected override void OnAfterRender(bool firstRender)
+    private void OnTasksChanged()
     {
-        if (!firstRender)
-        {
-            RefreshCount();
-        }
+        RefreshCount();
+        InvokeAsync(StateHasChanged);
     }
 
     private void RefreshCount()
     {
         _notConfiguredCount = TaskRepo.GetNotConfiguredCount();
+    }
+
+    public void Dispose()
+    {
+        NotificationService.OnTasksChanged -= OnTasksChanged;
     }
 }

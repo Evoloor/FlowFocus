@@ -1,9 +1,11 @@
 @using FlowFocus.Core
 @using FlowFocus.Core.Enums
 @using FlowFocus.Core.Models
+@using FlowFocus.Core.Services
 @using FlowFocus.WebApp.Components
 @inject ITaskRepository TaskRepo
 @inject ISettingsRepository SettingsRepo
+@inject INotificationService NotificationService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
@@ -122,6 +124,7 @@
         _currentTask.Status = TaskStatus.Planned;
         TaskRepo.Update(_currentTask);
 
+        NotificationService.NotifyTasksChanged();
         Snackbar.Add("Задача добавлена в сегодняшние планы", Severity.Success);
         MudDialog.Close(DialogResult.Ok(true));
     }

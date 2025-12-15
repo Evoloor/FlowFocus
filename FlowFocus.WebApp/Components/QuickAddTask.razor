@@ -1,9 +1,11 @@
 @using FlowFocus.Core
 @using FlowFocus.Core.Enums
 @using FlowFocus.Core.Models
+@using FlowFocus.Core.Services
 @inject ITaskRepository TaskRepo
 @inject ISettingsRepository SettingsRepo
 @inject IPlannerService PlannerService
+@inject INotificationService NotificationService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
@@ -88,6 +90,7 @@
             PlannerService.RecalculateAll(settings);
         }
 
+        NotificationService.NotifyTasksChanged();
         await InvokeAsync(StateHasChanged);
     }
 
@@ -115,6 +118,7 @@
         {
             _taskTitle = string.Empty;
             Snackbar.Add("Задача создана", Severity.Success);
+            NotificationService.NotifyTasksChanged();
         }
     }
 }

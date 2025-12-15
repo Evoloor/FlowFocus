@@ -1,4 +1,5 @@
 using FlowFocus.Core;
+using FlowFocus.Core.Services;
 using FlowFocus.Data;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
@@ -39,6 +40,9 @@ internal static class ServiceExtensions
     public static IServiceCollection AddDataLayer(this IServiceCollection services)
     {
         services.AddDbContext<StorageContext>();
+
+        // Сервис уведомлений (singleton для broadcast между компонентами)
+        services.AddScoped<INotificationService, NotificationService>();
 
         // Репозитории
         services.AddScoped<ITaskRepository, TaskRepository>();

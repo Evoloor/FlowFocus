@@ -1,9 +1,11 @@
 @page "/settings"
 @using FlowFocus.Core
 @using FlowFocus.Core.Models
+@using FlowFocus.Core.Services
 @inject ISettingsRepository SettingsRepo
 @inject IPriorityRepository PriorityRepo
 @inject IPlannerService PlannerService
+@inject INotificationService NotificationService
 @inject ISnackbar Snackbar
 
 <PageTitle>FlowFocus - Настройки</PageTitle>
@@ -14,7 +16,7 @@
     <MudText Typo="Typo.h6" Class="mb-3">Время и лимиты</MudText>
 
     <MudGrid>
-        <MudItem xs="12" sm="6" md="4">
+        <MudItem xs="12" sm="6" md="3">
             <MudNumericField T="int" @bind-Value="_settings.DayStartHour"
                              Label="Время начала дня (час)"
                              Min="0" Max="23"
@@ -22,21 +24,21 @@
                              HelperText="Задачи до этого часа считаются за вчера" />
         </MudItem>
 
-        <MudItem xs="12" sm="6" md="4">
+        <MudItem xs="12" sm="6" md="3">
             <MudNumericField T="int" @bind-Value="_settings.DailyTaskLimit"
                              Label="Лимит задач на день"
                              Min="1" Max="100"
                              Variant="Variant.Outlined" />
         </MudItem>
 
-        <MudItem xs="12" sm="6" md="4">
+        <MudItem xs="12" sm="6" md="3">
             <MudNumericField T="int" @bind-Value="_settings.DailyComplexityLimit"
                              Label="Лимит сложности на день"
                              Min="1" Max="1000"
                              Variant="Variant.Outlined" />
         </MudItem>
 
-        <MudItem xs="12" sm="6" md="4">
+        <MudItem xs="12" sm="6" md="3">
             <MudNumericField T="int" @bind-Value="_dailyTimeHours"
                              Label="Лимит времени на день (часы)"
                              Min="1" Max="24"
@@ -77,126 +79,296 @@
 <MudPaper Class="pa-4 mb-4" Elevation="1">
     <div class="d-flex align-center mb-3">
         <MudText Typo="Typo.h6">Приоритеты</MudText>
-        <MudTooltip Text="Настройка названий, цветов и порядка приоритетов">
-            <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="ml-2" />
+        <MudTooltip Text="Перетаскивайте строки для изменения порядка. Верхние приоритеты важнее.">
+            <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="ml-2" Color="Color.Info" />
         </MudTooltip>
     </div>
 
     <MudText Typo="Typo.body2" Class="text-muted mb-3">
-        Верхние приоритеты важнее нижних.
+        <MudIcon Icon="@Icons.Material.Filled.DragIndicator" Size="Size.Small" /> Перетащите для изменения порядка
     </MudText>
 
-    @foreach (var priority in _priorities.OrderBy(p => p.Order))
-    {
-        <MudPaper Class="priority-item pa-2 mb-2" Elevation="0" Outlined="true">
-            <div class="d-flex align-center gap-3">
-                <MudText Class="priority-order">@(priority.Order)</MudText>
-                <MudTextField T="string" @bind-Value="priority.Color"
-                              Label="Цвет"
-                              Variant="Variant.Outlined"
-                              Margin="Margin.Dense"
-                              Style="@($"width: 100px; background-color: {priority.Color}20")" />
-                <MudTextField T="string" @bind-Value="priority.Name"
-                              Label="Название"
-                              Variant="Variant.Outlined"
-                              Margin="Margin.Dense"
-                              Disabled="@priority.IsSystem"
-                              Class="flex-grow-1" />
-                @if (!priority.IsSystem)
-                {
-                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                   Size="Size.Small"
-                                   Color="Color.Error"
-                                   OnClick="@(() => DeletePriority(priority))" />
-                }
-            </div>
-        </MudPaper>
-    }
+    <MudDropContainer T="PriorityItem" Items="_priorityItems"
+                      ItemsSelector="@((item, zone) => true)"
+                      ItemDropped="@OnPriorityDropped"
+                      Class="priority-container">
+        <ChildContent>
+            <MudDropZone T="PriorityItem" Identifier="priorities" Class="priority-dropzone" AllowReorder="true">
+            </MudDropZone>
+        </ChildContent>
+        <ItemRenderer>
+            <MudPaper Class="priority-item pa-3 mb-2" Elevation="1">
+                <div class="d-flex align-center gap-3">
+                    <MudIcon Icon="@Icons.Material.Filled.DragIndicator" Class="drag-handle" Color="Color.Default" />
+                    
+                    <MudAvatar Size="Size.Small" Style="@($"background-color: {context.Color}; width: 24px; height: 24px;")">
+                        <MudText Typo="Typo.caption" Style="color: white; font-weight: bold;">@context.Order</MudText>
+                    </MudAvatar>
+                    
+                    <div class="color-picker-wrapper">
+                        <MudMenu Icon="@Icons.Material.Filled.Palette" Color="Color.Default" Size="Size.Small">
+                            <div class="pa-2">
+                                <MudText Typo="Typo.caption" Class="mb-2">Выберите цвет:</MudText>
+                                <div class="color-palette">
+                                    @foreach (var color in _colorPalette)
+                                    {
+                                        <div class="color-swatch @(context.Color == color ? "selected" : "")"
+                                             style="background-color: @color"
+                                             @onclick="() => SetPriorityColor(context, color)">
+                                        </div>
+                                    }
+                                </div>
+                                <MudTextField T="string" @bind-Value="context.Color"
+                                              Label="HEX"
+                                              Variant="Variant.Outlined"
+                                              Margin="Margin.Dense"
+                                              Class="mt-2"
+                                              Style="width: 120px" />
+                            </div>
+                        </MudMenu>
+                    </div>
 
-    @if (_priorities.Count < 20)
+                    <MudTextField T="string" @bind-Value="context.Name"
+                                  Label="Название"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Disabled="@context.IsSystem"
+                                  Class="flex-grow-1" />
+
+                    @if (!context.IsSystem)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Size="Size.Small"
+                                       Color="Color.Error"
+                                       OnClick="@(() => DeletePriority(context))"
+                                       Title="Удалить приоритет" />
+                    }
+                    else
+                    {
+                        <MudTooltip Text="Системный приоритет нельзя удалить">
+                            <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Color="Color.Default" />
+                        </MudTooltip>
+                    }
+                </div>
+            </MudPaper>
+        </ItemRenderer>
+    </MudDropContainer>
+
+    @if (_priorityItems.Count < 20)
     {
         <MudButton StartIcon="@Icons.Material.Filled.Add"
-                   Variant="Variant.Text"
+                   Variant="Variant.Outlined"
                    Color="Color.Primary"
                    OnClick="@AddPriority"
-                   Class="mt-2">
+                   Class="mt-3"
+                   FullWidth="true">
             Добавить приоритет
         </MudButton>
     }
+    else
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">
+            Достигнут максимум приоритетов (20)
+        </MudAlert>
+    }
 </MudPaper>
 
-<MudButton Variant="Variant.Filled"
-           Color="Color.Success"
-           Size="Size.Large"
-           StartIcon="@Icons.Material.Filled.Save"
-           OnClick="@SaveSettings"
-           Class="mb-4">
-    Сохранить настройки
-</MudButton>
+<div class="d-flex gap-3 mb-4">
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Success"
+               Size="Size.Large"
+               StartIcon="@Icons.Material.Filled.Save"
+               OnClick="@SaveSettings">
+        Сохранить настройки
+    </MudButton>
+    
+    <MudButton Variant="Variant.Outlined"
+               Color="Color.Default"
+               Size="Size.Large"
+               StartIcon="@Icons.Material.Filled.Restore"
+               OnClick="@ResetToDefaults">
+        Сбросить к умолчаниям
+    </MudButton>
+</div>
 
 <style>
+    .priority-container {
+        min-height: 100px;
+    }
+
+    .priority-dropzone {
+        min-height: 100px;
+        border: 2px dashed transparent;
+        border-radius: 8px;
+        transition: border-color 0.2s;
+    }
+
+    .priority-dropzone.mud-drop-zone-drag-block {
+        border-color: var(--mud-palette-primary);
+    }
+
     .priority-item {
-        transition: background-color 0.2s;
+        cursor: grab;
+        transition: all 0.2s;
+        border-left: 4px solid var(--mud-palette-lines-default);
     }
 
     .priority-item:hover {
-        background-color: var(--mud-palette-action-default-hover);
+        transform: translateX(4px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
 
-    .priority-order {
-        width: 30px;
-        text-align: center;
-        font-weight: bold;
+    .priority-item:active {
+        cursor: grabbing;
+    }
+
+    .drag-handle {
+        cursor: grab;
+        opacity: 0.5;
+    }
+
+    .drag-handle:hover {
+        opacity: 1;
+    }
+
+    .color-palette {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 4px;
+    }
+
+    .color-swatch {
+        width: 28px;
+        height: 28px;
+        border-radius: 4px;
+        cursor: pointer;
+        border: 2px solid transparent;
+        transition: all 0.2s;
+    }
+
+    .color-swatch:hover {
+        transform: scale(1.1);
+    }
+
+    .color-swatch.selected {
+        border-color: var(--mud-palette-text-primary);
+        box-shadow: 0 0 0 2px var(--mud-palette-background);
     }
 </style>
 
 @code {
     private UserSettings _settings = new();
-    private List<PriorityLevel> _priorities = new();
+    private List<PriorityItem> _priorityItems = new();
     private int _dailyTimeHours;
+
+    private static readonly string[] _colorPalette = new[]
+    {
+        "#FF4444", "#FF8C00", "#FFD700", "#4CAF50", "#2196F3",
+        "#9C27B0", "#E91E63", "#00BCD4", "#795548", "#607D8B",
+        "#FF5722", "#8BC34A", "#03A9F4", "#673AB7", "#F44336",
+        "#FFEB3B", "#009688", "#3F51B5", "#CDDC39", "#FF9800"
+    };
 
     protected override void OnInitialized()
     {
+        LoadSettings();
+    }
+
+    private void LoadSettings()
+    {
         _settings = SettingsRepo.GetUserSettings();
-        _priorities = PriorityRepo.GetAllOrdered();
         _dailyTimeHours = _settings.DailyTimeLimit / 60;
+        
+        var priorities = PriorityRepo.GetAllOrdered();
+        _priorityItems = priorities.Select(p => new PriorityItem
+        {
+            Id = p.Id,
+            Order = p.Order,
+            Name = p.Name,
+            Color = p.Color,
+            IsSystem = p.IsSystem
+        }).ToList();
+    }
+
+    private void OnPriorityDropped(MudItemDropInfo<PriorityItem> info)
+    {
+        if (info.Item == null) return;
+
+        var item = info.Item;
+        _priorityItems.Remove(item);
+        _priorityItems.Insert(info.IndexInZone, item);
+
+        // Обновляем порядковые номера
+        for (int i = 0; i < _priorityItems.Count; i++)
+        {
+            _priorityItems[i].Order = i + 1;
+        }
+    }
+
+    private void SetPriorityColor(PriorityItem item, string color)
+    {
+        item.Color = color;
     }
 
     private void AddPriority()
     {
-        var newPriority = new PriorityLevel
+        var newId = _priorityItems.Any() ? _priorityItems.Max(p => p.Id) + 1 : 1;
+        // Если есть пустые ID из новых, используем отрицательные
+        if (_priorityItems.Any(p => p.Id <= 0))
         {
-            Name = "Новый приоритет",
-            Color = "#808080",
-            Order = _priorities.Count + 1,
-            IsSystem = false
-        };
-        _priorities.Add(newPriority);
-    }
-
-    private void DeletePriority(PriorityLevel priority)
-    {
-        if (priority.IsSystem) return;
-
-        _priorities.Remove(priority);
-
-        // Переупорядочиваем
-        for (int i = 0; i < _priorities.Count; i++)
+            newId = _priorityItems.Where(p => p.Id <= 0).Min(p => p.Id) - 1;
+        }
+        else
         {
-            _priorities[i].Order = i + 1;
+            newId = -1;
         }
 
-        // Удаляем из БД если есть ID
-        if (priority.Id > 0)
+        var unusedColor = _colorPalette.FirstOrDefault(c => !_priorityItems.Any(p => p.Color == c)) ?? "#808080";
+
+        _priorityItems.Add(new PriorityItem
         {
-            PriorityRepo.Delete(priority.Id);
+            Id = newId, // Отрицательный ID = новый приоритет
+            Name = "Новый приоритет",
+            Color = unusedColor,
+            Order = _priorityItems.Count + 1,
+            IsSystem = false
+        });
+    }
+
+    private void DeletePriority(PriorityItem item)
+    {
+        if (item.IsSystem) return;
+
+        _priorityItems.Remove(item);
+
+        // Переупорядочиваем
+        for (int i = 0; i < _priorityItems.Count; i++)
+        {
+            _priorityItems[i].Order = i + 1;
+        }
+
+        // Удаляем из БД если уже сохранён
+        if (item.Id > 0)
+        {
+            PriorityRepo.Delete(item.Id);
         }
     }
 
     private void RecalculateAll()
     {
         PlannerService.RecalculateAll(_settings);
+        NotificationService.NotifyTasksChanged();
         Snackbar.Add("Все задачи пересчитаны", Severity.Success);
+    }
+
+    private void ResetToDefaults()
+    {
+        _settings.DayStartHour = 5;
+        _settings.DailyTaskLimit = 10;
+        _settings.DailyComplexityLimit = 100;
+        _dailyTimeHours = 8;
+        _settings.AutoDistributeEnabled = false;
+        Snackbar.Add("Настройки сброшены к значениям по умолчанию", Severity.Info);
     }
 
     private void SaveSettings()
@@ -207,25 +379,47 @@
             SettingsRepo.UpdateSettings(_settings);
 
             // Сохраняем приоритеты
-            foreach (var priority in _priorities)
+            foreach (var item in _priorityItems)
             {
-                if (priority.Id > 0)
+                var priority = new PriorityLevel
+                {
+                    Id = item.Id > 0 ? item.Id : 0,
+                    Order = item.Order,
+                    Name = item.Name,
+                    Color = item.Color,
+                    IsSystem = item.IsSystem
+                };
+
+                if (item.Id > 0)
                 {
                     PriorityRepo.Update(priority);
                 }
                 else
                 {
                     PriorityRepo.Add(priority);
+                    item.Id = priority.Id; // Обновляем ID после сохранения
                 }
             }
 
-            PriorityRepo.Reorder(_priorities.Select(p => p.Id).ToList());
+            // Переупорядочиваем
+            PriorityRepo.Reorder(_priorityItems.Where(p => p.Id > 0).Select(p => p.Id).ToList());
 
+            NotificationService.NotifySettingsChanged();
             Snackbar.Add("Настройки сохранены", Severity.Success);
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Ошибка: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Ошибка сохранения: {ex.Message}", Severity.Error);
         }
+    }
+
+    // Вспомогательный класс для drag-drop
+    private class PriorityItem
+    {
+        public int Id { get; set; }
+        public int Order { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Color { get; set; } = "#808080";
+        public bool IsSystem { get; set; }
     }
 }
