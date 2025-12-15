@@ -1,32 +1,61 @@
+@using FlowFocus.Core.Models
+@using FlowFocus.WebApp.Components
+
 <MudDialog>
     <TitleContent>
         <MudText Typo="Typo.h6">@Title</MudText>
     </TitleContent>
     <DialogContent>
-        <MudText>@Content</MudText>
+        <MudText Typo="Typo.body1">@Message</MudText>
+
+        @if (Task != null)
+        {
+            <div class="mt-3">
+                <TaskCard Task="Task" DisplayMode="DisplayMode.Compact" />
+            </div>
+        }
     </DialogContent>
     <DialogActions>
-        <MudButton Variant="Variant.Text" 
-                   OnClick="Cancel"
-                   Color="Color.Default">
+        <MudButton Variant="Variant.Text" OnClick="@Cancel">
             @CancelText
         </MudButton>
-        <MudButton Variant="Variant.Filled" 
-                   Color="Color.Error" 
-                   OnClick="OnConfirm">
+        <MudButton Variant="Variant.Filled"
+                   Color="@ConfirmColor"
+                   OnClick="@Confirm">
             @ConfirmText
         </MudButton>
     </DialogActions>
 </MudDialog>
 
 @code {
-    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
-    
-    [Parameter] public string Title { get; set; } = "Подтверждение";
-    [Parameter] public string Content { get; set; } = "Вы уверены?";
-    [Parameter] public string ConfirmText { get; set; } = "Подтвердить";
-    [Parameter] public string CancelText { get; set; } = "Отмена";
+    [CascadingParameter]
+    IMudDialogInstance MudDialog { get; set; } = null!;
 
-    private void OnConfirm() => MudDialog.Close(DialogResult.Ok(true));
-    private void Cancel() => MudDialog.Cancel();
+    [Parameter]
+    public string Title { get; set; } = "Подтверждение";
+
+    [Parameter]
+    public string Message { get; set; } = "Вы уверены?";
+
+    [Parameter]
+    public string ConfirmText { get; set; } = "Да";
+
+    [Parameter]
+    public string CancelText { get; set; } = "Отмена";
+
+    [Parameter]
+    public Color ConfirmColor { get; set; } = Color.Primary;
+
+    [Parameter]
+    public TaskItem? Task { get; set; }
+
+    private void Confirm()
+    {
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
 }

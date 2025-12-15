@@ -8,6 +8,10 @@
 
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.*">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="MudBlazor" Version="8.*" />
   </ItemGroup>
 
@@ -44,8 +48,8 @@
     <AdditionalFiles Include="Layout\MainLayout.razor" />
     <AdditionalFiles Include="Layout\NavMenu.razor" />
     <AdditionalFiles Include="Pages\AllTasks.razor" />
-    <AdditionalFiles Include="Pages\Graph.razor" />
     <AdditionalFiles Include="Pages\Home.razor" />
+    <AdditionalFiles Include="Pages\NotConfigured.razor" />
     <AdditionalFiles Include="Pages\Settings.razor" />
     <AdditionalFiles Include="Pages\Tomorrow.razor" />
   </ItemGroup>

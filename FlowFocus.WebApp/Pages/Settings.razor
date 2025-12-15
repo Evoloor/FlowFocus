@@ -1,0 +1,231 @@
+@page "/settings"
+@using FlowFocus.Core
+@using FlowFocus.Core.Models
+@inject ISettingsRepository SettingsRepo
+@inject IPriorityRepository PriorityRepo
+@inject IPlannerService PlannerService
+@inject ISnackbar Snackbar
+
+<PageTitle>FlowFocus - Настройки</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Настройки</MudText>
+
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudText Typo="Typo.h6" Class="mb-3">Время и лимиты</MudText>
+
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="4">
+            <MudNumericField T="int" @bind-Value="_settings.DayStartHour"
+                             Label="Время начала дня (час)"
+                             Min="0" Max="23"
+                             Variant="Variant.Outlined"
+                             HelperText="Задачи до этого часа считаются за вчера" />
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="4">
+            <MudNumericField T="int" @bind-Value="_settings.DailyTaskLimit"
+                             Label="Лимит задач на день"
+                             Min="1" Max="100"
+                             Variant="Variant.Outlined" />
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="4">
+            <MudNumericField T="int" @bind-Value="_settings.DailyComplexityLimit"
+                             Label="Лимит сложности на день"
+                             Min="1" Max="1000"
+                             Variant="Variant.Outlined" />
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="4">
+            <MudNumericField T="int" @bind-Value="_dailyTimeHours"
+                             Label="Лимит времени на день (часы)"
+                             Min="1" Max="24"
+                             Variant="Variant.Outlined" />
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudText Typo="Typo.h6" Class="mb-3">Авто-распределение</MudText>
+
+    <MudSwitch T="bool" @bind-Value="_settings.AutoDistributeEnabled"
+               Label="Пересчитывать при создании/изменении задач"
+               Color="Color.Primary" />
+
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Refresh"
+               OnClick="@RecalculateAll"
+               Class="mt-3">
+        Пересчитать ВСЕ дела
+    </MudButton>
+</MudPaper>
+
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudText Typo="Typo.h6" Class="mb-3">Интерфейс</MudText>
+
+    <MudSwitch T="bool" @bind-Value="_settings.IsDarkMode"
+               Label="Тёмная тема"
+               Color="Color.Primary" />
+
+    <MudSwitch T="bool" @bind-Value="_settings.HideTaskTitlesDefault"
+               Label="Скрывать названия задач под спойлер по умолчанию"
+               Color="Color.Primary"
+               Class="mt-2" />
+</MudPaper>
+
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <div class="d-flex align-center mb-3">
+        <MudText Typo="Typo.h6">Приоритеты</MudText>
+        <MudTooltip Text="Настройка названий, цветов и порядка приоритетов">
+            <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="ml-2" />
+        </MudTooltip>
+    </div>
+
+    <MudText Typo="Typo.body2" Class="text-muted mb-3">
+        Верхние приоритеты важнее нижних.
+    </MudText>
+
+    @foreach (var priority in _priorities.OrderBy(p => p.Order))
+    {
+        <MudPaper Class="priority-item pa-2 mb-2" Elevation="0" Outlined="true">
+            <div class="d-flex align-center gap-3">
+                <MudText Class="priority-order">@(priority.Order)</MudText>
+                <MudTextField T="string" @bind-Value="priority.Color"
+                              Label="Цвет"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Style="@($"width: 100px; background-color: {priority.Color}20")" />
+                <MudTextField T="string" @bind-Value="priority.Name"
+                              Label="Название"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Disabled="@priority.IsSystem"
+                              Class="flex-grow-1" />
+                @if (!priority.IsSystem)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Size="Size.Small"
+                                   Color="Color.Error"
+                                   OnClick="@(() => DeletePriority(priority))" />
+                }
+            </div>
+        </MudPaper>
+    }
+
+    @if (_priorities.Count < 20)
+    {
+        <MudButton StartIcon="@Icons.Material.Filled.Add"
+                   Variant="Variant.Text"
+                   Color="Color.Primary"
+                   OnClick="@AddPriority"
+                   Class="mt-2">
+            Добавить приоритет
+        </MudButton>
+    }
+</MudPaper>
+
+<MudButton Variant="Variant.Filled"
+           Color="Color.Success"
+           Size="Size.Large"
+           StartIcon="@Icons.Material.Filled.Save"
+           OnClick="@SaveSettings"
+           Class="mb-4">
+    Сохранить настройки
+</MudButton>
+
+<style>
+    .priority-item {
+        transition: background-color 0.2s;
+    }
+
+    .priority-item:hover {
+        background-color: var(--mud-palette-action-default-hover);
+    }
+
+    .priority-order {
+        width: 30px;
+        text-align: center;
+        font-weight: bold;
+    }
+</style>
+
+@code {
+    private UserSettings _settings = new();
+    private List<PriorityLevel> _priorities = new();
+    private int _dailyTimeHours;
+
+    protected override void OnInitialized()
+    {
+        _settings = SettingsRepo.GetUserSettings();
+        _priorities = PriorityRepo.GetAllOrdered();
+        _dailyTimeHours = _settings.DailyTimeLimit / 60;
+    }
+
+    private void AddPriority()
+    {
+        var newPriority = new PriorityLevel
+        {
+            Name = "Новый приоритет",
+            Color = "#808080",
+            Order = _priorities.Count + 1,
+            IsSystem = false
+        };
+        _priorities.Add(newPriority);
+    }
+
+    private void DeletePriority(PriorityLevel priority)
+    {
+        if (priority.IsSystem) return;
+
+        _priorities.Remove(priority);
+
+        // Переупорядочиваем
+        for (int i = 0; i < _priorities.Count; i++)
+        {
+            _priorities[i].Order = i + 1;
+        }
+
+        // Удаляем из БД если есть ID
+        if (priority.Id > 0)
+        {
+            PriorityRepo.Delete(priority.Id);
+        }
+    }
+
+    private void RecalculateAll()
+    {
+        PlannerService.RecalculateAll(_settings);
+        Snackbar.Add("Все задачи пересчитаны", Severity.Success);
+    }
+
+    private void SaveSettings()
+    {
+        try
+        {
+            _settings.DailyTimeLimit = _dailyTimeHours * 60;
+            SettingsRepo.UpdateSettings(_settings);
+
+            // Сохраняем приоритеты
+            foreach (var priority in _priorities)
+            {
+                if (priority.Id > 0)
+                {
+                    PriorityRepo.Update(priority);
+                }
+                else
+                {
+                    PriorityRepo.Add(priority);
+                }
+            }
+
+            PriorityRepo.Reorder(_priorities.Select(p => p.Id).ToList());
+
+            Snackbar.Add("Настройки сохранены", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка: {ex.Message}", Severity.Error);
+        }
+    }
+}

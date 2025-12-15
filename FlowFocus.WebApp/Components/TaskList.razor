@@ -1,0 +1,430 @@
+@using FlowFocus.Core
+@using FlowFocus.Core.Enums
+@using FlowFocus.Core.Models
+@inject ITaskRepository TaskRepo
+@inject ISettingsRepository SettingsRepo
+@inject ITagRepository TagRepo
+@inject IDialogService DialogService
+
+<div class="task-list">
+    @* Заголовок и элементы управления *@
+    @if (ShowTitle || ShowSearch || ShowSortDropdown || ShowFilters || ShowDisplayMode || ShowPagination)
+    {
+        <div class="task-list-header">
+            @if (ShowTitle && !string.IsNullOrEmpty(Title))
+            {
+                <MudText Typo="Typo.h5" Class="mb-3">@Title</MudText>
+            }
+
+            <div class="task-list-controls">
+                @* Поиск *@
+                @if (ShowSearch)
+                {
+                    <MudTextField T="string" @bind-Value="_searchQuery" Placeholder="Поиск..."
+                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                                  Immediate="true" DebounceInterval="300"
+                                  Class="search-field" />
+                }
+
+                @* Сортировка *@
+                @if (ShowSortDropdown)
+                {
+                    <MudSelect T="SortType" @bind-Value="_sortType" Label="Сортировка"
+                               Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true">
+                        <MudSelectItem Value="SortType.Relevance">По релевантности</MudSelectItem>
+                        <MudSelectItem Value="SortType.DateAsc">По дате (возр.)</MudSelectItem>
+                        <MudSelectItem Value="SortType.DateDesc">По дате (убыв.)</MudSelectItem>
+                        <MudSelectItem Value="SortType.ComplexityAsc">По сложности (возр.)</MudSelectItem>
+                        <MudSelectItem Value="SortType.ComplexityDesc">По сложности (убыв.)</MudSelectItem>
+                        <MudSelectItem Value="SortType.InterestAsc">По интересу (возр.)</MudSelectItem>
+                        <MudSelectItem Value="SortType.InterestDesc">По интересу (убыв.)</MudSelectItem>
+                        <MudSelectItem Value="SortType.DurationAsc">По времени (возр.)</MudSelectItem>
+                        <MudSelectItem Value="SortType.DurationDesc">По времени (убыв.)</MudSelectItem>
+                    </MudSelect>
+                }
+
+                @* Режим отображения *@
+                @if (ShowDisplayMode)
+                {
+                    <MudButtonGroup OverrideStyles="false" Class="display-mode-toggle">
+                        <MudIconButton Icon="@Icons.Material.Filled.ViewList"
+                                       Color="@(_displayMode == DisplayMode.List ? Color.Primary : Color.Default)"
+                                       OnClick="@(() => _displayMode = DisplayMode.List)"
+                                       Title="Список" />
+                        <MudIconButton Icon="@Icons.Material.Filled.ViewHeadline"
+                                       Color="@(_displayMode == DisplayMode.Compact ? Color.Primary : Color.Default)"
+                                       OnClick="@(() => _displayMode = DisplayMode.Compact)"
+                                       Title="Компактный" />
+                        <MudIconButton Icon="@Icons.Material.Filled.GridView"
+                                       Color="@(_displayMode == DisplayMode.Grid ? Color.Primary : Color.Default)"
+                                       OnClick="@(() => _displayMode = DisplayMode.Grid)"
+                                       Title="Сетка" />
+                    </MudButtonGroup>
+                }
+            </div>
+
+            @* Фильтры *@
+            @if (ShowFilters)
+            {
+                <div class="task-list-filters mt-3">
+                    @* Фильтр по дате *@
+                    <MudDateRangePicker @bind-DateRange="_dateRange" Label="Период"
+                                        Variant="Variant.Outlined" Margin="Margin.Dense"
+                                        Clearable="true" />
+
+                    @* Фильтр по статусу *@
+                    <MudSelect T="TaskStatus?" @bind-SelectedValues="_selectedStatuses" Label="Статус"
+                               MultiSelection="true" Variant="Variant.Outlined" Margin="Margin.Dense"
+                               Dense="true">
+                        <MudSelectItem T="TaskStatus?" Value="TaskStatus.Planned">Запланированные</MudSelectItem>
+                        <MudSelectItem T="TaskStatus?" Value="TaskStatus.NotConfigured">Ненастроенные</MudSelectItem>
+                        <MudSelectItem T="TaskStatus?" Value="TaskStatus.Blocked">Заблокированные</MudSelectItem>
+                        <MudSelectItem T="TaskStatus?" Value="TaskStatus.Completed">Завершённые</MudSelectItem>
+                        <MudSelectItem T="TaskStatus?" Value="TaskStatus.Irrelevant">Неактуальные</MudSelectItem>
+                    </MudSelect>
+
+                    @* Фильтр по времени выполнения *@
+                    <MudSelect T="DurationFilter" @bind-Value="_durationFilter" Label="Время"
+                               Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true">
+                        <MudSelectItem Value="DurationFilter.All">Все</MudSelectItem>
+                        <MudSelectItem Value="DurationFilter.Short">Короткие (≤10 мин)</MudSelectItem>
+                        <MudSelectItem Value="DurationFilter.Medium">Средние (≤1 ч)</MudSelectItem>
+                        <MudSelectItem Value="DurationFilter.Long">Долгие (≤12 ч)</MudSelectItem>
+                        <MudSelectItem Value="DurationFilter.MultiDay">Многодневные (>12 ч)</MudSelectItem>
+                    </MudSelect>
+
+                    @* Фильтр по тегам *@
+                    @if (_availableTags.Count > 1)
+                    {
+                        <MudSelect T="int?" @bind-SelectedValues="_selectedTagIds" Label="Теги"
+                                   MultiSelection="true" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                   Dense="true">
+                            @foreach (var tag in _availableTags)
+                            {
+                                <MudSelectItem T="int?" Value="tag.Id">@tag.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    @* Список задач *@
+    <div class="task-list-content @GetContentClass()">
+        @if (!FilteredTasks.Any())
+        {
+            <MudAlert Severity="Severity.Info" Class="mt-4">
+                @if (HasActiveFilters)
+                {
+                    <text>По выбранному фильтру дел нет, попробуйте ослабить фильтр</text>
+                }
+                else
+                {
+                    <text>Введите название дела в поле снизу, чтобы начать добавлять дела</text>
+                }
+            </MudAlert>
+        }
+        else
+        {
+            @foreach (var task in PagedTasks)
+            {
+                <TaskCard Task="task" DisplayMode="_displayMode" OnTaskChanged="@RefreshTasks" />
+            }
+        }
+    </div>
+
+    @* Пагинация *@
+    @if (ShowPagination && FilteredTasks.Count > _pageSize)
+    {
+        <div class="task-list-pagination mt-4">
+            <MudPagination Count="@TotalPages" Selected="@_currentPage"
+                           SelectedChanged="@OnPageChanged"
+                           Color="Color.Primary" />
+            <MudSelect T="int" @bind-Value="_pageSize" Label="На странице"
+                       Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true"
+                       Class="page-size-select">
+                <MudSelectItem Value="10">10</MudSelectItem>
+                <MudSelectItem Value="25">25</MudSelectItem>
+                <MudSelectItem Value="50">50</MudSelectItem>
+                <MudSelectItem Value="100">100</MudSelectItem>
+            </MudSelect>
+        </div>
+    }
+</div>
+
+<style>
+    .task-list-header {
+        margin-bottom: 16px;
+    }
+
+    .task-list-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .search-field {
+        min-width: 200px;
+        flex: 1;
+        max-width: 400px;
+    }
+
+    .task-list-filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: flex-start;
+    }
+
+    .task-list-filters > * {
+        min-width: 150px;
+    }
+
+    .display-mode-toggle {
+        flex-shrink: 0;
+    }
+
+    .task-list-content {
+        min-height: 200px;
+    }
+
+    .task-list-content-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 12px;
+    }
+
+    .task-list-pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .page-size-select {
+        width: 100px;
+    }
+</style>
+
+@code {
+    // === Параметры отображения ===
+    [Parameter]
+    public string? Title { get; set; }
+
+    [Parameter]
+    public bool ShowTitle { get; set; } = true;
+
+    [Parameter]
+    public bool ShowSearch { get; set; } = true;
+
+    [Parameter]
+    public bool ShowSortDropdown { get; set; } = true;
+
+    [Parameter]
+    public bool ShowFilters { get; set; } = true;
+
+    [Parameter]
+    public bool ShowDisplayMode { get; set; } = true;
+
+    [Parameter]
+    public bool ShowPagination { get; set; } = true;
+
+    [Parameter]
+    public bool ShowTags { get; set; } = true;
+
+    // === Фильтры по умолчанию ===
+    [Parameter]
+    public TaskListFilter? DefaultFilter { get; set; }
+
+    [Parameter]
+    public Func<List<TaskItem>>? CustomTaskSource { get; set; }
+
+    // === Внутреннее состояние ===
+    private List<TaskItem> _allTasks = new();
+    private List<Tag> _availableTags = new();
+    private UserSettings? _settings;
+
+    private string _searchQuery = string.Empty;
+    private SortType _sortType = SortType.Relevance;
+    private DisplayMode _displayMode = DisplayMode.List;
+    private DateRange? _dateRange;
+    private IEnumerable<TaskStatus?> _selectedStatuses = new List<TaskStatus?> { TaskStatus.Planned, TaskStatus.NotConfigured, TaskStatus.Blocked };
+    private DurationFilter _durationFilter = DurationFilter.All;
+    private IEnumerable<int?> _selectedTagIds = new List<int?>();
+
+    private int _currentPage = 1;
+    private int _pageSize = 25;
+
+    protected override void OnInitialized()
+    {
+        _settings = SettingsRepo.GetUserSettings();
+        RefreshTasks();
+    }
+
+    private void RefreshTasks()
+    {
+        if (CustomTaskSource != null)
+        {
+            _allTasks = CustomTaskSource();
+        }
+        else
+        {
+            _allTasks = TaskRepo.GetAll()
+                .Where(t => t.ParentTaskId == null) // Исключаем подзадачи
+                .ToList();
+        }
+
+        // Собираем теги
+        _availableTags = _allTasks
+            .SelectMany(t => t.Tags.Select(tt => tt.Tag))
+            .DistinctBy(t => t.Id)
+            .OrderByDescending(t => t.UsageCount)
+            .ToList();
+
+        StateHasChanged();
+    }
+
+    private bool HasActiveFilters =>
+        !string.IsNullOrEmpty(_searchQuery) ||
+        _dateRange != null ||
+        _selectedStatuses.Any() ||
+        _durationFilter != DurationFilter.All ||
+        _selectedTagIds.Any();
+
+    private List<TaskItem> FilteredTasks
+    {
+        get
+        {
+            var tasks = _allTasks.AsEnumerable();
+
+            // Применяем дефолтный фильтр
+            if (DefaultFilter != null)
+            {
+                tasks = ApplyDefaultFilter(tasks);
+            }
+
+            // Поиск по названию
+            if (!string.IsNullOrWhiteSpace(_searchQuery))
+            {
+                tasks = tasks.Where(t => t.Title.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase));
+            }
+
+            // Фильтр по дате
+            if (_dateRange?.Start != null)
+            {
+                tasks = tasks.Where(t => t.ActualAssignedDate >= _dateRange.Start);
+            }
+            if (_dateRange?.End != null)
+            {
+                tasks = tasks.Where(t => t.ActualAssignedDate <= _dateRange.End);
+            }
+
+            // Фильтр по статусу
+            if (_selectedStatuses.Any())
+            {
+                var statuses = _selectedStatuses.Where(s => s != null).Cast<TaskStatus>().ToList();
+                tasks = tasks.Where(t => statuses.Contains(t.Status));
+            }
+
+            // Фильтр по времени выполнения
+            tasks = _durationFilter switch
+            {
+                DurationFilter.Short => tasks.Where(t => t.EstimatedMinutes <= AppConfig.ShortTaskThreshold),
+                DurationFilter.Medium => tasks.Where(t => t.EstimatedMinutes > AppConfig.ShortTaskThreshold && t.EstimatedMinutes <= AppConfig.MediumTaskThreshold),
+                DurationFilter.Long => tasks.Where(t => t.EstimatedMinutes > AppConfig.MediumTaskThreshold && t.EstimatedMinutes <= AppConfig.LongTaskThreshold),
+                DurationFilter.MultiDay => tasks.Where(t => t.EstimatedMinutes > AppConfig.LongTaskThreshold),
+                _ => tasks
+            };
+
+            // Фильтр по тегам
+            if (_selectedTagIds.Any())
+            {
+                var tagIds = _selectedTagIds.Where(id => id != null).Cast<int>().ToList();
+                tasks = tasks.Where(t => t.Tags.Any(tt => tagIds.Contains(tt.TagId)));
+            }
+
+            // Сортировка
+            tasks = ApplySort(tasks);
+
+            return tasks.ToList();
+        }
+    }
+
+    private IEnumerable<TaskItem> ApplyDefaultFilter(IEnumerable<TaskItem> tasks)
+    {
+        if (DefaultFilter == null) return tasks;
+
+        return DefaultFilter.Type switch
+        {
+            TaskListFilterType.Today => tasks.Where(t =>
+                t.ActualAssignedDate?.Date == DateHelper.GetLogicalToday(_settings?.DayStartHour ?? 5) &&
+                t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant),
+
+            TaskListFilterType.Tomorrow => tasks.Where(t =>
+                t.ActualAssignedDate?.Date == DateHelper.GetTomorrow() &&
+                t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant),
+
+            TaskListFilterType.NotConfigured => tasks.Where(t => t.Status == TaskStatus.NotConfigured),
+
+            TaskListFilterType.Overdue => tasks.Where(t =>
+                DateHelper.IsOverdue(t.ActualAssignedDate, _settings?.DayStartHour ?? 5) &&
+                t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant),
+
+            _ => tasks
+        };
+    }
+
+    private IEnumerable<TaskItem> ApplySort(IEnumerable<TaskItem> tasks)
+    {
+        return _sortType switch
+        {
+            SortType.Relevance => tasks
+                .OrderBy(t => t.Status == TaskStatus.Planned ? 0 : 1)
+                .ThenBy(t => t.EffectivePriority?.Order ?? t.Priority?.Order ?? 99)
+                .ThenByDescending(t => t.Interest ?? 0)
+                .ThenBy(t => t.EstimatedMinutes ?? 9999),
+
+            SortType.DateAsc => tasks.OrderBy(t => t.ActualAssignedDate ?? DateTime.MaxValue),
+            SortType.DateDesc => tasks.OrderByDescending(t => t.ActualAssignedDate ?? DateTime.MinValue),
+
+            SortType.ComplexityAsc => tasks.OrderBy(t => t.Complexity ?? 0),
+            SortType.ComplexityDesc => tasks.OrderByDescending(t => t.Complexity ?? 0),
+
+            SortType.InterestAsc => tasks.OrderBy(t => t.Interest ?? 0),
+            SortType.InterestDesc => tasks.OrderByDescending(t => t.Interest ?? 0),
+
+            SortType.DurationAsc => tasks.OrderBy(t => t.EstimatedMinutes ?? 0),
+            SortType.DurationDesc => tasks.OrderByDescending(t => t.EstimatedMinutes ?? 0),
+
+            _ => tasks
+        };
+    }
+
+    private List<TaskItem> PagedTasks
+    {
+        get
+        {
+            if (!ShowPagination) return FilteredTasks;
+
+            return FilteredTasks
+                .Skip((_currentPage - 1) * _pageSize)
+                .Take(_pageSize)
+                .ToList();
+        }
+    }
+
+    private int TotalPages => (int)Math.Ceiling((double)FilteredTasks.Count / _pageSize);
+
+    private void OnPageChanged(int page)
+    {
+        _currentPage = page;
+    }
+
+    private string GetContentClass()
+    {
+        return _displayMode == DisplayMode.Grid ? "task-list-content-grid" : string.Empty;
+    }
+}

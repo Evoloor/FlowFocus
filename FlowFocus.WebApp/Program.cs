@@ -1,5 +1,5 @@
+using FlowFocus.Core;
 using FlowFocus.Data;
-using FlowFocus.WebApp;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
 
@@ -19,15 +19,13 @@ var app = builder.Build();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
-
 
 app.UseHttpsRedirection();
 app.UseAntiforgery();
 app.MapStaticAssets();
-app.MapRazorComponents<App>()
+app.MapRazorComponents<FlowFocus.WebApp.App>()
     .AddInteractiveServerRenderMode();
 
 // Кастомное заполнение БД
@@ -41,10 +39,16 @@ internal static class ServiceExtensions
     public static IServiceCollection AddDataLayer(this IServiceCollection services)
     {
         services.AddDbContext<StorageContext>();
-        
+
         // Репозитории
+        services.AddScoped<ITaskRepository, TaskRepository>();
+        services.AddScoped<ISettingsRepository, SettingsRepository>();
+        services.AddScoped<IPriorityRepository, PriorityRepository>();
+        services.AddScoped<ITagRepository, TagRepository>();
 
         // Сервисы
+        services.AddScoped<IPlannerService, PlannerService>();
+        services.AddScoped<ITagSessionService, TagSessionService>();
 
         return services;
     }

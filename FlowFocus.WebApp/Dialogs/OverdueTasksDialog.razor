@@ -1,0 +1,203 @@
+@using FlowFocus.Core
+@using FlowFocus.Core.Enums
+@using FlowFocus.Core.Models
+@using FlowFocus.WebApp.Components
+@inject ITaskRepository TaskRepo
+@inject ISettingsRepository SettingsRepo
+@inject IPlannerService PlannerService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudOverlay Visible="true" DarkBackground="true" ZIndex="1000">
+    <MudPaper Class="overdue-dialog pa-4" Elevation="4">
+        <MudText Typo="Typo.h5" Class="mb-3">
+            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" Class="me-2" />
+            Просроченные задачи
+        </MudText>
+
+        <MudText Typo="Typo.body2" Class="text-muted mb-4">
+            У вас есть @OverdueTasks.Count просроченных задач. Примите решение по каждой из них.
+        </MudText>
+
+        <div class="overdue-tasks-list">
+            @foreach (var task in OverdueTasks)
+            {
+                <MudPaper Class="overdue-task-item pa-3 mb-2" Elevation="0" Outlined="true">
+                    <div class="d-flex align-center justify-space-between">
+                        <div class="task-info">
+                            <MudText Typo="Typo.body1">@task.Title</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Error">
+                                Просрочена: @task.ActualAssignedDate?.ToString("dd.MM.yyyy")
+                            </MudText>
+                        </div>
+                        <div class="task-actions d-flex gap-2">
+                            <MudButton Variant="Variant.Outlined"
+                                       Size="Size.Small"
+                                       OnClick="@(() => MoveToToday(task))">
+                                На сегодня
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined"
+                                       Size="Size.Small"
+                                       OnClick="@(() => MoveToTomorrow(task))">
+                                На завтра
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined"
+                                       Size="Size.Small"
+                                       OnClick="@(() => EditTask(task))">
+                                Редактировать
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined"
+                                       Size="Size.Small"
+                                       Color="Color.Secondary"
+                                       OnClick="@(() => MarkIrrelevant(task))">
+                                Неактуально
+                            </MudButton>
+                        </div>
+                    </div>
+                </MudPaper>
+            }
+        </div>
+
+        <div class="dialog-actions mt-4 d-flex justify-space-between">
+            <MudButton Variant="Variant.Text"
+                       OnClick="@OnRemindLater">
+                Напомнить позже
+            </MudButton>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Disabled="@HasOverdueTasks"
+                       OnClick="@OnAutoDistribute">
+                Перераспределить автоматически
+            </MudButton>
+        </div>
+    </MudPaper>
+</MudOverlay>
+
+<style>
+    .overdue-dialog {
+        max-width: 700px;
+        max-height: 80vh;
+        overflow-y: auto;
+        border-radius: 8px;
+    }
+
+    .overdue-tasks-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .overdue-task-item {
+        transition: background-color 0.2s;
+    }
+
+    .overdue-task-item:hover {
+        background-color: var(--mud-palette-action-default-hover);
+    }
+</style>
+
+@code {
+    [Parameter, EditorRequired]
+    public List<TaskItem> OverdueTasks { get; set; } = new();
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback OnTasksUpdated { get; set; }
+
+    private UserSettings? _settings;
+
+    private bool HasOverdueTasks => OverdueTasks.Any(t =>
+        t.Status != TaskStatus.Completed &&
+        t.Status != TaskStatus.Irrelevant &&
+        DateHelper.IsOverdue(t.ActualAssignedDate, _settings?.DayStartHour ?? 5));
+
+    protected override void OnInitialized()
+    {
+        _settings = SettingsRepo.GetUserSettings();
+    }
+
+    private async Task MoveToToday(TaskItem task)
+    {
+        task.UserAssignedDate = DateHelper.GetLogicalToday(_settings?.DayStartHour ?? 5);
+        task.ActualAssignedDate = task.UserAssignedDate;
+        TaskRepo.Update(task);
+
+        OverdueTasks.Remove(task);
+        await CheckAndClose();
+    }
+
+    private async Task MoveToTomorrow(TaskItem task)
+    {
+        task.UserAssignedDate = DateHelper.GetTomorrow();
+        task.ActualAssignedDate = task.UserAssignedDate;
+        TaskRepo.Update(task);
+
+        OverdueTasks.Remove(task);
+        await CheckAndClose();
+    }
+
+    private async Task EditTask(TaskItem task)
+    {
+        var parameters = new DialogParameters<TaskEditDialog>
+        {
+            { x => x.ExistingTask, task }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true
+        };
+
+        var dialog = await DialogService.ShowAsync<TaskEditDialog>("Редактировать задачу", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            // Обновляем список
+            var updatedTask = TaskRepo.GetById(task.Id);
+            if (updatedTask != null && !DateHelper.IsOverdue(updatedTask.ActualAssignedDate, _settings?.DayStartHour ?? 5))
+            {
+                OverdueTasks.Remove(task);
+            }
+            await CheckAndClose();
+        }
+    }
+
+    private async Task MarkIrrelevant(TaskItem task)
+    {
+        TaskRepo.MarkIrrelevant(task.Id);
+        OverdueTasks.Remove(task);
+        await CheckAndClose();
+    }
+
+    private async Task OnRemindLater()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task OnAutoDistribute()
+    {
+        if (_settings == null) return;
+
+        PlannerService.RecalculateAll(_settings);
+        Snackbar.Add("Задачи перераспределены", Severity.Success);
+
+        await OnTasksUpdated.InvokeAsync();
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task CheckAndClose()
+    {
+        await OnTasksUpdated.InvokeAsync();
+
+        // Автозакрытие если все задачи обработаны
+        if (!OverdueTasks.Any())
+        {
+            await OnClose.InvokeAsync();
+        }
+    }
+}
+

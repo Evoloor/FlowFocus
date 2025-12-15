@@ -1,5 +1,7 @@
-﻿<MudNavMenu>
+﻿@using FlowFocus.Core
+@inject ITaskRepository TaskRepo
 
+<MudNavMenu>
     <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Today">
         Сегодня
     </MudNavLink>
@@ -13,15 +15,51 @@
     </MudNavLink>
 
     <MudNavLink Href="/not-configured" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.BuildCircle">
-        Ненастроенные
+        <div class="nav-item-with-badge">
+            <span>Ненастроенные</span>
+            @if (_notConfiguredCount > 0)
+            {
+                <MudBadge Content="@_notConfiguredCount" Color="Color.Error" Overlap="false" Class="nav-badge">
+                </MudBadge>
+            }
+        </div>
     </MudNavLink>
 
     <MudNavLink Href="/settings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Settings">
         Настройки
     </MudNavLink>
-
-    <MudNavLink Href="/graph" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.GraphicEq">
-        Граф
-    </MudNavLink>
-
 </MudNavMenu>
+
+<style>
+    .nav-item-with-badge {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .nav-badge {
+        margin-left: auto;
+    }
+</style>
+
+@code {
+    private int _notConfiguredCount;
+
+    protected override void OnInitialized()
+    {
+        RefreshCount();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            RefreshCount();
+        }
+    }
+
+    private void RefreshCount()
+    {
+        _notConfiguredCount = TaskRepo.GetNotConfiguredCount();
+    }
+}

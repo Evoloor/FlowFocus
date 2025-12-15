@@ -1,0 +1,591 @@
+@using FlowFocus.Core
+@using FlowFocus.Core.Enums
+@using FlowFocus.Core.Models
+@inject ITaskRepository TaskRepo
+@inject ISettingsRepository SettingsRepo
+@inject IPriorityRepository PriorityRepo
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudPaper Class="@GetCardClass()" Style="@GetCardStyle()" Elevation="@(IsNested ? 0 : 1)">
+    <div class="task-card-content">
+        @* Индикатор приоритета *@
+        <div class="priority-indicator" style="@GetPriorityIndicatorStyle()"></div>
+
+        <div class="task-card-main">
+            @* Верхняя строка: чекбокс/иконка + название + избранное *@
+            <div class="task-card-header">
+                @* Чекбокс / Иконка статуса *@
+                <div class="task-status-control">
+                    @if (Task.Status == TaskStatus.Blocked)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Color="Color.Warning" />
+                    }
+                    else if (Task.Status == TaskStatus.Irrelevant)
+                    {
+                        <MudText Typo="Typo.caption" Class="vertical-text text-muted">Неактуально</MudText>
+                    }
+                    else if (Task.Status == TaskStatus.Completed)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" />
+                    }
+                    else
+                    {
+                        <MudCheckBox T="bool" Value="@(Task.Status == TaskStatus.Completed)"
+                                     ValueChanged="@OnTaskCompleted"
+                                     Size="Size.Small"
+                                     Color="Color.Primary"
+                                     Disabled="@(Task.Status == TaskStatus.NotConfigured)" />
+                    }
+                </div>
+
+                @* Название *@
+                <div class="task-title-container flex-grow-1">
+                    @if (Task.Status == TaskStatus.NotConfigured)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Settings" Size="Size.Small" Class="me-1" Color="Color.Info" />
+                    }
+
+                    @if (ShouldHideUnderSpoiler && !_spoilerRevealed)
+                    {
+                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => _spoilerRevealed = true)"
+                                   Class="spoiler-button">
+                            <MudText Typo="Typo.body2">Показать название</MudText>
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body1" Class="@GetTitleClass()">@Task.Title</MudText>
+                    }
+                </div>
+
+                @* Избранное *@
+                <MudIconButton Icon="@(Task.IsFavorite ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarBorder)"
+                               Size="Size.Small"
+                               Color="@(Task.IsFavorite ? Color.Warning : Color.Default)"
+                               OnClick="@ToggleFavorite" />
+            </div>
+
+            @* Дата назначения / статус завершения *@
+            <div class="task-date-row">
+                @if (Task.Status == TaskStatus.Completed && Task.CompletedDate != null)
+                {
+                    <MudText Typo="Typo.caption" Class="text-muted">
+                        Завершена @Task.CompletedDate.Value.ToString("dd.MM.yyyy")
+                    </MudText>
+                }
+                else if (Task.ActualAssignedDate != null || Task.UserAssignedDate != null)
+                {
+                    var date = Task.ActualAssignedDate ?? Task.UserAssignedDate;
+                    var isManual = Task.UserAssignedDate != null;
+                    var isOverdue = DateHelper.IsOverdue(date, _settings?.DayStartHour ?? 5);
+
+                    <MudIcon Icon="@(isManual ? Icons.Material.Filled.Event : Icons.Material.Filled.AutoMode)"
+                             Size="Size.Small"
+                             Color="@(isOverdue ? Color.Error : Color.Default)"
+                             Class="me-1" />
+                    <MudText Typo="Typo.caption" Color="@(isOverdue ? Color.Error : Color.Default)">
+                        @date!.Value.ToString("dd.MM.yyyy")
+                    </MudText>
+                }
+            </div>
+
+            @* Описание (если есть и режим не компактный) *@
+            @if (!string.IsNullOrEmpty(Task.Description) && DisplayMode != DisplayMode.Compact)
+            {
+                @if (ShouldHideUnderSpoiler && !_spoilerRevealed)
+                {
+                    <MudText Typo="Typo.caption" Class="text-muted">Описание скрыто</MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Class="task-description text-muted">
+                        @Task.Description
+                    </MudText>
+                }
+            }
+
+            @* Строка настроек *@
+            @if (DisplayMode != DisplayMode.Compact)
+            {
+                <div class="task-settings-row">
+                    @if (Task.Priority != null || Task.EffectivePriority != null)
+                    {
+                        var priority = Task.EffectivePriority ?? Task.Priority;
+                        <MudChip T="string" Size="Size.Small" Style="@($"background-color: {priority!.Color}20; color: {priority.Color}")">
+                            @priority.Order
+                        </MudChip>
+                    }
+                    @if (Task.Interest != null)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
+                            <MudIcon Icon="@Icons.Material.Filled.Interests" Size="Size.Small" Class="me-1" />
+                            @Task.Interest
+                        </MudChip>
+                    }
+                    @if (Task.Complexity != null)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">
+                            <MudIcon Icon="@Icons.Material.Filled.Speed" Size="Size.Small" Class="me-1" />
+                            @Task.Complexity
+                        </MudChip>
+                    }
+                    @if (Task.EstimatedMinutes != null)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">
+                            <MudIcon Icon="@Icons.Material.Filled.Timer" Size="Size.Small" Class="me-1" />
+                            @Task.FormattedDuration
+                        </MudChip>
+                    }
+                </div>
+            }
+
+            @* Строка повторения *@
+            @if (Task.IsRecurring && DisplayMode != DisplayMode.Compact)
+            {
+                <div class="task-recurrence-row">
+                    <MudIcon Icon="@Icons.Material.Filled.Repeat" Size="Size.Small" Class="me-1" />
+                    <MudText Typo="Typo.caption">@GetRecurrenceText()</MudText>
+                </div>
+            }
+
+            @* Теги *@
+            @if (Task.Tags.Any() && DisplayMode != DisplayMode.Compact)
+            {
+                <div class="task-tags-row">
+                    @foreach (var taskTag in Task.Tags.Take(AppConfig.MaxDisplayedTags))
+                    {
+                        <MudChip T="string" Size="Size.Small"
+                                 Style="@($"background-color: {taskTag.Tag.BackgroundColor}; color: #333;")">
+                            @taskTag.Tag.Name
+                        </MudChip>
+                    }
+                    @if (Task.Tags.Count > AppConfig.MaxDisplayedTags)
+                    {
+                        <MudText Typo="Typo.caption" Class="text-muted">+@(Task.Tags.Count - AppConfig.MaxDisplayedTags)</MudText>
+                    }
+                </div>
+            }
+
+            @* Панель связей *@
+            @if (!IsNested && (Task.Subtasks.Any() || Task.Relations.Any() || Task.InverseRelations.Any()))
+            {
+                <div class="task-relations-panel">
+                    @* Подзадачи (развёрнуты по умолчанию) *@
+                    @if (Task.Subtasks.Any())
+                    {
+                        <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
+                            <MudExpansionPanel Text="@($"({Task.Subtasks.Count}) подзадач")" IsInitiallyExpanded="true">
+                                @foreach (var subtask in Task.Subtasks)
+                                {
+                                    <TaskCard Task="subtask" IsNested="true" DisplayMode="DisplayMode.Compact" />
+                                }
+                            </MudExpansionPanel>
+                        </MudExpansionPanels>
+                    }
+
+                    @* Связанные задачи (свёрнуты) *@
+                    @{
+                        var relatedTo = Task.Relations.Where(r => r.Type == RelationType.RelatedTo).ToList();
+                        var blocks = Task.Relations.Where(r => r.Type == RelationType.Blocks).ToList();
+                        var blockedBy = Task.Relations.Where(r => r.Type == RelationType.BlockedBy).ToList();
+                    }
+
+                    @if (relatedTo.Any())
+                    {
+                        <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
+                            <MudExpansionPanel Text="@($"Связана с ({relatedTo.Count})")">
+                                @foreach (var relation in relatedTo)
+                                {
+                                    @if (relation.TargetTask != null)
+                                    {
+                                        <TaskCard Task="relation.TargetTask" IsNested="true" DisplayMode="DisplayMode.Compact" />
+                                    }
+                                }
+                            </MudExpansionPanel>
+                        </MudExpansionPanels>
+                    }
+
+                    @if (blocks.Any())
+                    {
+                        <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
+                            <MudExpansionPanel Text="@($"Блокирует ({blocks.Count})")">
+                                @foreach (var relation in blocks)
+                                {
+                                    @if (relation.TargetTask != null)
+                                    {
+                                        <TaskCard Task="relation.TargetTask" IsNested="true" DisplayMode="DisplayMode.Compact" />
+                                    }
+                                }
+                            </MudExpansionPanel>
+                        </MudExpansionPanels>
+                    }
+
+                    @if (blockedBy.Any())
+                    {
+                        <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
+                            <MudExpansionPanel Text="@($"Блокирована ({blockedBy.Count}) задачами")">
+                                @foreach (var relation in blockedBy)
+                                {
+                                    @if (relation.TargetTask != null)
+                                    {
+                                        <TaskCard Task="relation.TargetTask" IsNested="true" DisplayMode="DisplayMode.Compact" />
+                                    }
+                                }
+                            </MudExpansionPanel>
+                        </MudExpansionPanels>
+                    }
+                </div>
+            }
+            else if (IsNested && TotalRelationsCount > 0)
+            {
+                @* Для вложенных карточек показываем только количество связей *@
+                <MudText Typo="Typo.caption" Class="text-muted">
+                    Связей: @TotalRelationsCount
+                </MudText>
+            }
+
+            @* Элементы управления *@
+            @if (!IsNested)
+            {
+                <div class="task-actions">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                   OnClick="@OpenEditDialog" Title="Редактировать" />
+                    <MudIconButton Icon="@Icons.Material.Filled.DoNotDisturb" Size="Size.Small"
+                                   OnClick="@MarkIrrelevant" Title="Сделать неактуальным"
+                                   Disabled="@(Task.Status == TaskStatus.Irrelevant || Task.Status == TaskStatus.Completed)" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="@DeleteTask" Title="Удалить" />
+                </div>
+            }
+        </div>
+    </div>
+</MudPaper>
+
+<style>
+    .task-card {
+        margin-bottom: 8px;
+        overflow: hidden;
+        transition: all 0.2s ease;
+    }
+
+    .task-card:hover {
+        transform: translateY(-1px);
+    }
+
+    .task-card-content {
+        display: flex;
+        position: relative;
+    }
+
+    .priority-indicator {
+        width: 4px;
+        min-height: 100%;
+        flex-shrink: 0;
+    }
+
+    .task-card-main {
+        flex: 1;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .task-card-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .task-status-control {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+    }
+
+    .task-title-container {
+        display: flex;
+        align-items: center;
+    }
+
+    .task-date-row {
+        display: flex;
+        align-items: center;
+    }
+
+    .task-description {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+
+    .task-settings-row,
+    .task-tags-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .task-recurrence-row {
+        display: flex;
+        align-items: center;
+    }
+
+    .task-relations-panel {
+        margin-top: 8px;
+    }
+
+    .relations-group {
+        margin-bottom: 4px;
+    }
+
+    .task-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 4px;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid var(--mud-palette-lines-default);
+    }
+
+    /* Статусы */
+    .task-card-completed {
+        opacity: 0.6;
+    }
+
+    .task-card-irrelevant {
+        opacity: 0.4;
+    }
+
+    .task-card-not-configured {
+        border-style: dashed !important;
+        border-width: 2px !important;
+    }
+
+    .task-card-blocked {
+        border-width: 3px !important;
+    }
+
+    .title-completed {
+        text-decoration: line-through;
+    }
+
+    .title-not-configured {
+        font-style: italic;
+    }
+
+    /* Вложенные карточки */
+    .task-card-nested {
+        margin: 4px 0;
+        padding: 8px;
+        font-size: 0.9em;
+    }
+
+    .task-card-nested .task-card-main {
+        padding: 8px;
+    }
+
+    /* Вертикальный текст */
+    .vertical-text {
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        font-size: 0.7em;
+    }
+
+    .spoiler-button {
+        text-transform: none !important;
+    }
+    
+    /* Режимы отображения */
+    .task-card-compact .task-card-main {
+        padding: 8px;
+    }
+    
+    .task-card-grid {
+        height: 100%;
+    }
+</style>
+
+@code {
+    [Parameter, EditorRequired]
+    public TaskItem Task { get; set; } = null!;
+
+    [Parameter]
+    public DisplayMode DisplayMode { get; set; } = DisplayMode.List;
+
+    [Parameter]
+    public bool IsNested { get; set; }
+
+    [Parameter]
+    public EventCallback OnTaskChanged { get; set; }
+
+    private UserSettings? _settings;
+    private bool _spoilerRevealed;
+
+    protected override void OnInitialized()
+    {
+        _settings = SettingsRepo.GetUserSettings();
+    }
+
+    private bool ShouldHideUnderSpoiler =>
+        Task.HideUnderSpoiler || (_settings?.HideTaskTitlesDefault ?? false);
+
+    private int TotalRelationsCount =>
+        Task.Subtasks.Count + Task.Relations.Count + Task.InverseRelations.Count;
+
+    private string GetCardClass()
+    {
+        var classes = new List<string> { "task-card" };
+
+        if (Task.Status == TaskStatus.Completed)
+            classes.Add("task-card-completed");
+        else if (Task.Status == TaskStatus.Irrelevant)
+            classes.Add("task-card-irrelevant");
+        else if (Task.Status == TaskStatus.NotConfigured)
+            classes.Add("task-card-not-configured");
+        else if (Task.Status == TaskStatus.Blocked)
+            classes.Add("task-card-blocked");
+
+        if (IsNested)
+            classes.Add("task-card-nested");
+
+        if (DisplayMode == DisplayMode.Compact)
+            classes.Add("task-card-compact");
+        else if (DisplayMode == DisplayMode.Grid)
+            classes.Add("task-card-grid");
+
+        return string.Join(" ", classes);
+    }
+
+    private string GetCardStyle()
+    {
+        var styles = new List<string>();
+
+        if (Task.Status == TaskStatus.Blocked)
+        {
+            var priority = Task.EffectivePriority ?? Task.Priority;
+            var color = priority?.Color ?? "#808080";
+            styles.Add($"border: 3px solid {color}");
+        }
+
+        return string.Join(";", styles);
+    }
+
+    private string GetPriorityIndicatorStyle()
+    {
+        var priority = Task.EffectivePriority ?? Task.Priority;
+        var color = priority?.Color ?? "#808080";
+        return $"background-color: {color}";
+    }
+
+    private string GetTitleClass()
+    {
+        var classes = new List<string>();
+
+        if (Task.Status == TaskStatus.Completed)
+            classes.Add("title-completed");
+        if (Task.Status == TaskStatus.NotConfigured)
+            classes.Add("title-not-configured");
+
+        return string.Join(" ", classes);
+    }
+
+    private string GetRecurrenceText()
+    {
+        return Task.RecurrenceType switch
+        {
+            RecurrenceType.Daily => "Ежедневно",
+            RecurrenceType.EveryNDays => $"Каждые {Task.RecurrenceInterval} дней",
+            RecurrenceType.WeekDays => "По дням недели",
+            _ => string.Empty
+        };
+    }
+
+    private async Task OnTaskCompleted(bool completed)
+    {
+        if (!completed) return;
+
+        // Проверяем разблокируемые задачи
+        var unblockedTasks = TaskRepo.GetTasksUnblockedBy(Task.Id);
+
+        TaskRepo.CompleteTask(Task.Id);
+
+        if (unblockedTasks.Any())
+        {
+            // Показываем диалог с разблокированными задачами
+            var parameters = new DialogParameters<UnblockedTasksDialog>
+            {
+                { x => x.UnblockedTasks, unblockedTasks }
+            };
+
+            await DialogService.ShowAsync<UnblockedTasksDialog>("Задачи разблокированы", parameters);
+        }
+
+        Snackbar.Add("Задача выполнена", Severity.Success);
+        await OnTaskChanged.InvokeAsync();
+    }
+
+    private async Task ToggleFavorite()
+    {
+        Task.IsFavorite = !Task.IsFavorite;
+        TaskRepo.Update(Task);
+        await OnTaskChanged.InvokeAsync();
+    }
+
+    private async Task OpenEditDialog()
+    {
+        var parameters = new DialogParameters<TaskEditDialog>
+        {
+            { x => x.ExistingTask, Task }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true
+        };
+
+        var dialog = await DialogService.ShowAsync<TaskEditDialog>("Редактировать задачу", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            await OnTaskChanged.InvokeAsync();
+        }
+    }
+
+    private async Task MarkIrrelevant()
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Подтверждение",
+            "Сделать задачу неактуальной?",
+            yesText: "Да", cancelText: "Отмена");
+
+        if (confirmed == true)
+        {
+            TaskRepo.MarkIrrelevant(Task.Id);
+            Snackbar.Add("Задача помечена как неактуальная", Severity.Info);
+            await OnTaskChanged.InvokeAsync();
+        }
+    }
+
+    private async Task DeleteTask()
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Удаление задачи",
+            $"Вы уверены, что хотите удалить задачу \"{Task.Title}\"?",
+            yesText: "Удалить", cancelText: "Отмена");
+
+        if (confirmed == true)
+        {
+            TaskRepo.Delete(Task.Id);
+            Snackbar.Add("Задача удалена", Severity.Success);
+            await OnTaskChanged.InvokeAsync();
+        }
+    }
+}
+
