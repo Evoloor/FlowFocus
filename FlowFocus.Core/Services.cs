@@ -146,7 +146,7 @@ public static class DateHelper
     /// </summary>
     private static DateTime GetLogicalDate(DateTime dateTime, int dayStartHour)
     {
-        if (dateTime.Hour > 0 && dateTime.Hour < dayStartHour)
+        if (dateTime.Hour >= 0 && dateTime.Hour < dayStartHour)
         {
             return dateTime.Date.AddDays(-1);
         }
@@ -167,9 +167,8 @@ public static class DateHelper
     public static bool IsOverdue(DateTime? date, int dayStartHour)
     {
         if (date == null) return false;
-        var logicalDate = GetLogicalDate(date.Value, dayStartHour);
         var logicalToday = GetLogicalToday(dayStartHour);
-        return logicalDate < logicalToday;
+        return date.Value < logicalToday;
     }
 
     /// <summary>

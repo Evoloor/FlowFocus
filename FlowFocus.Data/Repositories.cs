@@ -12,6 +12,164 @@ namespace FlowFocus.Data;
 public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>(context), ITaskRepository
 {
     protected override DbSet<TaskItem> GetDbSet() => Context.Tasks;
+    
+    public override void Update(TaskItem entity)
+    {
+        lock (CacheLock)
+        {
+            try
+            {
+                if (entity.Id <= 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Invalid entity ID: {entity.Id}. Entity must have a valid ID > 0 for update.");
+                }
+
+                var trackedEntity = GetTrackedQuery()
+                    .Include(t => t.Tags)
+                    .Include(t => t.Subtasks)
+                    .Include(t => t.Relations)
+                    .Include(t => t.PriorityEscalations)
+                    .FirstOrDefault(e => e.Id == entity.Id);
+                    
+                if (trackedEntity == null)
+                {
+                    throw new InvalidOperationException($"Entity with ID {entity.Id} not found");
+                }
+
+                // Обновляем основные свойства
+                Context.Entry(trackedEntity).CurrentValues.SetValues(entity);
+                
+                // Обновляем теги
+                UpdateTags(trackedEntity, entity);
+                
+                // Обновляем подзадачи
+                UpdateSubtasks(trackedEntity, entity);
+                
+                // Обновляем связи
+                UpdateRelations(trackedEntity, entity);
+                
+                // Обновляем повышения приоритета
+                UpdateEscalations(trackedEntity, entity);
+                
+                trackedEntity.LastChangesOn = DateTime.UtcNow;
+                Context.SaveChanges();
+                MarkDirty();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in Update: {ex.Message}");
+                throw;
+            }
+        }
+    }
+    
+    private void UpdateTags(TaskItem tracked, TaskItem source)
+    {
+        // Удаляем старые теги
+        var tagsToRemove = tracked.Tags.Where(tt => !source.Tags.Any(st => st.TagId == tt.TagId)).ToList();
+        foreach (var tag in tagsToRemove)
+        {
+            Context.TaskTags.Remove(tag);
+        }
+        
+        // Добавляем новые теги
+        foreach (var sourceTag in source.Tags)
+        {
+            if (!tracked.Tags.Any(tt => tt.TagId == sourceTag.TagId))
+            {
+                Context.TaskTags.Add(new TaskTag
+                {
+                    TaskId = tracked.Id,
+                    TagId = sourceTag.TagId
+                });
+            }
+        }
+    }
+    
+    private void UpdateSubtasks(TaskItem tracked, TaskItem source)
+    {
+        // Удаляем удаленные подзадачи
+        var subtasksToRemove = tracked.Subtasks.Where(st => !source.Subtasks.Any(sst => sst.Id == st.Id && sst.Id > 0)).ToList();
+        foreach (var subtask in subtasksToRemove)
+        {
+            Context.Tasks.Remove(subtask);
+        }
+        
+        // Обновляем существующие и добавляем новые подзадачи
+        foreach (var sourceSubtask in source.Subtasks)
+        {
+            if (sourceSubtask.Id > 0)
+            {
+                var existing = tracked.Subtasks.FirstOrDefault(s => s.Id == sourceSubtask.Id);
+                if (existing != null)
+                {
+                    Context.Entry(existing).CurrentValues.SetValues(sourceSubtask);
+                }
+            }
+            else
+            {
+                sourceSubtask.ParentTaskId = tracked.Id;
+                Context.Tasks.Add(sourceSubtask);
+            }
+        }
+    }
+    
+    private void UpdateRelations(TaskItem tracked, TaskItem source)
+    {
+        // Удаляем старые связи
+        var relationsToRemove = tracked.Relations.Where(r => !source.Relations.Any(sr => sr.Id == r.Id && sr.Id > 0)).ToList();
+        foreach (var relation in relationsToRemove)
+        {
+            Context.TaskRelations.Remove(relation);
+        }
+        
+        // Обновляем существующие и добавляем новые связи
+        foreach (var sourceRelation in source.Relations)
+        {
+            if (sourceRelation.Id > 0)
+            {
+                var existing = tracked.Relations.FirstOrDefault(r => r.Id == sourceRelation.Id);
+                if (existing != null)
+                {
+                    Context.Entry(existing).CurrentValues.SetValues(sourceRelation);
+                }
+            }
+            else
+            {
+                sourceRelation.SourceTaskId = tracked.Id;
+                Context.TaskRelations.Add(sourceRelation);
+            }
+        }
+    }
+    
+    private void UpdateEscalations(TaskItem tracked, TaskItem source)
+    {
+        // Удаляем старые повышения
+        var escalationsToRemove = tracked.PriorityEscalations.Where(e => !source.PriorityEscalations.Any(se => se.Id == e.Id && se.Id > 0)).ToList();
+        foreach (var escalation in escalationsToRemove)
+        {
+            Context.PriorityEscalations.Remove(escalation);
+        }
+        
+        // Обновляем существующие и добавляем новые повышения
+        foreach (var sourceEscalation in source.PriorityEscalations)
+        {
+            if (sourceEscalation.Id > 0)
+            {
+                var existing = tracked.PriorityEscalations.FirstOrDefault(e => e.Id == sourceEscalation.Id);
+                if (existing != null)
+                {
+                    Context.Entry(existing).CurrentValues.SetValues(sourceEscalation);
+                }
+            }
+            else
+            {
+                sourceEscalation.TaskId = tracked.Id;
+                Context.PriorityEscalations.Add(sourceEscalation);
+            }
+        }
+    }
 
     protected override IQueryable<TaskItem> GetBaseQuery() =>
         GetDbSet()
@@ -403,16 +561,18 @@ public class TagSessionService(ITagRepository tagRepository) : ITagSessionServic
     {
         var result = new List<Tag>();
 
+        // Сперва последний использованный тег из хипа (за сессию), если такой имеется
         if (_lastUsedTag != null)
         {
             result.Add(_lastUsedTag);
         }
 
-        var popular = tagRepository.GetPopularTags(count);
-        foreach (var tag in popular)
+        // Затем заполняем ещё 4 (или 5, если не было недавнего) по принципу самых используемых в созданных делах
+        var remainingCount = count - result.Count;
+        if (remainingCount > 0)
         {
-            if (result.Count >= count) break;
-            if (!result.Any(t => t.Id == tag.Id))
+            var popular = tagRepository.GetPopularTags(remainingCount + 5); // Берем больше, чтобы исключить уже добавленные
+            foreach (var tag in popular.TakeWhile(tag => result.Count < count).Where(tag => !result.Any(t => t.Id == tag.Id)))
             {
                 result.Add(tag);
             }

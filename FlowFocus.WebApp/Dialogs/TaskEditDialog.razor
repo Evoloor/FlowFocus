@@ -117,42 +117,91 @@
                     <MudItem xs="12">
                         <MudText Typo="Typo.subtitle2" Class="mb-2">Теги</MudText>
                         
-                        @* Предлагаемые теги *@
-                        @if (_suggestedTags.Any(t => !_selectedTagIds.Contains(t.Id)))
+                        @* Строка предлагающихся тегов *@
+                        @{
+                            var availableSuggestedTags = _suggestedTags.Where(t => !_selectedTagIds.Contains(t.Id)).Take(5).ToList();
+                        }
+                        @if (availableSuggestedTags.Any())
                         {
-                            <MudText Typo="Typo.caption" Class="mb-1 text-muted">Предлагаемые:</MudText>
-                            <div class="suggested-tags mb-2">
-                                @foreach (var tag in _suggestedTags.Where(t => !_selectedTagIds.Contains(t.Id)))
+                            <div class="suggested-tags mb-3">
+                                @foreach (var tag in availableSuggestedTags)
                                 {
                                     <MudChip T="string" Size="Size.Small"
+                                             Variant="Variant.Outlined"
                                              Icon="@Icons.Material.Filled.Add"
-                                             Style="@($"background-color: {tag.BackgroundColor}; color: #333; cursor: pointer;")"
-                                             OnClick="@(() => AddTag(tag))">
+                                             IconColor="Color.Primary"
+                                             Style="@($"background-color: {tag.BackgroundColor}40; color: #333; border-color: {tag.BackgroundColor}; cursor: pointer;")"
+                                             OnClick="@(() => AddTag(tag))"
+                                             Class="suggested-tag-chip">
                                         @tag.Name
                                     </MudChip>
                                 }
                             </div>
                         }
 
-                        @* Поле для нового тега *@
-                        <MudAutocomplete T="string" @bind-Value="_newTagInput"
-                                         Label="Добавить тег"
-                                         SearchFunc="@SearchTags"
-                                         Variant="Variant.Outlined"
-                                         Margin="Margin.Dense"
-                                         CoerceText="false"
-                                         CoerceValue="false"
-                                         OnKeyDown="@OnTagKeyDown"
-                                         Clearable="true" />
+                        @* Место для создания новых тегов или использования существующих с автодополнением *@
+                        <div class="tag-input-container mb-3">
+                            <div class="d-flex gap-2 align-end">
+                                <MudTextField T="string" @bind-Value="_newTagInput"
+                                             Label="Создать новый тег или выбрать существующий"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             OnKeyDown="@OnTagKeyDown"
+                                             OnInput="@OnTagInput"
+                                             Clearable="true"
+                                             Class="flex-grow-1" />
+                                <MudButton Variant="Variant.Filled"
+                                         Color="Color.Primary"
+                                         StartIcon="@Icons.Material.Filled.Add"
+                                         OnClick="@AddNewTag"
+                                         Disabled="@string.IsNullOrWhiteSpace(_newTagInput)"
+                                         Class="tag-add-button">
+                                    Добавить
+                                </MudButton>
+                            </div>
+                            
+                            @* Результаты поиска (подсказки) *@
+                            @if (_tagSearchResults.Any() && !string.IsNullOrWhiteSpace(_newTagInput))
+                            {
+                                <div class="tag-search-results mt-2">
+                                    <MudText Typo="Typo.caption" Class="mb-1 text-muted">Найдено:</MudText>
+                                    <div class="search-result-tags">
+                                        @foreach (var tag in _tagSearchResults)
+                                        {
+                                            @if (!_selectedTagIds.Contains(tag.Id))
+                                            {
+                                                <MudChip T="string" Size="Size.Small"
+                                                         Variant="Variant.Outlined"
+                                                         Style="@($"background-color: {tag.BackgroundColor}40; color: #333; border-color: {tag.BackgroundColor}; cursor: pointer;")"
+                                                         OnClick="@(() => SelectExistingTag(tag))"
+                                                         Class="search-result-chip">
+                                                    @tag.Name
+                                                </MudChip>
+                                            }
+                                        }
+                                    </div>
+                                </div>
+                            }
+                            
+                            @* Подсказка о создании нового тега *@
+                            @if (!string.IsNullOrWhiteSpace(_newTagInput) && !_tagSearchResults.Any(t => t.Name.Equals(_newTagInput.Trim(), StringComparison.OrdinalIgnoreCase)))
+                            {
+                                <MudText Typo="Typo.caption" Class="mt-1 text-info">
+                                    <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="me-1" />
+                                    Будет создан новый тег "@_newTagInput.Trim()"
+                                </MudText>
+                            }
+                        </div>
 
                         @* Добавленные теги *@
                         @if (_selectedTags.Any())
                         {
-                            <MudText Typo="Typo.caption" Class="mt-2 mb-1">Добавленные:</MudText>
+                            <MudText Typo="Typo.caption" Class="mt-2 mb-1 font-weight-medium">Добавленные:</MudText>
                             <div class="selected-tags">
                                 @foreach (var tag in _selectedTags)
                                 {
                                     <MudChip T="string" Size="Size.Small"
+                                             Variant="Variant.Filled"
                                              Style="@($"background-color: {tag.BackgroundColor}; color: #333;")"
                                              OnClose="@(() => RemoveTag(tag))">
                                         @tag.Name
@@ -392,6 +441,47 @@
         gap: 4px;
     }
 
+    .suggested-tag-chip {
+        transition: all 0.2s ease;
+    }
+
+    .suggested-tag-chip:hover {
+        transform: scale(1.05);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .tag-input-container {
+        position: relative;
+    }
+
+    .tag-add-button {
+        min-width: 100px;
+    }
+
+    .tag-search-results {
+        padding: 8px;
+        background: var(--mud-palette-background-gray);
+        border-radius: 4px;
+        border: 1px solid var(--mud-palette-lines-default);
+    }
+
+    .search-result-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .search-result-chip {
+        transition: all 0.2s ease;
+    }
+
+    .search-result-chip:hover {
+        transform: scale(1.05);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        background-color: var(--mud-palette-primary) !important;
+        color: var(--mud-palette-primary-text) !important;
+    }
+
     .escalation-row,
     .relation-row {
         display: flex;
@@ -434,6 +524,7 @@
     private List<Tag> _selectedTags = [];
     private HashSet<int> _selectedTagIds = [];
     private string _newTagInput = string.Empty;
+    private List<Tag> _tagSearchResults = [];
     private List<SubtaskDto> _subtasks = [];
     private string _newSubtaskTitle = string.Empty;
     private List<RelationDto> _relations = [];
@@ -455,6 +546,7 @@
     {
         _settings = SettingsRepo.GetUserSettings();
         _priorities = PriorityRepo.GetAllOrdered();
+        // Получаем предлагаемые теги: последний использованный + популярные (до 5)
         _suggestedTags = TagSessionService.GetSuggestedTags(5);
         _availableTasks = TaskRepo.GetTasksForAutocomplete();
 
@@ -562,11 +654,26 @@
 
     private async Task<IEnumerable<string>> SearchTags(string value, CancellationToken cancellationToken)
     {
+        // Этот метод больше не используется, но оставлен для совместимости
         if (string.IsNullOrWhiteSpace(value))
             return [];
 
         var tags = TagRepo.SearchByName(value, 10);
         return tags.Select(t => t.Name);
+    }
+    
+    private async Task OnTagInput(ChangeEventArgs e)
+    {
+        var searchValue = e.Value?.ToString()?.Trim();
+        if (string.IsNullOrWhiteSpace(searchValue))
+        {
+            _tagSearchResults = [];
+            return;
+        }
+
+        // Ищем теги по введенному тексту
+        _tagSearchResults = TagRepo.SearchByName(searchValue, 10);
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task<IEnumerable<TaskItem>> SearchTasks(string value, CancellationToken cancellationToken)
@@ -595,14 +702,46 @@
         _selectedTagIds.Remove(tag.Id);
     }
 
-    private void OnTagKeyDown(KeyboardEventArgs e)
+    private async Task OnTagKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_newTagInput))
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_newTagInput?.Trim()))
         {
-            var tag = TagRepo.GetOrCreate(_newTagInput.Trim());
-            AddTag(tag);
-            _newTagInput = string.Empty;
+            await AddNewTag();
         }
+    }
+    
+    private async Task AddNewTag()
+    {
+        if (string.IsNullOrWhiteSpace(_newTagInput?.Trim())) return;
+
+        var tagName = _newTagInput.Trim();
+        
+        // Проверяем, есть ли уже такой тег в результатах поиска
+        var existingTag = _tagSearchResults.FirstOrDefault(t => t.Name.Equals(tagName, StringComparison.OrdinalIgnoreCase));
+        
+        if (existingTag != null)
+        {
+            // Используем существующий тег
+            AddTag(existingTag);
+        }
+        else
+        {
+            // Создаем новый тег
+            var newTag = TagRepo.GetOrCreate(tagName);
+            AddTag(newTag);
+        }
+
+        _newTagInput = string.Empty;
+        _tagSearchResults = [];
+        await InvokeAsync(StateHasChanged);
+    }
+    
+    private async Task SelectExistingTag(Tag tag)
+    {
+        AddTag(tag);
+        _newTagInput = string.Empty;
+        _tagSearchResults = [];
+        await InvokeAsync(StateHasChanged);
     }
 
     private void AddSubtask()
@@ -744,6 +883,13 @@
             {
                 _task.Status = TaskStatus.Planned;
             }
+
+            // Обновляем теги задачи
+            _task.Tags = _selectedTags.Select(tag => new TaskTag
+            {
+                TagId = tag.Id,
+                Tag = tag
+            }).ToList();
 
             if (IsEdit)
             {

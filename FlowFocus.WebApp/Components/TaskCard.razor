@@ -172,7 +172,10 @@
                     @foreach (var taskTag in Task.Tags.Take(AppConfig.MaxDisplayedTags))
                     {
                         <MudChip T="string" Size="Size.Small"
-                                 Style="@($"background-color: {taskTag.Tag.BackgroundColor}; color: #333;")">
+                                 Variant="Variant.Filled"
+                                 Style="@($"background-color: {taskTag.Tag.BackgroundColor}; color: #333; border: none; cursor: default;")"
+                                 Clickable="false"
+                                 Deletable="false">
                             @taskTag.Tag.Name
                         </MudChip>
                     }
