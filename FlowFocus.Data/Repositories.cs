@@ -49,9 +49,9 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
         return GetTasksForDate(logicalToday, dayStartHour);
     }
 
-    public List<TaskItem> GetTomorrowTasks()
+    public List<TaskItem> GetTomorrowTasks(int dayStartHour)
     {
-        var tomorrow = DateHelper.GetTomorrow();
+        var tomorrow = DateHelper.GetTomorrow(dayStartHour);
         var all = GetAll();
         return FilterOutSubtasks(all)
             .Where(t => t.ActualAssignedDate?.Date == tomorrow.Date &&

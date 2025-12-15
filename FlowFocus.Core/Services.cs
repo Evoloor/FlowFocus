@@ -26,7 +26,7 @@ public interface ITaskRepository : IRepository<TaskItem>
     List<TaskItem> GetTodayTasks(int dayStartHour);
 
     /// <summary>Получить задачи на завтра</summary>
-    List<TaskItem> GetTomorrowTasks();
+    List<TaskItem> GetTomorrowTasks(int dayStartHour);
 
     /// <summary>Получить ненастроенные задачи</summary>
     List<TaskItem> GetNotConfiguredTasks();
@@ -173,11 +173,29 @@ public static class DateHelper
     }
 
     /// <summary>
-    /// Получить завтрашнюю дату (без учёта времени начала дня)
+    /// Получить завтрашнюю "логическую" дату с учётом времени начала дня
     /// </summary>
-    public static DateTime GetTomorrow()
+    public static DateTime GetTomorrow(int dayStartHour)
     {
-        return DateTime.Now.Date.AddDays(1);
+        return GetLogicalToday(dayStartHour).AddDays(1);
+    }
+
+    /// <summary>
+    /// Проверить, является ли дата "сегодняшней" (логически)
+    /// </summary>
+    public static bool IsToday(DateTime? date, int dayStartHour)
+    {
+        if (date == null) return false;
+        return date.Value.Date == GetLogicalToday(dayStartHour);
+    }
+
+    /// <summary>
+    /// Проверить, является ли дата "завтрашней" (логически)
+    /// </summary>
+    public static bool IsTomorrow(DateTime? date, int dayStartHour)
+    {
+        if (date == null) return false;
+        return date.Value.Date == GetTomorrow(dayStartHour);
     }
 }
 

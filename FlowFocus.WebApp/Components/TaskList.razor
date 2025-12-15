@@ -364,7 +364,7 @@
                 t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant),
 
             TaskListFilterType.Tomorrow => tasks.Where(t =>
-                t.ActualAssignedDate?.Date == DateHelper.GetTomorrow() &&
+                t.ActualAssignedDate?.Date == DateHelper.GetTomorrow(_settings?.DayStartHour ?? 5) &&
                 t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant),
 
             TaskListFilterType.NotConfigured => tasks.Where(t => t.Status == TaskStatus.NotConfigured),

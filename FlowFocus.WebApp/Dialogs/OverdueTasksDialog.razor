@@ -132,7 +132,7 @@
 
     private async Task MoveToTomorrow(TaskItem task)
     {
-        task.UserAssignedDate = DateHelper.GetTomorrow();
+        task.UserAssignedDate = DateHelper.GetTomorrow(_settings?.DayStartHour ?? 5);
         task.ActualAssignedDate = task.UserAssignedDate;
         TaskRepo.Update(task);
 
