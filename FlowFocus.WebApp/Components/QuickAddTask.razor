@@ -31,7 +31,8 @@
             <MudIconButton Icon="@Icons.Material.Filled.Settings"
                            Color="Color.Primary"
                            Size="Size.Medium"
-                           OnClick="@OpenEditDialog" />
+                           OnClick="@OpenEditDialog"
+                           Disabled="@(!IsValid)" />
         </MudTooltip>
     </div>
 </MudPaper>
@@ -57,13 +58,18 @@
 @code {
     private string _taskTitle = string.Empty;
 
-    private bool IsValid => !string.IsNullOrWhiteSpace(_taskTitle);
+    private bool IsValid => !string.IsNullOrWhiteSpace(_taskTitle?.Trim());
 
     private async Task OnKeyDown(KeyboardEventArgs e)
     {
         if (e.Key == "Enter" && IsValid)
         {
             await QuickAdd();
+        }
+        else if (e.Key == "Escape")
+        {
+            _taskTitle = string.Empty;
+            await InvokeAsync(StateHasChanged);
         }
     }
 
