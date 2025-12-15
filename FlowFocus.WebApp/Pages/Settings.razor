@@ -1,7 +1,4 @@
 @page "/settings"
-@using FlowFocus.Core
-@using FlowFocus.Core.Models
-@using FlowFocus.Core.Services
 @inject ISettingsRepository SettingsRepo
 @inject IPriorityRepository PriorityRepo
 @inject IPlannerService PlannerService
@@ -258,16 +255,16 @@
 
 @code {
     private UserSettings _settings = new();
-    private List<PriorityItem> _priorityItems = new();
+    private List<PriorityItem> _priorityItems = [];
     private int _dailyTimeHours;
 
-    private static readonly string[] _colorPalette = new[]
-    {
+    private static readonly string[] _colorPalette =
+    [
         "#FF4444", "#FF8C00", "#FFD700", "#4CAF50", "#2196F3",
         "#9C27B0", "#E91E63", "#00BCD4", "#795548", "#607D8B",
         "#FF5722", "#8BC34A", "#03A9F4", "#673AB7", "#F44336",
         "#FFEB3B", "#009688", "#3F51B5", "#CDDC39", "#FF9800"
-    };
+    ];
 
     protected override void OnInitialized()
     {

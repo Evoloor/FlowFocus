@@ -1,10 +1,5 @@
-@using FlowFocus.Core
-@using FlowFocus.Core.Enums
-@using FlowFocus.Core.Models
 @inject ITaskRepository TaskRepo
 @inject ISettingsRepository SettingsRepo
-@inject ITagRepository TagRepo
-@inject IDialogService DialogService
 
 <div class="task-list">
     @* Заголовок и элементы управления *@
@@ -130,7 +125,7 @@
         {
             @foreach (var task in PagedTasks)
             {
-                <TaskCard Task="task" DisplayMode="_displayMode" OnTaskChanged="@RefreshTasks" />
+                <TaskCard Task="task" DisplayMode="_displayMode" OnTaskChanged="@HandleTaskChanged" />
             }
         }
     </div>
@@ -242,9 +237,12 @@
     [Parameter]
     public Func<List<TaskItem>>? CustomTaskSource { get; set; }
 
+    [Parameter]
+    public EventCallback OnTaskChanged { get; set; }
+
     // === Внутреннее состояние ===
-    private List<TaskItem> _allTasks = new();
-    private List<Tag> _availableTags = new();
+    private List<TaskItem> _allTasks = [];
+    private List<Tag> _availableTags = [];
     private UserSettings? _settings;
 
     private string _searchQuery = string.Empty;
@@ -285,6 +283,12 @@
             .ToList();
 
         StateHasChanged();
+    }
+
+    private async Task HandleTaskChanged()
+    {
+        RefreshTasks();
+        await OnTaskChanged.InvokeAsync();
     }
 
     private bool HasActiveFilters =>
@@ -333,8 +337,8 @@
             tasks = _durationFilter switch
             {
                 DurationFilter.Short => tasks.Where(t => t.EstimatedMinutes <= AppConfig.ShortTaskThreshold),
-                DurationFilter.Medium => tasks.Where(t => t.EstimatedMinutes > AppConfig.ShortTaskThreshold && t.EstimatedMinutes <= AppConfig.MediumTaskThreshold),
-                DurationFilter.Long => tasks.Where(t => t.EstimatedMinutes > AppConfig.MediumTaskThreshold && t.EstimatedMinutes <= AppConfig.LongTaskThreshold),
+                DurationFilter.Medium => tasks.Where(t => t.EstimatedMinutes is > AppConfig.ShortTaskThreshold and <= AppConfig.MediumTaskThreshold),
+                DurationFilter.Long => tasks.Where(t => t.EstimatedMinutes is > AppConfig.MediumTaskThreshold and <= AppConfig.LongTaskThreshold),
                 DurationFilter.MultiDay => tasks.Where(t => t.EstimatedMinutes > AppConfig.LongTaskThreshold),
                 _ => tasks
             };

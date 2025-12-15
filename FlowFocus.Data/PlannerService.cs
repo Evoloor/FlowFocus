@@ -148,22 +148,24 @@ public class PlannerService(
                 continue;
 
             var hasActiveBlockers = task.Relations
-                .Any(r => r.Type == RelationType.BlockedBy &&
-                          r.TargetTask != null &&
+                .Any(r => r is { Type: RelationType.BlockedBy, TargetTask: not null } &&
                           r.TargetTask.Status != TaskStatus.Completed &&
                           r.TargetTask.Status != TaskStatus.Irrelevant);
 
             var trackedTask = context.Tasks.Find(task.Id);
             if (trackedTask != null)
             {
-                if (hasActiveBlockers && trackedTask.Status == TaskStatus.Planned)
+                // Если есть активные блокеры, устанавливаем статус Blocked
+                if (hasActiveBlockers && trackedTask.Status != TaskStatus.Blocked)
                 {
                     trackedTask.Status = TaskStatus.Blocked;
                     trackedTask.LastChangesOn = DateTime.UtcNow;
                 }
+                // Если нет активных блокеров, но статус Blocked, возвращаем к Planned или NotConfigured
                 else if (!hasActiveBlockers && trackedTask.Status == TaskStatus.Blocked)
                 {
-                    trackedTask.Status = TaskStatus.NotConfigured;
+                    // Возвращаем к предыдущему статусу или NotConfigured
+                    trackedTask.Status = TaskStatus.Planned;
                     trackedTask.LastChangesOn = DateTime.UtcNow;
                 }
             }

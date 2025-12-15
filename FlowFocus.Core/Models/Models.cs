@@ -100,19 +100,19 @@ public class TaskItem : IAuditEntity
     public TaskItem? ParentTask { get; set; }
 
     /// <summary>Подзадачи</summary>
-    public List<TaskItem> Subtasks { get; set; } = new();
+    public List<TaskItem> Subtasks { get; set; } = [];
 
     /// <summary>Теги задачи</summary>
-    public List<TaskTag> Tags { get; set; } = new();
+    public List<TaskTag> Tags { get; set; } = [];
 
     /// <summary>Связи с другими задачами</summary>
-    public List<TaskRelation> Relations { get; set; } = new();
+    public List<TaskRelation> Relations { get; set; } = [];
 
     /// <summary>Обратные связи (задачи, которые ссылаются на эту)</summary>
-    public List<TaskRelation> InverseRelations { get; set; } = new();
+    public List<TaskRelation> InverseRelations { get; set; } = [];
 
     /// <summary>Правила повышения приоритета</summary>
-    public List<PriorityEscalation> PriorityEscalations { get; set; } = new();
+    public List<PriorityEscalation> PriorityEscalations { get; set; } = [];
 
     // === Вычисляемые свойства ===
     [NotMapped]

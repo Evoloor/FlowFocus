@@ -1,8 +1,3 @@
-@using FlowFocus.Core
-@using FlowFocus.Core.Enums
-@using FlowFocus.Core.Models
-@using FlowFocus.Core.Services
-@using FlowFocus.WebApp.Dialogs
 @inject ITaskRepository TaskRepo
 @inject ISettingsRepository SettingsRepo
 @inject IPriorityRepository PriorityRepo
@@ -434,16 +429,16 @@
     private bool _isFormValid;
     private TaskItem _task = new();
     private TaskItem? _originalTask; // Для отслеживания изменений
-    private List<PriorityLevel> _priorities = new();
-    private List<Tag> _suggestedTags = new();
-    private List<Tag> _selectedTags = new();
-    private HashSet<int> _selectedTagIds = new();
+    private List<PriorityLevel> _priorities = [];
+    private List<Tag> _suggestedTags = [];
+    private List<Tag> _selectedTags = [];
+    private HashSet<int> _selectedTagIds = [];
     private string _newTagInput = string.Empty;
-    private List<SubtaskDto> _subtasks = new();
+    private List<SubtaskDto> _subtasks = [];
     private string _newSubtaskTitle = string.Empty;
-    private List<RelationDto> _relations = new();
-    private List<EscalationDto> _escalations = new();
-    private List<TaskItem> _availableTasks = new();
+    private List<RelationDto> _relations = [];
+    private List<EscalationDto> _escalations = [];
+    private List<TaskItem> _availableTasks = [];
     private UserSettings? _settings;
 
     private int? _estimatedValue;
@@ -451,10 +446,10 @@
 
     private bool IsEdit => ExistingTask != null;
 
-    private static readonly (string Name, int Value)[] _weekDays = new[]
-    {
+    private static readonly (string Name, int Value)[] _weekDays =
+    [
         ("Пн", 1), ("Вт", 2), ("Ср", 4), ("Чт", 8), ("Пт", 16), ("Сб", 32), ("Вс", 64)
-    };
+    ];
 
     protected override void OnInitialized()
     {
@@ -568,7 +563,7 @@
     private async Task<IEnumerable<string>> SearchTags(string value, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(value))
-            return Enumerable.Empty<string>();
+            return [];
 
         var tags = TagRepo.SearchByName(value, 10);
         return tags.Select(t => t.Name);
@@ -766,6 +761,11 @@
             {
                 PlannerService.RecalculateAll(_settings);
             }
+            else if (RelationsChanged())
+            {
+                // Обновляем статусы блокировки при изменении связей
+                PlannerService.UpdateBlockedStatuses();
+            }
 
             NotificationService.NotifyTasksChanged();
             MudDialog.Close(DialogResult.Ok(_task));
@@ -957,6 +957,40 @@
         return _originalTask.PriorityId != _task.PriorityId ||
                _originalTask.UserAssignedDate != _task.UserAssignedDate ||
                _originalTask.ActualAssignedDate != _task.ActualAssignedDate;
+    }
+
+    /// <summary>
+    /// Проверка изменения связей
+    /// </summary>
+    private bool RelationsChanged()
+    {
+        if (_originalTask == null) return _relations.Any(); // Новая задача - проверяем наличие связей
+
+        var originalRelations = _originalTask.Relations
+            .Select(r => new { r.Type, r.TargetTaskId })
+            .OrderBy(r => r.TargetTaskId)
+            .ThenBy(r => r.Type)
+            .ToList();
+
+        var newRelations = _relations
+            .Where(r => r.TargetTask != null)
+            .Select(r => new { r.Type, TargetTaskId = r.TargetTask!.Id })
+            .OrderBy(r => r.TargetTaskId)
+            .ThenBy(r => r.Type)
+            .ToList();
+
+        if (originalRelations.Count != newRelations.Count) return true;
+
+        for (int i = 0; i < originalRelations.Count; i++)
+        {
+            if (originalRelations[i].Type != newRelations[i].Type ||
+                originalRelations[i].TargetTaskId != newRelations[i].TargetTaskId)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void Cancel()

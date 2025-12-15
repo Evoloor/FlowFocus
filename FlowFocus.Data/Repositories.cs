@@ -33,11 +33,12 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
         return tasks.Where(t => t.ParentTaskId == null);
     }
 
-    public List<TaskItem> GetTasksForDate(DateTime date, int dayStartHour)
+    public List<TaskItem> GetTasksForDate(DateTime date)
     {
         var all = GetAll();
         return FilterOutSubtasks(all)
-            .Where(t => t.ActualAssignedDate?.Date == date.Date &&
+            .Where(t => t.ActualAssignedDate != null &&
+                        t.ActualAssignedDate.Value.Date == date.Date &&
                         t.Status != TaskStatus.Completed &&
                         t.Status != TaskStatus.Irrelevant)
             .ToList();
@@ -46,18 +47,19 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
     public List<TaskItem> GetTodayTasks(int dayStartHour)
     {
         var logicalToday = DateHelper.GetLogicalToday(dayStartHour);
-        return GetTasksForDate(logicalToday, dayStartHour);
-    }
-
-    public List<TaskItem> GetTomorrowTasks(int dayStartHour)
-    {
-        var tomorrow = DateHelper.GetTomorrow(dayStartHour);
         var all = GetAll();
         return FilterOutSubtasks(all)
-            .Where(t => t.ActualAssignedDate?.Date == tomorrow.Date &&
+            .Where(t => t.ActualAssignedDate != null &&
+                        t.ActualAssignedDate.Value.Date == logicalToday.Date &&
                         t.Status != TaskStatus.Completed &&
                         t.Status != TaskStatus.Irrelevant)
             .ToList();
+    }
+
+    public List<TaskItem> GetTomorrowTasks()
+    {
+        var tomorrow = DateTime.Today.AddDays(1);
+        return GetTasksForDate(tomorrow);
     }
 
     public List<TaskItem> GetNotConfiguredTasks()
@@ -80,7 +82,7 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
         var all = GetAll();
         return FilterOutSubtasks(all)
             .Where(t => t.ActualAssignedDate != null &&
-                        t.ActualAssignedDate.Value.Date < logicalToday &&
+                        t.ActualAssignedDate.Value.Date < logicalToday.Date &&
                         t.Status != TaskStatus.Completed &&
                         t.Status != TaskStatus.Irrelevant)
             .ToList();
@@ -220,16 +222,21 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
     {
         var all = GetAll();
         return FilterOutSubtasks(all)
-            .Where(t => t.Interest >= AppConfig.MinProcrastinationInterest &&
-                        t.Status == TaskStatus.Planned &&
+            .Where(t => t is { Interest: >= AppConfig.MinProcrastinationInterest, Status: TaskStatus.Planned } &&
                         !excludeIds.Contains(t.Id))
             .OrderByDescending(t => t.Interest - Math.Sqrt(t.EffectivePriority?.Order ?? t.Priority?.Order ?? 99))
             .FirstOrDefault();
     }
 
-    public TaskItem? GetLeastPriorityTaskOfDay(int dayStartHour)
+    public TaskItem? GetLeastPriorityTaskOfDay()
     {
-        var todayTasks = GetTodayTasks(dayStartHour);
+        var today = DateTime.Today;
+        var all = GetAll();
+        var todayTasks = FilterOutSubtasks(all)
+            .Where(t => t.ActualAssignedDate != null &&
+                        t.ActualAssignedDate.Value.Date == today &&
+                        t.Status != TaskStatus.Completed &&
+                        t.Status != TaskStatus.Irrelevant);
         return todayTasks
             .Where(t => t.Status == TaskStatus.Planned)
             .OrderByDescending(t => t.EffectivePriority?.Order ?? t.Priority?.Order ?? 99)
@@ -346,7 +353,7 @@ public class TagRepository(StorageContext context) : CachedRepository<Tag>(conte
 
     public List<Tag> SearchByName(string query, int limit = 10)
     {
-        if (string.IsNullOrWhiteSpace(query)) return new List<Tag>();
+        if (string.IsNullOrWhiteSpace(query)) return [];
 
         return GetAll()
             .Where(t => t.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
@@ -364,12 +371,12 @@ public class TagRepository(StorageContext context) : CachedRepository<Tag>(conte
         });
     }
 
-    private static readonly string[] PastelColors = new[]
-    {
+    private static readonly string[] PastelColors =
+    [
         "#FFB3BA", "#FFDFBA", "#FFFFBA", "#BAFFC9", "#BAE1FF",
         "#E0BBE4", "#FEC8D8", "#D4F0F0", "#CCE2CB", "#B6CFB6",
         "#97C1A9", "#FCB9AA", "#FFDBCC", "#ECEAE4", "#A2E1DB"
-    };
+    ];
 
     private static string GeneratePastelColor()
     {

@@ -1,7 +1,3 @@
-@using FlowFocus.Core
-@using FlowFocus.Core.Enums
-@using FlowFocus.Core.Models
-@using FlowFocus.Core.Services
 @inject ITaskRepository TaskRepo
 @inject ISettingsRepository SettingsRepo
 @inject IPriorityRepository PriorityRepo
@@ -25,7 +21,7 @@
             <div class="task-card-header">
                 @* Чекбокс / Иконка статуса *@
                 <div class="task-status-control">
-                    @if (Task.Status == TaskStatus.Blocked)
+                    @if (Task.Status == TaskStatus.Blocked || Task.IsBlocked)
                     {
                         <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Color="Color.Warning" />
                     }
@@ -88,7 +84,7 @@
 
             @* Дата назначения / статус завершения *@
             <div class="task-date-row">
-                @if (Task.Status == TaskStatus.Completed && Task.CompletedDate != null)
+                @if (Task is { Status: TaskStatus.Completed, CompletedDate: not null })
                 {
                     <MudText Typo="Typo.caption" Class="text-muted">
                         Завершена @Task.CompletedDate.Value.ToString("dd.MM.yyyy")
@@ -214,7 +210,7 @@
                     @if (relatedTo.Any())
                     {
                         <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
-                            <MudExpansionPanel Text="@($"Связана с ({relatedTo.Count})")">
+                            <MudExpansionPanel Text="@($"Связана с ({relatedTo.Count})")" IsInitiallyExpanded="false">
                                 @foreach (var relation in relatedTo)
                                 {
                                     @if (relation.TargetTask != null)
@@ -229,7 +225,7 @@
                     @if (blocks.Any())
                     {
                         <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
-                            <MudExpansionPanel Text="@($"Блокирует ({blocks.Count})")">
+                            <MudExpansionPanel Text="@($"Блокирует ({blocks.Count})")" IsInitiallyExpanded="false">
                                 @foreach (var relation in blocks)
                                 {
                                     @if (relation.TargetTask != null)
@@ -244,7 +240,7 @@
                     @if (blockedBy.Any())
                     {
                         <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
-                            <MudExpansionPanel Text="@($"Блокирована ({blockedBy.Count}) задачами")">
+                            <MudExpansionPanel Text="@($"Блокирована ({blockedBy.Count})")" IsInitiallyExpanded="false">
                                 @foreach (var relation in blockedBy)
                                 {
                                     @if (relation.TargetTask != null)
@@ -595,7 +591,7 @@
             classes.Add("task-card-irrelevant");
         else if (Task.Status == TaskStatus.NotConfigured)
             classes.Add("task-card-not-configured");
-        else if (Task.Status == TaskStatus.Blocked)
+        else if (Task.Status == TaskStatus.Blocked || Task.IsBlocked)
             classes.Add("task-card-blocked");
 
         if (IsNested)
@@ -613,11 +609,11 @@
     {
         var styles = new List<string>();
 
-        if (Task.Status == TaskStatus.Blocked)
+        if (Task.Status == TaskStatus.Blocked || Task.IsBlocked)
         {
             var priority = Task.EffectivePriority ?? Task.Priority;
             var color = priority?.Color ?? "#808080";
-            styles.Add($"border: 3px solid {color}");
+            styles.Add($"border: 3px solid {color} !important");
         }
 
         return string.Join(";", styles);

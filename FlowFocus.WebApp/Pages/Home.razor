@@ -1,11 +1,6 @@
 ﻿@page "/"
-@using FlowFocus.Core
-@using FlowFocus.Core.Enums
-@using FlowFocus.Core.Models
-@using FlowFocus.WebApp.Components
 @inject ITaskRepository TaskRepo
 @inject ISettingsRepository SettingsRepo
-@inject IDialogService DialogService
 
 <PageTitle>FlowFocus - Сегодня</PageTitle>
 
@@ -28,7 +23,7 @@
           ShowPagination="false" />
 
 @code {
-    private List<TaskItem> _overdueTasks = new();
+    private List<TaskItem> _overdueTasks = [];
     private bool _showOverdueDialog;
     private UserSettings? _settings;
 

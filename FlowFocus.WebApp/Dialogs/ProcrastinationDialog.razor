@@ -1,8 +1,3 @@
-@using FlowFocus.Core
-@using FlowFocus.Core.Enums
-@using FlowFocus.Core.Models
-@using FlowFocus.Core.Services
-@using FlowFocus.WebApp.Components
 @inject ITaskRepository TaskRepo
 @inject ISettingsRepository SettingsRepo
 @inject INotificationService NotificationService
@@ -59,7 +54,7 @@
     IMudDialogInstance MudDialog { get; set; } = null!;
 
     private TaskItem? _currentTask;
-    private List<int> _excludedTaskIds = new();
+    private List<int> _excludedTaskIds = [];
     private UserSettings? _settings;
 
     protected override void OnInitialized()
@@ -99,7 +94,7 @@
         if (!hasSpace)
         {
             // Предлагаем вытеснить наименее приоритетную задачу
-            var leastPriorityTask = TaskRepo.GetLeastPriorityTaskOfDay(_settings.DayStartHour);
+            var leastPriorityTask = TaskRepo.GetLeastPriorityTaskOfDay();
 
             if (leastPriorityTask != null)
             {

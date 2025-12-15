@@ -1,6 +1,4 @@
-using FlowFocus.Core.Enums;
 using FlowFocus.Core.Models;
-using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Core;
 
@@ -19,14 +17,14 @@ public interface IRepository<T> where T : class
 /// </summary>
 public interface ITaskRepository : IRepository<TaskItem>
 {
-    /// <summary>Получить задачи на указанную дату (с учётом времени начала дня)</summary>
-    List<TaskItem> GetTasksForDate(DateTime date, int dayStartHour);
+    /// <summary>Получить задачи на указанную дату</summary>
+    List<TaskItem> GetTasksForDate(DateTime date);
 
     /// <summary>Получить задачи на сегодня</summary>
     List<TaskItem> GetTodayTasks(int dayStartHour);
 
     /// <summary>Получить задачи на завтра</summary>
-    List<TaskItem> GetTomorrowTasks(int dayStartHour);
+    List<TaskItem> GetTomorrowTasks();
 
     /// <summary>Получить ненастроенные задачи</summary>
     List<TaskItem> GetNotConfiguredTasks();
@@ -53,7 +51,7 @@ public interface ITaskRepository : IRepository<TaskItem>
     TaskItem? GetProcrastinationTask(List<int> excludeIds);
 
     /// <summary>Получить наименее приоритетную задачу дня</summary>
-    TaskItem? GetLeastPriorityTaskOfDay(int dayStartHour);
+    TaskItem? GetLeastPriorityTaskOfDay();
 }
 
 /// <summary>
@@ -146,9 +144,9 @@ public static class DateHelper
     /// Получить "логическую" дату с учётом времени начала дня.
     /// Если текущее время меньше времени начала дня, возвращает вчерашнюю дату.
     /// </summary>
-    public static DateTime GetLogicalDate(DateTime dateTime, int dayStartHour)
+    private static DateTime GetLogicalDate(DateTime dateTime, int dayStartHour)
     {
-        if (dateTime.Hour < dayStartHour)
+        if (dateTime.Hour > 0 && dateTime.Hour < dayStartHour)
         {
             return dateTime.Date.AddDays(-1);
         }
@@ -169,7 +167,9 @@ public static class DateHelper
     public static bool IsOverdue(DateTime? date, int dayStartHour)
     {
         if (date == null) return false;
-        return date.Value.Date < GetLogicalToday(dayStartHour);
+        var logicalDate = GetLogicalDate(date.Value, dayStartHour);
+        var logicalToday = GetLogicalToday(dayStartHour);
+        return logicalDate < logicalToday;
     }
 
     /// <summary>
