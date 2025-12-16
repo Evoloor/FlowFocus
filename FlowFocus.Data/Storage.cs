@@ -198,7 +198,7 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
         }
     }
 
-    private int GetNextId()
+    protected int GetNextId()
     {
         var maxId = Context.Set<T>()
             .AsNoTracking()

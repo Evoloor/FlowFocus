@@ -13,6 +13,40 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
 {
     protected override DbSet<TaskItem> GetDbSet() => Context.Tasks;
     
+    public override void Add(TaskItem entity)
+    {
+        lock (CacheLock)
+        {
+            if (entity.Id == 0)
+            {
+                entity.Id = GetNextId();
+            }
+
+            entity.LastChangesOn = DateTime.UtcNow;
+            
+            // Устанавливаем ParentTaskId для подзадач перед сохранением
+            if (entity.Subtasks.Any())
+            {
+                foreach (var subtask in entity.Subtasks)
+                {
+                    if (subtask.ParentTaskId == null)
+                    {
+                        subtask.ParentTaskId = entity.Id;
+                    }
+                    if (subtask.CreatedDate == default)
+                    {
+                        subtask.CreatedDate = DateTime.UtcNow;
+                    }
+                    subtask.Status = TaskStatus.Planned;
+                }
+            }
+            
+            GetDbSet().Add(entity);
+            Context.SaveChanges();
+            MarkDirty();
+        }
+    }
+    
     public override void Update(TaskItem entity)
     {
         lock (CacheLock)

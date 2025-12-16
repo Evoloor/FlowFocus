@@ -611,8 +611,8 @@
             _selectedTagIds = [];
         }
 
-        // Загружаем подзадачи
-        _subtasks = _task.Subtasks.Select(s => new SubtaskDto
+        // Загружаем подзадачи из оригинальной задачи (конструктор копирования не копирует навигационные свойства)
+        _subtasks = (ExistingTask?.Subtasks ?? []).Select(s => new SubtaskDto
         {
             Id = s.Id,
             Title = s.Title,
@@ -954,6 +954,9 @@
                 Tag = tag
             }).ToList();
 
+            // Синхронизируем подзадачи из DTO в модель задачи
+            SyncSubtasksToTask();
+
             if (IsEdit)
             {
                 TaskRepo.Update(_task);
@@ -1166,6 +1169,79 @@
         return _originalTask.PriorityId != _task.PriorityId ||
                _originalTask.UserAssignedDate != _task.UserAssignedDate ||
                _originalTask.ActualAssignedDate != _task.ActualAssignedDate;
+    }
+
+    /// <summary>
+    /// Синхронизация подзадач из DTO в модель задачи
+    /// </summary>
+    private void SyncSubtasksToTask()
+    {
+        // Фильтруем удаленные подзадачи
+        var activeSubtasks = _subtasks.Where(s => !s.IsDeleted).ToList();
+        
+        // Получаем существующие подзадачи из оригинальной задачи для получения полной информации
+        var existingSubtasksSource = ExistingTask?.Subtasks ?? [];
+        
+        // Список для результата
+        var resultSubtasks = new List<TaskItem>();
+        
+        foreach (var dto in activeSubtasks)
+        {
+            if (dto.Id.HasValue && dto.Id.Value > 0)
+            {
+                // Обновляем существующую подзадачу
+                var existing = existingSubtasksSource.FirstOrDefault(s => s.Id == dto.Id.Value);
+                if (existing != null)
+                {
+                    // Создаем новый объект с обновленными данными (репозиторий обновит отслеживаемую сущность)
+                    var updatedSubtask = new TaskItem(existing)
+                    {
+                        Title = dto.Title,
+                        IsFavorite = dto.IsFavorite,
+                        Interest = dto.Interest,
+                        Complexity = dto.Complexity,
+                        EstimatedMinutes = dto.EstimatedMinutes,
+                        Status = TaskStatus.Planned
+                    };
+                    resultSubtasks.Add(updatedSubtask);
+                }
+                else
+                {
+                    // Подзадача с ID не найдена - создаем новую с этим ID (не должно происходить в нормальном случае)
+                    var newSubtask = new TaskItem
+                    {
+                        Id = dto.Id.Value,
+                        Title = dto.Title,
+                        IsFavorite = dto.IsFavorite,
+                        Interest = dto.Interest,
+                        Complexity = dto.Complexity,
+                        EstimatedMinutes = dto.EstimatedMinutes,
+                        Status = TaskStatus.Planned,
+                        ParentTaskId = _task.Id > 0 ? _task.Id : null,
+                        CreatedDate = DateTime.UtcNow
+                    };
+                    resultSubtasks.Add(newSubtask);
+                }
+            }
+            else
+            {
+                // Создаем новую подзадачу
+                var newSubtask = new TaskItem
+                {
+                    Title = dto.Title,
+                    IsFavorite = dto.IsFavorite,
+                    Interest = dto.Interest,
+                    Complexity = dto.Complexity,
+                    EstimatedMinutes = dto.EstimatedMinutes,
+                    Status = TaskStatus.Planned,
+                    ParentTaskId = _task.Id > 0 ? _task.Id : null,
+                    CreatedDate = DateTime.UtcNow
+                };
+                resultSubtasks.Add(newSubtask);
+            }
+        }
+        
+        _task.Subtasks = resultSubtasks;
     }
 
     /// <summary>
