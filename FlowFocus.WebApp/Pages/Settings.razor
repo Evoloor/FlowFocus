@@ -296,7 +296,7 @@
         _priorityItems.Insert(info.IndexInZone, item);
 
         // Обновляем порядковые номера
-        for (int i = 0; i < _priorityItems.Count; i++)
+        for (var i = 0; i < _priorityItems.Count; i++)
         {
             _priorityItems[i].Order = i + 1;
         }
@@ -339,7 +339,7 @@
         _priorityItems.Remove(item);
 
         // Переупорядочиваем
-        for (int i = 0; i < _priorityItems.Count; i++)
+        for (var i = 0; i < _priorityItems.Count; i++)
         {
             _priorityItems[i].Order = i + 1;
         }
@@ -376,7 +376,7 @@
             SettingsRepo.UpdateSettings(_settings);
 
             // Обновляем Order у всех приоритетов согласно текущему порядку
-            for (int i = 0; i < _priorityItems.Count; i++)
+            for (var i = 0; i < _priorityItems.Count; i++)
             {
                 _priorityItems[i].Order = i + 1;
             }

@@ -41,6 +41,32 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
                 }
             }
             
+            // Устанавливаем SourceTaskId для связей перед сохранением
+            if (entity.Relations.Any())
+            {
+                foreach (var relation in entity.Relations)
+                {
+                    if (relation.SourceTaskId == 0)
+                    {
+                        relation.SourceTaskId = entity.Id;
+                    }
+                    relation.LastChangesOn = DateTime.UtcNow;
+                }
+            }
+            
+            // Устанавливаем TaskId для повышений приоритета перед сохранением
+            if (entity.PriorityEscalations.Any())
+            {
+                foreach (var escalation in entity.PriorityEscalations)
+                {
+                    if (escalation.TaskId == 0)
+                    {
+                        escalation.TaskId = entity.Id;
+                    }
+                    escalation.LastChangesOn = DateTime.UtcNow;
+                }
+            }
+            
             GetDbSet().Add(entity);
             Context.SaveChanges();
             MarkDirty();
@@ -414,7 +440,7 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
         var maskDay = currentDay == 0 ? 64 : (1 << (currentDay - 1));
 
         // Ищем следующий день недели из маски
-        for (int i = 1; i <= 7; i++)
+        for (var i = 1; i <= 7; i++)
         {
             var nextDay = (currentDay + i) % 7;
             var nextMaskDay = nextDay == 0 ? 64 : (1 << (nextDay - 1));
@@ -558,7 +584,7 @@ public class PriorityRepository(StorageContext context) : CachedRepository<Prior
         lock (CacheLock)
         {
             var priorities = Context.Priorities.ToList();
-            for (int i = 0; i < orderedIds.Count; i++)
+            for (var i = 0; i < orderedIds.Count; i++)
             {
                 var priority = priorities.FirstOrDefault(p => p.Id == orderedIds[i]);
                 if (priority != null)

@@ -957,6 +957,12 @@
             // Синхронизируем подзадачи из DTO в модель задачи
             SyncSubtasksToTask();
 
+            // Синхронизируем связи из DTO в модель задачи
+            SyncRelationsToTask();
+
+            // Синхронизируем повышения приоритета из DTO в модель задачи
+            SyncEscalationsToTask();
+
             if (IsEdit)
             {
                 TaskRepo.Update(_task);
@@ -1242,6 +1248,132 @@
         }
         
         _task.Subtasks = resultSubtasks;
+    }
+
+    /// <summary>
+    /// Синхронизация связей из DTO в модель задачи
+    /// </summary>
+    private void SyncRelationsToTask()
+    {
+        // Фильтруем связи с валидными целевыми задачами
+        var validRelations = _relations.Where(r => r.TargetTask != null).ToList();
+        
+        // Получаем существующие связи из оригинальной задачи для получения полной информации
+        var existingRelationsSource = ExistingTask?.Relations ?? [];
+        
+        // Список для результата
+        var resultRelations = new List<TaskRelation>();
+        
+        foreach (var dto in validRelations)
+        {
+            if (dto.Id.HasValue && dto.Id.Value > 0)
+            {
+                // Обновляем существующую связь
+                var existing = existingRelationsSource.FirstOrDefault(r => r.Id == dto.Id.Value);
+                if (existing != null)
+                {
+                    // Создаем новый объект с обновленными данными (используем только ID, не навигационные свойства)
+                    var updatedRelation = new TaskRelation
+                    {
+                        Id = existing.Id,
+                        SourceTaskId = _task.Id > 0 ? _task.Id : existing.SourceTaskId,
+                        TargetTaskId = dto.TargetTask!.Id,
+                        Type = dto.Type,
+                        LastChangesOn = DateTime.UtcNow
+                    };
+                    resultRelations.Add(updatedRelation);
+                }
+                else
+                {
+                    // Связь с ID не найдена - создаем новую
+                    var newRelation = new TaskRelation
+                    {
+                        SourceTaskId = _task.Id > 0 ? _task.Id : 0,
+                        TargetTaskId = dto.TargetTask!.Id,
+                        Type = dto.Type,
+                        LastChangesOn = DateTime.UtcNow
+                    };
+                    resultRelations.Add(newRelation);
+                }
+            }
+            else
+            {
+                // Создаем новую связь
+                var newRelation = new TaskRelation
+                {
+                    SourceTaskId = _task.Id > 0 ? _task.Id : 0,
+                    TargetTaskId = dto.TargetTask!.Id,
+                    Type = dto.Type,
+                    LastChangesOn = DateTime.UtcNow
+                };
+                resultRelations.Add(newRelation);
+            }
+        }
+        
+        _task.Relations = resultRelations;
+    }
+
+    /// <summary>
+    /// Синхронизация повышений приоритета из DTO в модель задачи
+    /// </summary>
+    private void SyncEscalationsToTask()
+    {
+        // Получаем существующие повышения из оригинальной задачи для получения полной информации
+        var existingEscalationsSource = ExistingTask?.PriorityEscalations ?? [];
+        
+        // Список для результата
+        var resultEscalations = new List<PriorityEscalation>();
+        
+        foreach (var dto in _escalations)
+        {
+            if (dto.Id.HasValue && dto.Id.Value > 0)
+            {
+                // Обновляем существующее повышение
+                var existing = existingEscalationsSource.FirstOrDefault(e => e.Id == dto.Id.Value);
+                if (existing != null)
+                {
+                    // Создаем новый объект с обновленными данными (используем только ID, не навигационные свойства)
+                    var updatedEscalation = new PriorityEscalation
+                    {
+                        Id = existing.Id,
+                        TaskId = _task.Id > 0 ? _task.Id : existing.TaskId,
+                        TargetPriorityId = dto.TargetPriorityId,
+                        EscalationDate = dto.EscalationDate ?? DateTime.Today,
+                        IsApplied = existing.IsApplied,
+                        LastChangesOn = DateTime.UtcNow
+                    };
+                    resultEscalations.Add(updatedEscalation);
+                }
+                else
+                {
+                    // Повышение с ID не найдено - создаем новое
+                    var newEscalation = new PriorityEscalation
+                    {
+                        TaskId = _task.Id > 0 ? _task.Id : 0,
+                        TargetPriorityId = dto.TargetPriorityId,
+                        EscalationDate = dto.EscalationDate ?? DateTime.Today,
+                        IsApplied = false,
+                        LastChangesOn = DateTime.UtcNow
+                    };
+                    resultEscalations.Add(newEscalation);
+                }
+            }
+            else
+            {
+                // Создаем новое повышение
+                var newEscalation = new PriorityEscalation
+                {
+                    TaskId = _task.Id > 0 ? _task.Id : 0,
+                    TargetPriorityId = dto.TargetPriorityId,
+                    EscalationDate = dto.EscalationDate ?? DateTime.Today,
+                    IsApplied = false,
+                    LastChangesOn = DateTime.UtcNow
+                };
+                resultEscalations.Add(newEscalation);
+            }
+        }
+        
+        _task.PriorityEscalations = resultEscalations;
     }
 
     /// <summary>
