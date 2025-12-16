@@ -294,10 +294,24 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
         var task = GetById(taskId);
         if (task == null) return;
 
+        // Для просроченных задач дата завершения должна быть равна дате назначения
+        // Это важно для правильного расчета следующей даты повторения
+        var completedDate = task.ActualAssignedDate ?? task.UserAssignedDate;
+        if (completedDate != null && completedDate.Value.Date < DateTime.UtcNow.Date)
+        {
+            // Задача просрочена - используем дату назначения
+            completedDate = completedDate.Value.Date;
+        }
+        else
+        {
+            // Задача не просрочена - используем текущую дату
+            completedDate = DateTime.UtcNow;
+        }
+
         UpdatePartial(taskId, t =>
         {
             t.Status = TaskStatus.Completed;
-            t.CompletedDate = DateTime.UtcNow;
+            t.CompletedDate = completedDate;
         });
 
         // Создаём следующую копию для повторяющихся задач
