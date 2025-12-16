@@ -403,6 +403,14 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
         });
     }
 
+    public void RestoreFromIrrelevant(int taskId)
+    {
+        UpdatePartial(taskId, task =>
+        {
+            task.Status = TaskStatus.Planned;
+        });
+    }
+
     public TaskItem? GetProcrastinationTask(List<int> excludeIds)
     {
         var all = GetAll();

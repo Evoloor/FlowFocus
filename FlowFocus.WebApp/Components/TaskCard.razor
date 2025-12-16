@@ -270,9 +270,17 @@
                 <div class="task-actions">
                     <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
                                    OnClick="@OpenEditDialog" Title="Редактировать" />
-                    <MudIconButton Icon="@Icons.Material.Filled.DoNotDisturb" Size="Size.Small"
-                                   OnClick="@MarkIrrelevant" Title="Сделать неактуальным"
-                                   Disabled="@(Task.Status == TaskStatus.Irrelevant || Task.Status == TaskStatus.Completed)" />
+                    @if (Task.Status == TaskStatus.Irrelevant)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Restore" Size="Size.Small"
+                                       OnClick="@RestoreFromIrrelevant" Title="Вернуть из неактуальных" />
+                    }
+                    else
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.DoNotDisturb" Size="Size.Small"
+                                       OnClick="@MarkIrrelevant" Title="Сделать неактуальным"
+                                       Disabled="@(Task.Status == TaskStatus.Completed)" />
+                    }
                     <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
                                    OnClick="@DeleteTask" Title="Удалить" />
                 </div>
@@ -724,6 +732,14 @@
             NotificationService.NotifyTasksChanged();
             await OnTaskChanged.InvokeAsync();
         }
+    }
+
+    private async Task RestoreFromIrrelevant()
+    {
+        TaskRepo.RestoreFromIrrelevant(Task.Id);
+        Snackbar.Add("Задача возвращена в актуальные", Severity.Success);
+        NotificationService.NotifyTasksChanged();
+        await OnTaskChanged.InvokeAsync();
     }
 
     private async Task DeleteTask()

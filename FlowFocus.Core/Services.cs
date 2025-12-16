@@ -47,6 +47,9 @@ public interface ITaskRepository : IRepository<TaskItem>
     /// <summary>Пометить задачу как неактуальную</summary>
     void MarkIrrelevant(int taskId);
 
+    /// <summary>Вернуть задачу из неактуальных в актуальные</summary>
+    void RestoreFromIrrelevant(int taskId);
+
     /// <summary>Получить интересную задачу для прокрастинации</summary>
     TaskItem? GetProcrastinationTask(List<int> excludeIds);
 
