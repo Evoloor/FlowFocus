@@ -168,18 +168,15 @@
                                 <div class="tag-search-results mt-2">
                                     <MudText Typo="Typo.caption" Class="mb-1 text-muted">Найдено:</MudText>
                                     <div class="search-result-tags">
-                                        @foreach (var tag in _tagSearchResults)
+                                        @foreach (var tag in _tagSearchResults.Where(tag => !_selectedTagIds.Contains(tag.Id)))
                                         {
-                                            @if (!_selectedTagIds.Contains(tag.Id))
-                                            {
-                                                <MudChip T="string" Size="Size.Small"
-                                                         Variant="Variant.Outlined"
-                                                         Style="@($"background-color: {tag.BackgroundColor}40; color: #333; border-color: {tag.BackgroundColor}; cursor: pointer;")"
-                                                         OnClick="@(() => SelectExistingTag(tag))"
-                                                         Class="search-result-chip">
-                                                    @tag.Name
-                                                </MudChip>
-                                            }
+                                            <MudChip T="string" Size="Size.Small"
+                                                     Variant="Variant.Outlined"
+                                                     Style="@($"background-color: {tag.BackgroundColor}40; color: #333; border-color: {tag.BackgroundColor}; cursor: pointer;")"
+                                                     OnClick="@(() => SelectExistingTag(tag))"
+                                                     Class="search-result-chip">
+                                                @tag.Name
+                                            </MudChip>
                                         }
                                     </div>
                                 </div>
@@ -561,7 +558,7 @@
         _settings = SettingsRepo.GetUserSettings();
         _priorities = PriorityRepo.GetAllOrdered();
         // Получаем предлагаемые теги: последний использованный + популярные (до 5)
-        _suggestedTags = TagSessionService.GetSuggestedTags(5);
+        _suggestedTags = TagSessionService.GetSuggestedTags();
         _availableTasks = TaskRepo.GetTasksForAutocomplete();
 
         if (ExistingTask != null)
@@ -674,14 +671,14 @@
                           .ToList();
     }
 
-    private async Task<IEnumerable<string>> SearchTags(string value, CancellationToken cancellationToken)
+    private Task<IEnumerable<string>> SearchTags(string value, CancellationToken cancellationToken)
     {
         // Этот метод больше не используется, но оставлен для совместимости
         if (string.IsNullOrWhiteSpace(value))
-            return [];
+            return Task.FromResult<IEnumerable<string>>([]);
 
-        var tags = TagRepo.SearchByName(value, 10);
-        return tags.Select(t => t.Name);
+        var tags = TagRepo.SearchByName(value);
+        return Task.FromResult(tags.Select(t => t.Name));
     }
     
     private bool IsAddTagButtonDisabled 
@@ -707,19 +704,19 @@
 
         // Ищем теги по введенному тексту (даже если это один символ)
         // Поиск работает по мере ввода для авто-дополнения
-        _tagSearchResults = TagRepo.SearchByName(_newTagInput, 10);
+        _tagSearchResults = TagRepo.SearchByName(_newTagInput);
         await InvokeAsync(StateHasChanged);
     }
 
-    private async Task<IEnumerable<TaskItem>> SearchTasks(string value, CancellationToken cancellationToken)
+    private Task<IEnumerable<TaskItem>> SearchTasks(string value, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(value))
-            return _availableTasks.Take(10);
+            return Task.FromResult(_availableTasks.Take(10));
 
-        return _availableTasks
+        return Task.FromResult(_availableTasks
             .Where(t => t.Title.Contains(value, StringComparison.OrdinalIgnoreCase))
             .Where(t => t.Id != _task.Id) // Исключаем текущую задачу
-            .Take(10);
+            .Take(10));
     }
 
     private async Task AddTag(Tag tag)
@@ -744,13 +741,9 @@
         if (_suggestedTags.Count < 5)
         {
             var popular = TagRepo.GetPopularTags(10);
-            foreach (var tag in popular)
+            foreach (var tag in popular.TakeWhile(tag => _suggestedTags.Count < 5).Where(tag => !_selectedTagIds.Contains(tag.Id) && _suggestedTags.All(t => t.Id != tag.Id)))
             {
-                if (_suggestedTags.Count >= 5) break;
-                if (!_selectedTagIds.Contains(tag.Id) && !_suggestedTags.Any(t => t.Id == tag.Id))
-                {
-                    _suggestedTags.Add(tag);
-                }
+                _suggestedTags.Add(tag);
             }
         }
         
@@ -882,7 +875,7 @@
     private void AddEscalation()
     {
         var available = GetAvailablePrioritiesForEscalation()
-            .Where(p => !_escalations.Any(e => e.TargetPriorityId == p.Id))
+            .Where(p => _escalations.All(e => e.TargetPriorityId != p.Id))
             .FirstOrDefault();
 
         if (available == null) return;
@@ -1193,7 +1186,7 @@
         
         foreach (var dto in activeSubtasks)
         {
-            if (dto.Id.HasValue && dto.Id.Value > 0)
+            if (dto.Id is > 0)
             {
                 // Обновляем существующую подзадачу
                 var existing = existingSubtasksSource.FirstOrDefault(s => s.Id == dto.Id.Value);
@@ -1266,7 +1259,7 @@
         
         foreach (var dto in validRelations)
         {
-            if (dto.Id.HasValue && dto.Id.Value > 0)
+            if (dto.Id is > 0)
             {
                 // Обновляем существующую связь
                 var existing = existingRelationsSource.FirstOrDefault(r => r.Id == dto.Id.Value);
@@ -1326,7 +1319,7 @@
         
         foreach (var dto in _escalations)
         {
-            if (dto.Id.HasValue && dto.Id.Value > 0)
+            if (dto.Id is > 0)
             {
                 // Обновляем существующее повышение
                 var existing = existingEscalationsSource.FirstOrDefault(e => e.Id == dto.Id.Value);
@@ -1398,7 +1391,7 @@
 
         if (originalRelations.Count != newRelations.Count) return true;
 
-        for (int i = 0; i < originalRelations.Count; i++)
+        for (var i = 0; i < originalRelations.Count; i++)
         {
             if (originalRelations[i].Type != newRelations[i].Type ||
                 originalRelations[i].TargetTaskId != newRelations[i].TargetTaskId)

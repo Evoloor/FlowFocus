@@ -194,7 +194,7 @@
                     @if (Task.Subtasks.Any())
                     {
                         <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
-                            <MudExpansionPanel Text="@($"({Task.Subtasks.Count}) подзадач")" IsInitiallyExpanded="true">
+                            <MudExpansionPanel Text="@($"({Task.Subtasks.Count}) подзадач")" Expanded="true">
                                 @foreach (var subtask in Task.Subtasks)
                                 {
                                     <TaskCard Task="subtask" IsNested="true" DisplayMode="DisplayMode.Compact" />
