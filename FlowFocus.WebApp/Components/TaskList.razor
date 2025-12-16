@@ -1,5 +1,7 @@
 @inject ITaskRepository TaskRepo
 @inject ISettingsRepository SettingsRepo
+@inject INotificationService NotificationService
+@implements IDisposable
 
 <div class="task-list">
     @* Заголовок и элементы управления *@
@@ -260,6 +262,19 @@
     {
         _settings = SettingsRepo.GetUserSettings();
         RefreshTasks();
+        NotificationService.OnTasksChanged += OnTasksChanged;
+    }
+
+    protected override void OnParametersSet()
+    {
+        // Обновляем при навигации (когда параметры изменились)
+        RefreshTasks();
+    }
+
+    private void OnTasksChanged()
+    {
+        RefreshTasks();
+        InvokeAsync(StateHasChanged);
     }
 
     private void RefreshTasks()
@@ -281,6 +296,9 @@
             .DistinctBy(t => t.Id)
             .OrderByDescending(t => t.UsageCount)
             .ToList();
+
+        // Сбрасываем страницу пагинации при обновлении
+        _currentPage = 1;
 
         StateHasChanged();
     }
@@ -430,5 +448,10 @@
     private string GetContentClass()
     {
         return _displayMode == DisplayMode.Grid ? "task-list-content-grid" : string.Empty;
+    }
+
+    public void Dispose()
+    {
+        NotificationService.OnTasksChanged -= OnTasksChanged;
     }
 }

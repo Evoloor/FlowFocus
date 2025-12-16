@@ -66,7 +66,7 @@ public class PlannerService(
     {
         var tasks = taskRepository.GetAll()
             .Where(t => t.ParentTaskId == null) // Исключаем подзадачи
-            .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant)
+            .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
             .Where(t => t.UserAssignedDate == null) // Только задачи без ручной даты
             .ToList();
 
@@ -108,7 +108,7 @@ public class PlannerService(
         // Обрабатываем задачи с ручной датой
         var fixedDateTasks = taskRepository.GetAll()
             .Where(t => t.ParentTaskId == null)
-            .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant)
+            .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
             .Where(t => t.UserAssignedDate != null)
             .ToList();
 
