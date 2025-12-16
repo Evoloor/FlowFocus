@@ -109,6 +109,24 @@
     {
         if (_settings == null) return;
 
+        // Получаем актуальный список просроченных задач
+        var dayStartHour = _settings.DayStartHour;
+        var overdueTasks = TaskRepo.GetOverdueTasks(dayStartHour);
+
+        // Сбрасываем даты просроченных задач, чтобы они были перераспределены
+        foreach (var overdueTask in overdueTasks)
+        {
+            var task = TaskRepo.GetById(overdueTask.Id);
+            if (task != null)
+            {
+                // Сбрасываем обе даты, чтобы задача была перераспределена по алгоритму
+                task.ActualAssignedDate = null;
+                task.UserAssignedDate = null;
+                TaskRepo.Update(task);
+            }
+        }
+
+        // Перераспределяем все задачи согласно алгоритму
         PlannerService.RecalculateAll(_settings);
         Snackbar.Add("Задачи перераспределены", Severity.Success);
 
