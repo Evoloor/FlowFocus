@@ -86,7 +86,7 @@
     </MudText>
 
     <MudDropContainer T="PriorityItem" Items="_priorityItems"
-                      ItemsSelector="@((item, zone) => true)"
+                      ItemsSelector="@((_, _) => true)"
                       ItemDropped="@OnPriorityDropped"
                       Class="priority-container">
         <ChildContent>
@@ -107,7 +107,7 @@
                             <div class="pa-2">
                                 <MudText Typo="Typo.caption" Class="mb-2">Выберите цвет:</MudText>
                                 <div class="color-palette">
-                                    @foreach (var color in _colorPalette)
+                                    @foreach (var color in ColorPalette)
                                     {
                                         <div class="color-swatch @(context.Color == color ? "selected" : "")"
                                              style="background-color: @color"
@@ -258,7 +258,7 @@
     private List<PriorityItem> _priorityItems = [];
     private int _dailyTimeHours;
 
-    private static readonly string[] _colorPalette =
+    private static readonly string[] ColorPalette =
     [
         "#FF4444", "#FF8C00", "#FFD700", "#4CAF50", "#2196F3",
         "#9C27B0", "#E91E63", "#00BCD4", "#795548", "#607D8B",
@@ -309,7 +309,7 @@
 
     private void AddPriority()
     {
-        var newId = _priorityItems.Any() ? _priorityItems.Max(p => p.Id) + 1 : 1;
+        int newId;
         // Если есть пустые ID из новых, используем отрицательные
         if (_priorityItems.Any(p => p.Id <= 0))
         {
@@ -320,7 +320,7 @@
             newId = -1;
         }
 
-        var unusedColor = _colorPalette.FirstOrDefault(c => !_priorityItems.Any(p => p.Color == c)) ?? "#808080";
+        var unusedColor = ColorPalette.FirstOrDefault(c => _priorityItems.All(p => p.Color != c)) ?? "#808080";
 
         _priorityItems.Add(new PriorityItem
         {
