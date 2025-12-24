@@ -1,0 +1,134 @@
+@using FlowFocus.Blazor.Dialogs
+@inject ITaskRepository TaskRepo
+@inject ISettingsRepository SettingsRepo
+@inject IPlannerService PlannerService
+@inject INotificationService NotificationService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudPaper Class="quick-add-panel" Elevation="2">
+    <div class="quick-add-content">
+        <MudTextField T="string" @bind-Value="_taskTitle"
+                      @key="_fieldKey"
+                      Placeholder="Введите название задачи..."
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      Immediate="true"
+                      Class="quick-add-input"
+                      OnKeyDown="@OnKeyDown" />
+
+        <MudTooltip Text="Быстрое добавление (Enter)">
+            <MudIconButton Icon="@Icons.Material.Filled.Check"
+                           Color="Color.Success"
+                           Size="Size.Medium"
+                           OnClick="@QuickAdd"
+                           Disabled="@(!IsValid)" />
+        </MudTooltip>
+
+        <MudTooltip Text="Добавить с настройками">
+            <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                           Color="Color.Primary"
+                           Size="Size.Medium"
+                           OnClick="@OpenEditDialog"
+                           Disabled="@(!IsValid)" />
+        </MudTooltip>
+    </div>
+</MudPaper>
+
+<style>
+    .quick-add-panel {
+        padding: 12px 16px;
+        background: var(--mud-palette-surface);
+        border-radius: 8px;
+    }
+
+    .quick-add-content {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .quick-add-input {
+        flex: 1;
+    }
+</style>
+
+@code {
+    private string _taskTitle = string.Empty;
+    private int _fieldKey = 0;
+
+    private bool IsValid => !string.IsNullOrWhiteSpace(_taskTitle?.Trim());
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && IsValid)
+        {
+            await QuickAdd();
+        }
+        else if (e.Key == "Escape")
+        {
+            _taskTitle = string.Empty;
+            _fieldKey++; // Принудительно пересоздаём компонент для очистки поля
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task QuickAdd()
+    {
+        if (!IsValid) return;
+
+        var task = new TaskItem
+        {
+            Title = _taskTitle.Trim(),
+            Status = TaskStatus.NotConfigured,
+            CreatedDate = DateTime.UtcNow
+        };
+
+        TaskRepo.Add(task);
+        Snackbar.Add("Задача добавлена в ненастроенные", Severity.Success);
+
+        _taskTitle = string.Empty;
+        _fieldKey++; // Принудительно пересоздаём компонент для очистки поля
+        await InvokeAsync(StateHasChanged);
+
+        // Проверяем авто-распределение
+        var settings = SettingsRepo.GetUserSettings();
+        if (settings.AutoDistributeEnabled)
+        {
+            PlannerService.RecalculateAll(settings);
+        }
+
+        NotificationService.NotifyTasksChanged();
+    }
+
+    private async Task OpenEditDialog()
+    {
+        var parameters = new DialogParameters<TaskEditDialog>();
+
+        // Если уже введено название, передаём его в диалог
+        if (!string.IsNullOrWhiteSpace(_taskTitle))
+        {
+            parameters.Add(x => x.InitialTitle, _taskTitle.Trim());
+        }
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true
+        };
+
+        var dialog = await DialogService.ShowAsync<TaskEditDialog>("Новая задача", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            _taskTitle = string.Empty;
+            _fieldKey++; // Принудительно пересоздаём компонент для очистки поля
+            await InvokeAsync(StateHasChanged);
+            Snackbar.Add("Задача создана", Severity.Success);
+            NotificationService.NotifyTasksChanged();
+        }
+    }
+}
+

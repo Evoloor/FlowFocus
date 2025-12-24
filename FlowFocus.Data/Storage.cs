@@ -14,6 +14,14 @@ public class StorageContext : DbContext
     public DbSet<PriorityEscalation> PriorityEscalations { get; set; } = null!;
     public DbSet<UserSettings> Settings { get; set; } = null!;
 
+    public StorageContext()
+    {
+    }
+
+    public StorageContext(DbContextOptions<StorageContext> options) : base(options)
+    {
+    }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         if (!optionsBuilder.IsConfigured)

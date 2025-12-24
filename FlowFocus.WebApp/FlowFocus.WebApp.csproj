@@ -35,22 +35,25 @@
     <_ContentIncludedByDefault Remove="Components\Pages\Settings.razor" />
     <_ContentIncludedByDefault Remove="Components\Pages\Tomorrow.razor" />
     <_ContentIncludedByDefault Remove="Components\Pages\Unconfigured.razor" />
+    <_ContentIncludedByDefault Remove="Components\QuickAddTask.razor" />
+    <_ContentIncludedByDefault Remove="Components\TaskCard.razor" />
+    <_ContentIncludedByDefault Remove="Components\TaskList.razor" />
+    <_ContentIncludedByDefault Remove="Dialogs\ConfirmDialog.razor" />
+    <_ContentIncludedByDefault Remove="Dialogs\OverdueTasksDialog.razor" />
+    <_ContentIncludedByDefault Remove="Dialogs\ProcrastinationDialog.razor" />
+    <_ContentIncludedByDefault Remove="Dialogs\SubtaskEditDialog.razor" />
+    <_ContentIncludedByDefault Remove="Dialogs\TaskEditDialog.razor" />
+    <_ContentIncludedByDefault Remove="Dialogs\UnblockedTasksDialog.razor" />
+    <_ContentIncludedByDefault Remove="Layout\MainLayout.razor" />
+    <_ContentIncludedByDefault Remove="Layout\NavMenu.razor" />
+    <_ContentIncludedByDefault Remove="Pages\Home.razor" />
+    <_ContentIncludedByDefault Remove="Pages\NotConfigured.razor" />
   </ItemGroup>
 
 
   <ItemGroup>
+    <ProjectReference Include="..\FlowFocus.Blazor\FlowFocus.Blazor.csproj" />
     <ProjectReference Include="..\FlowFocus.Core\FlowFocus.Core.csproj" />
     <ProjectReference Include="..\FlowFocus.Data\FlowFocus.Data.csproj" />
-  </ItemGroup>
-
-
-  <ItemGroup>
-    <AdditionalFiles Include="Layout\MainLayout.razor" />
-    <AdditionalFiles Include="Layout\NavMenu.razor" />
-    <AdditionalFiles Include="Pages\AllTasks.razor" />
-    <AdditionalFiles Include="Pages\Home.razor" />
-    <AdditionalFiles Include="Pages\NotConfigured.razor" />
-    <AdditionalFiles Include="Pages\Settings.razor" />
-    <AdditionalFiles Include="Pages\Tomorrow.razor" />
   </ItemGroup>
 </Project>

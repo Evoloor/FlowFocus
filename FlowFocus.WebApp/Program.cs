@@ -1,6 +1,7 @@
 using FlowFocus.Core;
 using FlowFocus.Core.Services;
 using FlowFocus.Data;
+using FlowFocus.Blazor.Layout;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
 
@@ -27,7 +28,8 @@ app.UseHttpsRedirection();
 app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<FlowFocus.WebApp.App>()
-    .AddInteractiveServerRenderMode();
+    .AddInteractiveServerRenderMode()
+    .AddAdditionalAssemblies(typeof(MainLayout).Assembly);
 
 // Кастомное заполнение БД
 app.Services.InitializeDatabase();

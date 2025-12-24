@@ -1,0 +1,48 @@
+﻿@page "/"
+@using FlowFocus.Blazor.Components
+@inject ITaskRepository TaskRepo
+@inject ISettingsRepository SettingsRepo
+
+<PageTitle>FlowFocus - Сегодня</PageTitle>
+
+@* Диалог просроченных задач *@
+@if (_showOverdueDialog && _overdueTasks.Any())
+{
+    <OverdueTasksDialog OverdueTasks="_overdueTasks"
+                        OnClose="@(() => _showOverdueDialog = false)"
+                        OnTasksUpdated="@RefreshTasks" />
+}
+
+<TaskList Title="Задачи на сегодня"
+          DefaultFilter="@(new TaskListFilter { Type = TaskListFilterType.Today })"
+          ShowTitle="true"
+          ShowSearch="true"
+          ShowSortDropdown="true"
+          ShowDisplayMode="true"
+          ShowTags="true"
+          ShowFilters="false"
+          ShowPagination="false" />
+
+@code {
+    private List<TaskItem> _overdueTasks = [];
+    private bool _showOverdueDialog;
+    private UserSettings? _settings;
+
+    protected override void OnInitialized()
+    {
+        _settings = SettingsRepo.GetUserSettings();
+        CheckOverdueTasks();
+    }
+
+    private void CheckOverdueTasks()
+    {
+        _overdueTasks = TaskRepo.GetOverdueTasks(_settings?.DayStartHour ?? 5);
+        _showOverdueDialog = _overdueTasks.Any();
+    }
+
+    private void RefreshTasks()
+    {
+        CheckOverdueTasks();
+        StateHasChanged();
+    }
+}

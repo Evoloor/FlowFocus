@@ -1,0 +1,36 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\FlowFocus.Core\FlowFocus.Core.csproj" />
+      <ProjectReference Include="..\FlowFocus.Data\FlowFocus.Data.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <AdditionalFiles Include="Components\QuickAddTask.razor" />
+      <AdditionalFiles Include="Components\TaskCard.razor" />
+      <AdditionalFiles Include="Components\TaskList.razor" />
+      <AdditionalFiles Include="Dialogs\ConfirmDialog.razor" />
+      <AdditionalFiles Include="Dialogs\OverdueTasksDialog.razor" />
+      <AdditionalFiles Include="Dialogs\ProcrastinationDialog.razor" />
+      <AdditionalFiles Include="Dialogs\SubtaskEditDialog.razor" />
+      <AdditionalFiles Include="Dialogs\TaskEditDialog.razor" />
+      <AdditionalFiles Include="Dialogs\UnblockedTasksDialog.razor" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="MudBlazor" Version="8.15.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Update="_Imports.razor">
+        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      </Content>
+    </ItemGroup>
+
+</Project>

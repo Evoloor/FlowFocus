@@ -1,6 +1,22 @@
-﻿<Router AppAssembly="typeof(Program).Assembly">
+﻿@using FlowFocus.Blazor.Layout
+@using FlowFocus.WebApp
+
+@code {
+    private static readonly System.Reflection.Assembly[] AdditionalAssemblies = new[] 
+    { 
+        typeof(MainLayout).Assembly
+    };
+}
+
+<Router AppAssembly="@AppAssembly.Value" AdditionalAssemblies="@AdditionalAssemblies">
     <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+        <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
+    <NotFound>
+        <PageTitle>Not found</PageTitle>
+        <LayoutView Layout="typeof(MainLayout)">
+            <p role="alert">Sorry, there's nothing at this address.</p>
+        </LayoutView>
+    </NotFound>
 </Router>

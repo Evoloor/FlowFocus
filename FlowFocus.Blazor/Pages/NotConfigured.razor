@@ -1,0 +1,14 @@
+@page "/not-configured"
+@using FlowFocus.Blazor.Components
+
+<PageTitle>FlowFocus - Ненастроенные</PageTitle>
+
+<TaskList Title="Ненастроенные задачи"
+          DefaultFilter="@(new TaskListFilter { Type = TaskListFilterType.NotConfigured })"
+          ShowTitle="true"
+          ShowSearch="true"
+          ShowSortDropdown="false"
+          ShowDisplayMode="true"
+          ShowTags="false"
+          ShowFilters="false"
+          ShowPagination="false" />
