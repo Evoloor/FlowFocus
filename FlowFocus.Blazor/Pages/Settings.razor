@@ -86,6 +86,7 @@
     </MudText>
 
     <MudDropContainer T="PriorityItem" Items="_priorityItems"
+                      @ref="_dropContainer"
                       ItemsSelector="@((_, _) => true)"
                       ItemDropped="@OnPriorityDropped"
                       Class="priority-container">
@@ -266,6 +267,8 @@
         "#FFEB3B", "#009688", "#3F51B5", "#CDDC39", "#FF9800"
     ];
 
+    private MudDropContainer<PriorityItem> _dropContainer;
+
     protected override void OnInitialized()
     {
         LoadSettings();
@@ -330,6 +333,7 @@
             Order = _priorityItems.Count + 1,
             IsSystem = false
         });
+        _dropContainer?.Refresh();
     }
 
     private void DeletePriority(PriorityItem item)
@@ -349,6 +353,8 @@
         {
             PriorityRepo.Delete(item.Id);
         }
+        
+        _dropContainer?.Refresh();
     }
 
     private void RecalculateAll()
