@@ -74,8 +74,26 @@
 </MudPaper>
 
 <MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudText Typo="Typo.h6" Class="mb-3">Приоритет по умолчанию</MudText>
+
+    <MudSelect T="int?" @bind-Value="_settings.DefaultPriorityId"
+               Label="Приоритет по умолчанию для новых задач"
+               Variant="Variant.Outlined"
+               Clearable="true"
+               Class="mb-4">
+        @foreach (var priority in _priorityItems)
+        {
+            <MudSelectItem T="int?" Value="priority.Id">
+                <div class="priority-option">
+                    <div class="priority-color" style="background-color: @priority.Color"></div>
+                    <span>@priority.Name</span>
+                </div>
+            </MudSelectItem>
+        }
+    </MudSelect>
+
     <div class="d-flex align-center mb-3">
-        <MudText Typo="Typo.h6">Приоритеты</MudText>
+        <MudText Typo="Typo.h6">Список приоритетов</MudText>
         <MudTooltip Text="Перетаскивайте строки для изменения порядка. Верхние приоритеты важнее.">
             <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="ml-2" Color="Color.Info" />
         </MudTooltip>
@@ -190,6 +208,18 @@
 </div>
 
 <style>
+    .priority-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .priority-color {
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+    }
+
     .priority-container {
         min-height: 100px;
     }
@@ -371,6 +401,7 @@
         _settings.DailyComplexityLimit = 100;
         _dailyTimeHours = 8;
         _settings.AutoDistributeEnabled = false;
+        _settings.DefaultPriorityId = null; // Сбрасываем приоритет по умолчанию
         Snackbar.Add("Настройки сброшены к значениям по умолчанию", Severity.Info);
     }
 

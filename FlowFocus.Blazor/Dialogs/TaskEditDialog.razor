@@ -574,9 +574,11 @@
             {
                 Title = InitialTitle ?? string.Empty,
                 Status = TaskStatus.Planned,
-                CreatedDate = DateTime.UtcNow
+                CreatedDate = DateTime.UtcNow,
+                PriorityId = _settings?.DefaultPriorityId
             };
             _originalTask = null;
+            StateHasChanged();
         }
 
         // Конвертируем время
