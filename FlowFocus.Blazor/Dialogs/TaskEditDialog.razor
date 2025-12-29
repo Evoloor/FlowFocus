@@ -59,8 +59,8 @@
                 @if (!IsSubtaskMode)
                 {
                     <MudItem xs="12" sm="6">
-                        <MudSelect T="int?" @Value="_task.PriorityId"
-                                   ValueChanged="@OnPriorityChanged"
+                        <MudSelect T="int?" @bind-Value="_task.PriorityId"
+                                   @bind-Value:after="@OnAfterPriorityChanged"
                                    Label="Приоритет"
                                    Variant="Variant.Outlined"
                                    Clearable="true"
@@ -851,9 +851,8 @@
         _relations.Add(new RelationDto { Type = RelationType.RelatedTo });
     }
 
-    private void OnPriorityChanged(int? newPriorityId)
+    private void OnAfterPriorityChanged()
     {
-        _task.PriorityId = newPriorityId;
         // Автоматически удаляем рудиментные повышения при изменении приоритета
         CleanupRedundantEscalations();
         StateHasChanged();
