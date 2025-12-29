@@ -148,10 +148,9 @@
                                   Label="Название"
                                   Variant="Variant.Outlined"
                                   Margin="Margin.Dense"
-                                  Disabled="@context.IsSystem"
                                   Class="flex-grow-1" />
 
-                    @if (!context.IsSystem)
+                    @if (_priorityItems.Count > 1)
                     {
                         <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                        Size="Size.Small"
@@ -161,7 +160,7 @@
                     }
                     else
                     {
-                        <MudTooltip Text="Системный приоритет нельзя удалить">
+                        <MudTooltip Text="Нельзя удалить последний приоритет">
                             <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Color="Color.Default" />
                         </MudTooltip>
                     }
@@ -368,7 +367,16 @@
 
     private void DeletePriority(PriorityItem item)
     {
-        if (item.IsSystem) return;
+        if (_priorityItems.Count <= 1)
+        {
+            Snackbar.Add("Нельзя удалить последний приоритет", Severity.Warning);
+            return;
+        }
+
+        if (_settings.DefaultPriorityId == item.Id)
+        {
+            _settings.DefaultPriorityId = null;
+        }
 
         _priorityItems.Remove(item);
 
