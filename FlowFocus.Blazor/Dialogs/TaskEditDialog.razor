@@ -567,6 +567,9 @@
             _task = new TaskItem(ExistingTask);
             _originalTask = new TaskItem(ExistingTask); // Сохраняем оригинал для сравнения
             LoadExistingTaskData();
+
+            // If editing existing task, and it has no user priority set, apply default from settings
+            _task.PriorityId ??= _settings?.DefaultPriorityId;
         }
         else
         {
