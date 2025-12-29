@@ -44,7 +44,7 @@ internal static class ServiceExtensions
         services.AddDbContext<StorageContext>();
 
         // Сервис уведомлений (singleton для broadcast между компонентами)
-        services.AddScoped<INotificationService, NotificationService>();
+        services.AddSingleton<INotificationService, NotificationService>();
 
         // Репозитории
         services.AddScoped<ITaskRepository, TaskRepository>();

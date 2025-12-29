@@ -69,7 +69,7 @@ internal static class ServiceExtensions
             options.UseSqlite($"Data Source={dbPath}"));
 
         // Сервис уведомлений (singleton для broadcast между компонентами)
-        services.AddScoped<INotificationService, NotificationService>();
+        services.AddSingleton<INotificationService, NotificationService>();
 
         // Репозитории
         services.AddScoped<ITaskRepository, TaskRepository>();
