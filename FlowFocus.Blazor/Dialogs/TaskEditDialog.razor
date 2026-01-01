@@ -1,4 +1,6 @@
 @using SubtaskDto = FlowFocus.WebApp.Dialogs.SubtaskDto
+@using FlowFocus.Blazor.Components
+@using FlowFocus.Blazor.Dialogs.Validators
 @inject ITaskRepository TaskRepo
 @inject ISettingsRepository SettingsRepo
 @inject IPriorityRepository PriorityRepo
@@ -116,112 +118,9 @@
                 @if (!IsSubtaskMode)
                 {
                     <MudItem xs="12">
-                        <MudText Typo="Typo.subtitle2" Class="mb-2">Теги</MudText>
-                        
-                        @* Строка предлагающихся тегов *@
-                        @{
-                            var availableSuggestedTags = _suggestedTags.Where(t => !_selectedTagIds.Contains(t.Id)).Take(5).ToList();
-                        }
-                        @if (availableSuggestedTags.Any())
-                        {
-                            <div class="suggested-tags mb-3">
-                                @foreach (var tag in availableSuggestedTags)
-                                {
-                                    <MudChip T="string" Size="Size.Small"
-                                             Variant="Variant.Outlined"
-                                             Icon="@Icons.Material.Filled.Add"
-                                             IconColor="Color.Primary"
-                                             Style="@($"background-color: {tag.BackgroundColor}40; color: #333; border-color: {tag.BackgroundColor}; cursor: pointer;")"
-                                             OnClick="@(async () => await AddTag(tag))"
-                                             Class="suggested-tag-chip">
-                                        @tag.Name
-                                    </MudChip>
-                                }
-                            </div>
-                        }
-
-                        @* Место для создания новых тегов или использования существующих с автодополнением *@
-                        <div class="tag-input-container mb-3">
-                            <div class="d-flex gap-2 align-end">
-                                <MudTextField T="string" 
-                                             @bind-Value="_newTagInput"
-                                             @bind-Value:after="OnTagInputChanged"
-                                             Label="Создать новый тег или выбрать существующий"
-                                             Variant="Variant.Outlined"
-                                             Margin="Margin.Dense"
-                                             OnKeyDown="@OnTagKeyDown"
-                                             Immediate="true"
-                                             Clearable="true"
-                                             Class="flex-grow-1" />
-                                <MudButton Variant="Variant.Filled"
-                                         Color="Color.Primary"
-                                         StartIcon="@Icons.Material.Filled.Add"
-                                         OnClick="@AddNewTag"
-                                         Disabled="@IsAddTagButtonDisabled"
-                                         Class="tag-add-button">
-                                    Добавить
-                                </MudButton>
-                            </div>
-                            
-                            @* Результаты поиска (подсказки) *@
-                            @if (_tagSearchResults.Any() && !string.IsNullOrWhiteSpace(_newTagInput))
-                            {
-                                <div class="tag-search-results mt-2">
-                                    <MudText Typo="Typo.caption" Class="mb-1 text-muted">Найдено:</MudText>
-                                    <div class="search-result-tags">
-                                        @foreach (var tag in _tagSearchResults.Where(tag => !_selectedTagIds.Contains(tag.Id)))
-                                        {
-                                            <MudChip T="string" Size="Size.Small"
-                                                     Variant="Variant.Outlined"
-                                                     Style="@($"background-color: {tag.BackgroundColor}40; color: #333; border-color: {tag.BackgroundColor}; cursor: pointer;")"
-                                                     OnClick="@(() => SelectExistingTag(tag))"
-                                                     Class="search-result-chip">
-                                                @tag.Name
-                                            </MudChip>
-                                        }
-                                    </div>
-                                </div>
-                            }
-                            
-                            @* Подсказка о создании/использовании тега *@
-                            @if (!string.IsNullOrWhiteSpace(_newTagInput))
-                            {
-                                var trimmedInput = _newTagInput.Trim();
-                                var exactMatch = _tagSearchResults.FirstOrDefault(t => t.Name.Equals(trimmedInput, StringComparison.OrdinalIgnoreCase));
-                                
-                                @if (exactMatch != null)
-                                {
-                                    <MudText Typo="Typo.caption" Class="mt-1 text-success">
-                                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Class="me-1" />
-                                        Будет использован существующий тег "@exactMatch.Name"
-                                    </MudText>
-                                }
-                                else if (!string.IsNullOrWhiteSpace(trimmedInput))
-                                {
-                                    <MudText Typo="Typo.caption" Class="mt-1 text-info">
-                                        <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="me-1" />
-                                        Будет создан новый тег "@trimmedInput"
-                                    </MudText>
-                                }
-                            }
-                        </div>
-
-                        @* Добавленные теги *@
-                        @if (_selectedTags.Any())
-                        {
-                            <MudText Typo="Typo.caption" Class="mt-2 mb-1 font-weight-medium">Добавленные:</MudText>
-                            <div class="selected-tags">
-                                @foreach (var tag in _selectedTags)
-                                {
-                                    <MudChip T="string" Size="Size.Small"
-                                             Variant="Variant.Filled"
-                                             Style="@($"background-color: {tag.BackgroundColor}; color: #333;")"
-                                             OnClose="@(() => RemoveTag(tag))">
-                                        @tag.Name
-                                    </MudChip>
-                                }
-                            </div>
-                        }
+                        <TagInput SuggestedTags="_suggestedTags" SelectedTags="_selectedTags" SelectedTagIds="_selectedTagIds"
+                                  OnTagAdded="@(async (Tag t) => await AddTag(t))"
+                                  OnTagRemoved="@(async (Tag t) => { RemoveTag(t); await InvokeAsync(StateHasChanged); })" />
                     </MudItem>
                 }
 
@@ -557,12 +456,10 @@
     private List<Tag> _suggestedTags = [];
     private List<Tag> _selectedTags = [];
     private HashSet<int> _selectedTagIds = [];
-    private string _newTagInput = string.Empty;
-    private List<Tag> _tagSearchResults = [];
     private List<SubtaskDto> _subtasks = [];
     private string _newSubtaskTitle = string.Empty;
-    private List<RelationDto> _relations = [];
-    private List<EscalationDto> _escalations = [];
+    private List<FlowFocus.Blazor.Dialogs.RelationDto> _relations = [];
+    private List<FlowFocus.Blazor.Dialogs.EscalationDto> _escalations = [];
     private List<TaskItem> _availableTasks = [];
     private UserSettings? _settings;
 
@@ -653,7 +550,7 @@
         }).ToList();
 
         // Загружаем связи
-        _relations = _task.Relations.Select(r => new RelationDto
+        _relations = _task.Relations.Select(r => new FlowFocus.Blazor.Dialogs.RelationDto
         {
             Id = r.Id,
             Type = r.Type,
@@ -706,33 +603,6 @@
         var tags = TagRepo.SearchByName(value);
         return Task.FromResult(tags.Select(t => t.Name));
     }
-    
-    private bool IsAddTagButtonDisabled 
-    {
-        get
-        {
-            if (string.IsNullOrWhiteSpace(_newTagInput)) return true;
-            var trimmed = _newTagInput.Trim();
-            return string.IsNullOrWhiteSpace(trimmed);
-        }
-    }
-    
-    private async Task OnTagInputChanged()
-    {
-        // Обновляем UI для кнопки
-        await InvokeAsync(StateHasChanged);
-        
-        if (string.IsNullOrWhiteSpace(_newTagInput))
-        {
-            _tagSearchResults = [];
-            return;
-        }
-
-        // Ищем теги по введенному тексту (даже если это один символ)
-        // Поиск работает по мере ввода для авто-дополнения
-        _tagSearchResults = TagRepo.SearchByName(_newTagInput);
-        await InvokeAsync(StateHasChanged);
-    }
 
     private Task<IEnumerable<TaskItem>> SearchTasks(string value, CancellationToken cancellationToken)
     {
@@ -752,7 +622,7 @@
         _selectedTags.Add(tag);
         _selectedTagIds.Add(tag.Id);
         TagSessionService.MarkTagUsed(tag);
-        
+
         // Обновляем предложенные теги после добавления
         await RefreshSuggestedTags();
     }
@@ -780,50 +650,6 @@
     {
         _selectedTags.Remove(tag);
         _selectedTagIds.Remove(tag.Id);
-    }
-
-    private async Task OnTagKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_newTagInput?.Trim()))
-        {
-            await AddNewTag();
-        }
-    }
-    
-    private async Task AddNewTag()
-    {
-        if (string.IsNullOrWhiteSpace(_newTagInput)) return;
-
-        var tagName = _newTagInput.Trim();
-        if (string.IsNullOrWhiteSpace(tagName)) return;
-        
-        // Всегда проверяем существование тега в базе данных (не только в результатах поиска)
-        // Это гарантирует уникальность - нельзя создать два идентичных тега
-        var existingTag = TagRepo.GetByName(tagName);
-        
-        if (existingTag != null)
-        {
-            // Используем существующий тег
-            await AddTag(existingTag);
-        }
-        else
-        {
-            // Создаем новый тег только если его точно нет
-            var newTag = TagRepo.GetOrCreate(tagName);
-            await AddTag(newTag);
-        }
-
-        _newTagInput = string.Empty;
-        _tagSearchResults = [];
-        await InvokeAsync(StateHasChanged);
-    }
-    
-    private async Task SelectExistingTag(Tag tag)
-    {
-        await AddTag(tag);
-        _newTagInput = string.Empty;
-        _tagSearchResults = [];
-        await InvokeAsync(StateHasChanged);
     }
 
     private void AddSubtask()
@@ -871,7 +697,7 @@
             Snackbar.Add($"Достигнут лимит связей ({AppConfig.MaxTaskRelations})", Severity.Warning);
             return;
         }
-        _relations.Add(new RelationDto { Type = RelationType.RelatedTo });
+        _relations.Add(new FlowFocus.Blazor.Dialogs.RelationDto { Type = RelationType.RelatedTo });
     }
 
     private void OnAfterPriorityChanged()
@@ -881,7 +707,7 @@
         StateHasChanged();
     }
 
-    private bool IsEscalationPriorityDisabled(EscalationDto escalation)
+    private bool IsEscalationPriorityDisabled(FlowFocus.Blazor.Dialogs.EscalationDto escalation)
     {
         // Проверяем, что приоритет не выше текущего
         var currentPriorityOrder = _task.PriorityId.HasValue
@@ -892,7 +718,7 @@
         return escalationPriority != null && escalationPriority.Order >= currentPriorityOrder;
     }
 
-    private bool IsEscalationDateDisabled(EscalationDto escalation)
+    private bool IsEscalationDateDisabled(FlowFocus.Blazor.Dialogs.EscalationDto escalation)
     {
         return escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date < DateTime.Today;
     }
@@ -905,14 +731,14 @@
 
         if (available == null) return;
 
-        _escalations.Add(new EscalationDto
+        _escalations.Add(new FlowFocus.Blazor.Dialogs.EscalationDto
         {
             TargetPriorityId = available.Id,
             EscalationDate = DateTime.Today.AddDays(7)
         });
     }
 
-    private void RemoveEscalation(EscalationDto escalation)
+    private void RemoveEscalation(FlowFocus.Blazor.Dialogs.EscalationDto escalation)
     {
         _escalations.Remove(escalation);
     }
@@ -1019,64 +845,13 @@
     {
         var errors = new List<string>();
 
-        // Валидация повышений приоритета
-        ValidateEscalations(errors);
+        var escResult = TaskEditValidator.ValidateEscalations(_escalations, _task, _priorities);
+        if (!escResult.IsValid) errors.AddRange(escResult.Errors);
 
-        // Валидация связей
-        ValidateRelations(errors);
+        var relResult = TaskEditValidator.ValidateRelations(_relations, _task, _priorities);
+        if (!relResult.IsValid) errors.AddRange(relResult.Errors);
 
         return errors;
-    }
-
-    /// <summary>
-    /// Валидация таблицы повышения приоритета
-    /// </summary>
-    private void ValidateEscalations(List<string> errors)
-    {
-        if (!_escalations.Any()) return;
-
-        var currentPriorityOrder = _task.PriorityId.HasValue
-            ? _priorities.FirstOrDefault(p => p.Id == _task.PriorityId)?.Order ?? 99
-            : 99;
-
-        // Сортируем по дате
-        var sortedEscalations = _escalations
-            .Where(e => e.EscalationDate.HasValue)
-            .OrderBy(e => e.EscalationDate)
-            .ToList();
-
-        var prevPriorityOrder = currentPriorityOrder;
-        var prevDate = DateTime.Today;
-
-        foreach (var escalation in sortedEscalations)
-        {
-            var targetPriority = _priorities.FirstOrDefault(p => p.Id == escalation.TargetPriorityId);
-            if (targetPriority == null) continue;
-
-            // Проверяем, что приоритет повышается (order уменьшается)
-            if (targetPriority.Order >= prevPriorityOrder)
-            {
-                errors.Add($"Повышение приоритета должно быть последовательным: {targetPriority.Name} не выше текущего");
-            }
-
-            // Проверяем, что дата не в прошлом
-            if (escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date < DateTime.Today)
-            {
-                errors.Add($"Дата повышения {escalation.EscalationDate.Value:dd.MM.yyyy} уже прошла");
-            }
-
-            // Проверяем последовательность дат
-            if (escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date <= prevDate)
-            {
-                errors.Add("Даты повышений должны быть последовательными");
-            }
-
-            prevPriorityOrder = targetPriority.Order;
-            prevDate = escalation.EscalationDate?.Date ?? prevDate;
-        }
-
-        // Удаляем рудиментные (уже не нужные) повышения
-        CleanupRedundantEscalations();
     }
 
     /// <summary>
@@ -1094,92 +869,6 @@
             var targetPriority = _priorities.FirstOrDefault(p => p.Id == e.TargetPriorityId);
             return targetPriority != null && targetPriority.Order >= currentPriorityOrder;
         });
-    }
-
-    /// <summary>
-    /// Валидация связей между задачами
-    /// </summary>
-    private void ValidateRelations(List<string> errors)
-    {
-        foreach (var relation in _relations.Where(r => r.TargetTask != null))
-        {
-            // Проверка блокирующих связей
-            if (relation.Type == RelationType.Blocks || relation.Type == RelationType.BlockedBy)
-            {
-                ValidateBlockingRelation(relation, errors);
-            }
-
-            // Проверка на циклические ссылки
-            if (HasCircularReference(relation))
-            {
-                errors.Add($"Обнаружена циклическая зависимость с задачей \"{relation.TargetTask!.Title}\"");
-            }
-        }
-    }
-
-    /// <summary>
-    /// Валидация блокирующей связи
-    /// </summary>
-    private void ValidateBlockingRelation(RelationDto relation, List<string> errors)
-    {
-        var targetTask = relation.TargetTask;
-        if (targetTask == null) return;
-
-        // Определяем блокирующую и блокируемую задачи
-        TaskItem blocker, blocked;
-        if (relation.Type == RelationType.Blocks)
-        {
-            blocker = _task;
-            blocked = targetTask;
-        }
-        else // BlockedBy
-        {
-            blocker = targetTask;
-            blocked = _task;
-        }
-
-        // Проверка дат: дедлайн блокера <= дедлайн блокируемой
-        var blockerDate = blocker.UserAssignedDate ?? blocker.ActualAssignedDate;
-        var blockedDate = blocked.UserAssignedDate ?? blocked.ActualAssignedDate;
-        
-        if (blockerDate.HasValue && blockedDate.HasValue)
-        {
-            if (blockerDate.Value.Date > blockedDate.Value.Date)
-            {
-                errors.Add($"Дата блокера \"{blocker.Title}\" ({blockerDate.Value:dd.MM.yyyy}) должна быть не позже даты блокируемой задачи ({blockedDate.Value:dd.MM.yyyy})");
-            }
-        }
-
-        // Проверка приоритетов: приоритет блокера не слабее блокируемой
-        var blockerPriorityOrder = blocker.PriorityId.HasValue
-            ? _priorities.FirstOrDefault(p => p.Id == blocker.PriorityId)?.Order ?? 99
-            : 99;
-        var blockedPriorityOrder = blocked.PriorityId.HasValue
-            ? _priorities.FirstOrDefault(p => p.Id == blocked.PriorityId)?.Order ?? 99
-            : 99;
-
-        if (blockerPriorityOrder > blockedPriorityOrder)
-        {
-            var blockerPriority = _priorities.FirstOrDefault(p => p.Id == blocker.PriorityId)?.Name ?? "не задан";
-            var blockedPriority = _priorities.FirstOrDefault(p => p.Id == blocked.PriorityId)?.Name ?? "не задан";
-            errors.Add($"Приоритет блокера \"{blocker.Title}\" ({blockerPriority}) не должен быть слабее блокируемой задачи ({blockedPriority})");
-        }
-    }
-
-    /// <summary>
-    /// Проверка на циклические ссылки
-    /// </summary>
-    private bool HasCircularReference(RelationDto newRelation)
-    {
-        if (newRelation.TargetTask == null) return false;
-        if (newRelation.TargetTask.Id == _task.Id) return true;
-
-        // Простая проверка на прямую обратную ссылку
-        var targetRelations = newRelation.TargetTask.Relations;
-        return targetRelations.Any(r =>
-            r.TargetTaskId == _task.Id &&
-            ((r.Type == RelationType.Blocks && newRelation.Type == RelationType.BlockedBy) ||
-             (r.Type == RelationType.BlockedBy && newRelation.Type == RelationType.Blocks)));
     }
 
     /// <summary>
@@ -1462,19 +1151,4 @@
         }
     }
 
-    // === DTO классы ===
-
-    private class RelationDto
-    {
-        public int? Id { get; set; }
-        public RelationType Type { get; set; }
-        public TaskItem? TargetTask { get; set; }
-    }
-
-    private class EscalationDto
-    {
-        public int? Id { get; set; }
-        public int TargetPriorityId { get; set; }
-        public DateTime? EscalationDate { get; set; }
-    }
 }
