@@ -351,7 +351,29 @@
                                         <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                                        Size="Size.Small"
                                                        Color="Color.Error"
-                                                       OnClick="@(() => _relations.Remove(relation))" />
+                                                       OnClick="@(() => RemoveRelationById(relation.Id))" />
+                                    </div>
+                                }
+
+                                @* Показываем входящие связи (блокеры), только для чтения *@
+                                @if (_inverseRelations.Any())
+                                {
+                                    <div class="mt-3">
+                                        <MudText Typo="Typo.subtitle2" Class="mb-2">Блокируют эту задачу</MudText>
+                                        @foreach (var inv in _inverseRelations)
+                                        {
+                                            @if (inv.SourceTask != null)
+                                            {
+                                                <MudPaper Class="mb-2 pa-2" Elevation="0" Outlined="true">
+                                                    <div class="d-flex align-center gap-2">
+                                                        <MudText>@inv.SourceTask.Title</MudText>
+                                                        <MudSpacer />
+                                                        <MudText Typo="Typo.caption" Class="text-muted">@inv.Type.ToString()</MudText>
+                                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => RemoveRelationById(inv.Id))" />
+                                                    </div>
+                                                </MudPaper>
+                                            }
+                                        }
                                     </div>
                                 }
 
@@ -554,6 +576,8 @@
         ("Пн", 1), ("Вт", 2), ("Ср", 4), ("Чт", 8), ("Пт", 16), ("Сб", 32), ("Вс", 64)
     ];
 
+    private List<TaskRelation> _inverseRelations = [];
+
     protected override void OnInitialized()
     {
         _settings = SettingsRepo.GetUserSettings();
@@ -570,6 +594,9 @@
 
             // If editing existing task, and it has no user priority set, apply default from settings
             _task.PriorityId ??= _settings?.DefaultPriorityId;
+
+            // Load inverse relations for display
+            _inverseRelations = ExistingTask.InverseRelations ?? [];
         }
         else
         {
@@ -633,15 +660,8 @@
             TargetTask = r.TargetTask
         }).ToList();
 
-        // Загружаем повышения приоритета
-        _escalations = _task.PriorityEscalations
-            .Where(e => !e.IsApplied)
-            .Select(e => new EscalationDto
-            {
-                Id = e.Id,
-                TargetPriorityId = e.TargetPriorityId,
-                EscalationDate = e.EscalationDate
-            }).ToList();
+        // Load inverse relations into DTOs for display as readonly list
+        _inverseRelations = ExistingTask?.InverseRelations ?? [];
     }
 
     private bool ShouldShowEscalationTable
@@ -1411,6 +1431,35 @@
     private void Cancel()
     {
         MudDialog.Cancel();
+    }
+
+    private async Task RemoveRelationById(int? relationId)
+    {
+        if (relationId == null || relationId <= 0)
+        {
+            // If relation has no id (not persisted) remove from local DTO list
+            _relations.RemoveAll(r => r.Id == relationId);
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        try
+        {
+            TaskRepo.DeleteRelation(relationId.Value);
+            // Update blocked statuses because relation deletion may change statuses
+            PlannerService.UpdateBlockedStatuses();
+            NotificationService.NotifyTasksChanged();
+
+            // Remove from local lists
+            _relations.RemoveAll(r => r.Id == relationId);
+            _inverseRelations.RemoveAll(r => r.Id == relationId);
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Не удалось удалить связь: {ex.Message}", Severity.Error);
+        }
     }
 
     // === DTO классы ===

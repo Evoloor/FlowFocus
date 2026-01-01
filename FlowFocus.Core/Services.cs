@@ -55,6 +55,9 @@ public interface ITaskRepository : IRepository<TaskItem>
 
     /// <summary>Получить наименее приоритетную задачу дня</summary>
     TaskItem? GetLeastPriorityTaskOfDay();
+
+    /// <summary>Удалить запись о связи между задачами</summary>
+    void DeleteRelation(int relationId);
 }
 
 /// <summary>

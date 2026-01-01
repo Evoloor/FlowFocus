@@ -147,10 +147,13 @@ public class PlannerService(
             if (task.Status == TaskStatus.Completed || task.Status == TaskStatus.Irrelevant)
                 continue;
 
-            var hasActiveBlockers = task.Relations
-                .Any(r => r is { Type: RelationType.BlockedBy, TargetTask: not null } &&
-                          r.TargetTask.Status != TaskStatus.Completed &&
-                          r.TargetTask.Status != TaskStatus.Irrelevant);
+            // Consider both incoming "Blocks" relations (inverse) and outgoing "BlockedBy" relations
+            var hasActiveBlockers = task.InverseRelations
+                .Any(r => r.Type == RelationType.Blocks && r.SourceTask != null &&
+                          r.SourceTask.Status != TaskStatus.Completed && r.SourceTask.Status != TaskStatus.Irrelevant)
+                || task.Relations
+                .Any(r => r.Type == RelationType.BlockedBy && r.TargetTask != null &&
+                          r.TargetTask.Status != TaskStatus.Completed && r.TargetTask.Status != TaskStatus.Irrelevant);
 
             var trackedTask = context.Tasks.Find(task.Id);
             if (trackedTask != null)
@@ -161,10 +164,9 @@ public class PlannerService(
                     trackedTask.Status = TaskStatus.Blocked;
                     trackedTask.LastChangesOn = DateTime.UtcNow;
                 }
-                // Если нет активных блокеров, но статус Blocked, возвращаем к Planned или NotConfigured
+                // Если нет активных блокеров, но статус Blocked, возвращаем к Planned
                 else if (!hasActiveBlockers && trackedTask.Status == TaskStatus.Blocked)
                 {
-                    // Возвращаем к предыдущему статусу или NotConfigured
                     trackedTask.Status = TaskStatus.Planned;
                     trackedTask.LastChangesOn = DateTime.UtcNow;
                 }

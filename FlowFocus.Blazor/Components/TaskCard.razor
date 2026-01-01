@@ -5,6 +5,7 @@
 @inject INotificationService NotificationService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject IPlannerService PlannerService
 
 <MudPaper Class="@GetCardClass()" Style="@GetCardStyle()" Elevation="@(IsNested ? 0 : 1)">
     @* Оверлей для неактуальных задач *@
@@ -208,7 +209,8 @@
                     @{
                         var relatedTo = Task.Relations.Where(r => r.Type == RelationType.RelatedTo).ToList();
                         var blocks = Task.Relations.Where(r => r.Type == RelationType.Blocks).ToList();
-                        var blockedBy = Task.Relations.Where(r => r.Type == RelationType.BlockedBy).ToList();
+                        var blockedByOutgoing = Task.Relations.Where(r => r.Type == RelationType.BlockedBy).ToList();
+                        var blockedByIncoming = Task.InverseRelations.Where(r => r.Type == RelationType.Blocks).ToList();
                     }
 
                     @if (relatedTo.Any())
@@ -241,15 +243,24 @@
                         </MudExpansionPanels>
                     }
 
-                    @if (blockedBy.Any())
+                    @* Показываем блокирующие задачи: как исходящие BlockedBy, так и входящие Blocks *@
+                    @if (blockedByOutgoing.Any() || blockedByIncoming.Any())
                     {
+                        var totalBlockedBy = blockedByOutgoing.Count + blockedByIncoming.Count;
                         <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
-                            <MudExpansionPanel Text="@($"Блокирована ({blockedBy.Count})")" IsInitiallyExpanded="false">
-                                @foreach (var relation in blockedBy)
+                            <MudExpansionPanel Text="@($"Блокирована ({totalBlockedBy})")" IsInitiallyExpanded="false">
+                                @foreach (var relation in blockedByOutgoing)
                                 {
                                     @if (relation.TargetTask != null)
                                     {
                                         <TaskCard Task="relation.TargetTask" IsNested="true" DisplayMode="DisplayMode.Compact" />
+                                    }
+                                }
+                                @foreach (var relation in blockedByIncoming)
+                                {
+                                    @if (relation.SourceTask != null)
+                                    {
+                                        <TaskCard Task="relation.SourceTask" IsNested="true" DisplayMode="DisplayMode.Compact" />
                                     }
                                 }
                             </MudExpansionPanel>
@@ -753,6 +764,8 @@
         if (confirmed == true)
         {
             TaskRepo.Delete(Task.Id);
+            // After deletion ensure blocked statuses updated
+            PlannerService.UpdateBlockedStatuses();
             Snackbar.Add("Задача удалена", Severity.Success);
             NotificationService.NotifyTasksChanged();
             await OnTaskChanged.InvokeAsync();

@@ -323,19 +323,32 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
     {
         var all = GetAll();
         return all
-            .Where(t => t.Relations.Any(r =>
-                r.Type == RelationType.BlockedBy &&
-                r.TargetTaskId == taskId))
+            .Where(t =>
+                // either this task has an incoming Blocks relation from taskId (A blocks this)
+                t.InverseRelations.Any(r => r.SourceTaskId == taskId && r.Type == RelationType.Blocks)
+                // or this task has an outgoing BlockedBy relation pointing to taskId (stored in other orientation)
+                || t.Relations.Any(r => r.Type == RelationType.BlockedBy && r.TargetTaskId == taskId)
+            )
             .Where(t =>
             {
                 // Проверяем, что это был единственный активный блокер
-                var otherBlockers = t.Relations
-                    .Where(r => r.Type == RelationType.BlockedBy && r.TargetTaskId != taskId)
-                    .Select(r => r.TargetTask)
+                var otherBlockers = new List<TaskRelation>();
+
+                // Other incoming blockers excluding the one we are completing
+                otherBlockers.AddRange(t.InverseRelations
+                    .Where(r => r.Type == RelationType.Blocks && r.SourceTaskId != taskId));
+
+                // Other outgoing BlockedBy relations excluding the one referenced to taskId
+                otherBlockers.AddRange(t.Relations
+                    .Where(r => r.Type == RelationType.BlockedBy && r.TargetTaskId != taskId));
+
+                var active = otherBlockers
+                    .Select(r => r.SourceTask ?? r.TargetTask) // source for incoming, target for outgoing
                     .Where(blocker => blocker != null &&
                                       blocker.Status != TaskStatus.Completed &&
                                       blocker.Status != TaskStatus.Irrelevant);
-                return !otherBlockers.Any();
+
+                return !active.Any();
             })
             .ToList();
     }
@@ -504,12 +517,21 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
             // Получаем задачу с тегами перед удалением
             var task = GetTrackedQuery()
                 .Include(t => t.Tags)
+                .Include(t => t.Relations)
+                .Include(t => t.InverseRelations)
                 .FirstOrDefault(e => e.Id == id);
                 
             if (task == null) return;
             
             // Сохраняем ID тегов для проверки после удаления
             var tagIds = task.Tags.Select(tt => tt.TagId).ToList();
+
+            // Удаляем связи, где эта задача является источником или целью
+            var relations = Context.TaskRelations.Where(r => r.SourceTaskId == id || r.TargetTaskId == id).ToList();
+            if (relations.Any())
+            {
+                Context.TaskRelations.RemoveRange(relations);
+            }
             
             // Удаляем задачу
             GetDbSet().Remove(task);
@@ -522,6 +544,18 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
                 tagRepo.CleanupUnusedTags(tagIds);
             }
             
+            MarkDirty();
+        }
+    }
+
+    public void DeleteRelation(int relationId)
+    {
+        lock (CacheLock)
+        {
+            var relation = Context.TaskRelations.Find(relationId);
+            if (relation == null) return;
+            Context.TaskRelations.Remove(relation);
+            Context.SaveChanges();
             MarkDirty();
         }
     }
