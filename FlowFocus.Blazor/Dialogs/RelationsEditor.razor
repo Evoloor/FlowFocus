@@ -1,24 +1,23 @@
-@using FlowFocus.Core.Models
 @inject IDialogService DialogService
 
 <div>
-    <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Связи с задачами</MudText>
+    <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">пїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ</MudText>
 
     @foreach (var relation in Relations)
     {
         <div class="relation-row mb-2">
             <MudSelect T="RelationType" @bind-Value="relation.Type"
-                       Label="Тип"
+                       Label="пїЅпїЅпїЅ"
                        Variant="Variant.Outlined"
                        Margin="Margin.Dense"
                        Dense="true"
                        Style="width: 150px">
-                <MudSelectItem Value="RelationType.RelatedTo">Связана с</MudSelectItem>
-                <MudSelectItem Value="RelationType.Blocks">Блокирует</MudSelectItem>
-                <MudSelectItem Value="RelationType.BlockedBy">Блокирована</MudSelectItem>
+                <MudSelectItem Value="RelationType.RelatedTo">пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ</MudSelectItem>
+                <MudSelectItem Value="RelationType.Blocks">пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ</MudSelectItem>
+                <MudSelectItem Value="RelationType.BlockedBy">пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ</MudSelectItem>
             </MudSelect>
             <MudAutocomplete T="TaskItem" @bind-Value="relation.TargetTask"
-                             Label="Задача"
+                             Label="пїЅпїЅпїЅпїЅпїЅпїЅ"
                              SearchFunc="@SearchTasks"
                              ToStringFunc="@(t => t?.Title ?? string.Empty)"
                              Variant="Variant.Outlined"
@@ -38,13 +37,13 @@
                    Variant="Variant.Text"
                    Size="Size.Small"
                    OnClick="@AddRelation">
-            Добавить связь (@(Relations.Count)/@AppConfig.MaxTaskRelations)
+            пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ (@(Relations.Count)/@AppConfig.MaxTaskRelations)
         </MudButton>
     }
     else
     {
         <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
-            Достигнут лимит связей (@AppConfig.MaxTaskRelations). Удалите существующие связи для добавления новых.
+            пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ (@AppConfig.MaxTaskRelations). пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ.
         </MudAlert>
     }
 </div>
@@ -65,7 +64,7 @@
         {
             return;
         }
-        Relations.Add(new RelationDto { Type = Core.Enums.RelationType.RelatedTo });
+        Relations.Add(new RelationDto { Type = RelationType.RelatedTo });
     }
 
     private async Task OnDeleteClicked(RelationDto relation)

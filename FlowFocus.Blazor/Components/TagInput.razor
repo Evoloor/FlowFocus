@@ -1,10 +1,9 @@
-@using FlowFocus.Core.Models
 @inject ITagRepository TagRepo
 @inject ITagSessionService TagSessionService
 @inject ISnackbar Snackbar
 
 <div class="tag-input-container">
-    <MudText Typo="Typo.subtitle2" Class="mb-2">Теги</MudText>
+    <MudText Typo="Typo.subtitle2" Class="mb-2">пїЅпїЅпїЅпїЅ</MudText>
     <div class="suggested-tags mb-3">
         @foreach (var tag in SuggestedTags)
         {
@@ -18,17 +17,17 @@
 
     <div class="d-flex gap-2 align-end mb-3">
         <MudTextField T="string" @bind-Value="NewTagInput" @bind-Value:after="OnTagInputChanged"
-                     Label="Создать новый тег или выбрать существующий" Variant="Variant.Outlined" Margin="Margin.Dense"
+                     Label="пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ" Variant="Variant.Outlined" Margin="Margin.Dense"
                      OnKeyDown="OnTagKeyDown" Immediate="true" Clearable="true" Class="flex-grow-1" />
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddNewTag" Disabled="@IsAddTagButtonDisabled">
-            Добавить
+            пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         </MudButton>
     </div>
 
     @if (TagSearchResults.Any() && !string.IsNullOrWhiteSpace(NewTagInput))
     {
         <div class="tag-search-results mt-2">
-            <MudText Typo="Typo.caption" Class="mb-1 text-muted">Найдено:</MudText>
+            <MudText Typo="Typo.caption" Class="mb-1 text-muted">пїЅпїЅпїЅпїЅпїЅпїЅпїЅ:</MudText>
             <div class="search-result-tags">
                 @foreach (var tag in TagSearchResults.Where(tag => !SelectedTagIds.Contains(tag.Id)))
                 {
@@ -42,7 +41,7 @@
 
     @if (SelectedTags.Any())
     {
-        <MudText Typo="Typo.caption" Class="mt-2 mb-1 font-weight-medium">Добавленные:</MudText>
+        <MudText Typo="Typo.caption" Class="mt-2 mb-1 font-weight-medium">пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ:</MudText>
         <div class="selected-tags">
             @foreach (var tag in SelectedTags)
             {

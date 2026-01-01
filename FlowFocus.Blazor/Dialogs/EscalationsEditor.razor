@@ -1,18 +1,17 @@
-@using FlowFocus.Core.Models
 @inject IPriorityRepository PriorityRepo
 
 @if (ShouldShow)
 {
     <MudExpansionPanels>
-        <MudExpansionPanel Text="Повышение приоритета">
-            <MudText Typo="Typo.body2" Class="mb-2 text-muted">Настройте автоматическое повышение приоритета по датам</MudText>
+        <MudExpansionPanel Text="пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ">
+            <MudText Typo="Typo.body2" Class="mb-2 text-muted">пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ</MudText>
 
             @foreach (var escalation in Escalations)
             {
                 var isEscalationDateDisabled = escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date < DateTime.Today;
                 <div class="escalation-row mb-2">
                     <MudSelect T="int" @bind-Value="escalation.TargetPriorityId"
-                               Label="Приоритет"
+                               Label="пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ"
                                Variant="Variant.Outlined"
                                Margin="Margin.Dense"
                                Dense="true"
@@ -22,9 +21,9 @@
                             <MudSelectItem Value="p.Id">@p.Name</MudSelectItem>
                         }
                     </MudSelect>
-                    <MudTooltip Text="@(isEscalationDateDisabled ? "Дата повышения не может быть в прошлом" : "")">
+                    <MudTooltip Text="@(isEscalationDateDisabled ? "пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ" : "")">
                         <MudDatePicker T="DateTime?" @bind-Date="escalation.EscalationDate"
-                                       Label="Дата"
+                                       Label="пїЅпїЅпїЅпїЅ"
                                        Variant="Variant.Outlined"
                                        Margin="Margin.Dense"
                                        MinDate="@DateTime.Today"
@@ -43,7 +42,7 @@
                            Variant="Variant.Text"
                            Color="Color.Primary"
                            OnClick="@AddEscalation">
-                    Добавить правило повышения
+                    пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
                 </MudButton>
             }
         </MudExpansionPanel>

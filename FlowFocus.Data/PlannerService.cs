@@ -23,7 +23,7 @@ public class PlannerService(
 
         foreach (var task in tasks)
         {
-            if (task.Status == TaskStatus.Completed || task.Status == TaskStatus.Irrelevant)
+            if (task.Status is TaskStatus.Completed or TaskStatus.Irrelevant)
                 continue;
 
             var escalations = task.PriorityEscalations
@@ -144,7 +144,7 @@ public class PlannerService(
 
         foreach (var task in tasks)
         {
-            if (task.Status == TaskStatus.Completed || task.Status == TaskStatus.Irrelevant)
+            if (task.Status is TaskStatus.Completed or TaskStatus.Irrelevant)
                 continue;
 
             // Consider both incoming "Blocks" relations (inverse) and outgoing "BlockedBy" relations

@@ -1,5 +1,4 @@
 @using SubtaskDto = FlowFocus.WebApp.Dialogs.SubtaskDto
-@using FlowFocus.Blazor.Components
 @using FlowFocus.Blazor.Dialogs.Validators
 @inject ITaskRepository TaskRepo
 @inject ISettingsRepository SettingsRepo
@@ -221,49 +220,7 @@
                                 }
 
                                 @* Повторение *@
-                                <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Повторение</MudText>
-                                <MudCheckBox T="bool" @bind-Value="_task.IsRecurring"
-                                             Label="Повторяющаяся задача" />
-
-                                @if (_task.IsRecurring)
-                                {
-                                    <div class="recurrence-options mt-2">
-                                        <MudRadioGroup T="RecurrenceType" @bind-Value="_task.RecurrenceType">
-                                            <MudRadio Value="RecurrenceType.Daily" Color="Color.Primary">
-                                                Ежедневно
-                                            </MudRadio>
-                                            <MudRadio Value="RecurrenceType.EveryNDays" Color="Color.Primary">
-                                                <div class="d-flex align-center gap-2">
-                                                    <span>Каждые</span>
-                                                    <MudNumericField T="int?" @bind-Value="_task.RecurrenceInterval"
-                                                                     Min="2" Max="365"
-                                                                     Variant="Variant.Outlined"
-                                                                     Margin="Margin.Dense"
-                                                                     Style="width: 80px"
-                                                                     Disabled="@(_task.RecurrenceType != RecurrenceType.EveryNDays)" />
-                                                    <span>дней</span>
-                                                </div>
-                                            </MudRadio>
-                                            <MudRadio Value="RecurrenceType.WeekDays" Color="Color.Primary">
-                                                По дням недели
-                                            </MudRadio>
-                                        </MudRadioGroup>
-
-                                        @if (_task.RecurrenceType == RecurrenceType.WeekDays)
-                                        {
-                                            <div class="weekday-select mt-2">
-                                                @foreach (var day in _weekDays)
-                                                {
-                                                    <MudCheckBox T="bool"
-                                                                 Value="@IsWeekDaySelected(day.Value)"
-                                                                 ValueChanged="@(v => ToggleWeekDay(day.Value, v))"
-                                                                 Label="@day.Name"
-                                                                 Dense="true" />
-                                                }
-                                            </div>
-                                        }
-                                    </div>
-                                }
+                                <RecurrenceEditor Task="_task" />
                             </MudExpansionPanel>
                         </MudExpansionPanels>
                     </MudItem>
@@ -386,8 +343,8 @@
     private HashSet<int> _selectedTagIds = [];
     private List<SubtaskDto> _subtasks = [];
     private string _newSubtaskTitle = string.Empty;
-    private List<FlowFocus.Blazor.Dialogs.RelationDto> _relations = [];
-    private List<FlowFocus.Blazor.Dialogs.EscalationDto> _escalations = [];
+    private List<RelationDto> _relations = [];
+    private readonly List<EscalationDto> _escalations = [];
     private List<TaskItem> _availableTasks = [];
     private UserSettings? _settings;
 
@@ -395,11 +352,6 @@
     private TimeFormat _timeFormat = TimeFormat.Minutes;
 
     private bool IsEdit => ExistingTask != null;
-
-    private static readonly (string Name, int Value)[] _weekDays =
-    [
-        ("Пн", 1), ("Вт", 2), ("Ср", 4), ("Чт", 8), ("Пт", 16), ("Сб", 32), ("Вс", 64)
-    ];
 
     private List<TaskRelation> _inverseRelations = [];
 
@@ -478,7 +430,7 @@
         }).ToList();
 
         // Загружаем связи
-        _relations = _task.Relations.Select(r => new FlowFocus.Blazor.Dialogs.RelationDto
+        _relations = _task.Relations.Select(r => new RelationDto
         {
             Id = r.Id,
             Type = r.Type,
@@ -499,48 +451,6 @@
             // Не показываем, если уже установлен максимальный приоритет
             return _task.PriorityId == null || _task.PriorityId != highestPriority.Id;
         }
-    }
-
-    private bool CanAddEscalation
-    {
-        get
-        {
-            var available = GetAvailablePrioritiesForEscalation();
-            return available.Any(p => !_escalations.Any(e => e.TargetPriorityId == p.Id));
-        }
-    }
-
-    private List<PriorityLevel> GetAvailablePrioritiesForEscalation()
-    {
-        if (_task.PriorityId == null)
-        {
-            return _priorities;
-        }
-
-        return _priorities.Where(p => p.Id != _task.PriorityId &&
-                                      p.Order < (_priorities.FirstOrDefault(pp => pp.Id == _task.PriorityId)?.Order ?? 0))
-                          .ToList();
-    }
-
-    private Task<IEnumerable<string>> SearchTags(string value, CancellationToken cancellationToken)
-    {
-        // Этот метод больше не используется, но оставлен для совместимости
-        if (string.IsNullOrWhiteSpace(value))
-            return Task.FromResult<IEnumerable<string>>([]);
-
-        var tags = TagRepo.SearchByName(value);
-        return Task.FromResult(tags.Select(t => t.Name));
-    }
-
-    private Task<IEnumerable<TaskItem>> SearchTasks(string value, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return Task.FromResult(_availableTasks.Take(10));
-
-        return Task.FromResult(_availableTasks
-            .Where(t => t.Title.Contains(value, StringComparison.OrdinalIgnoreCase))
-            .Where(t => t.Id != _task.Id) // Исключаем текущую задачу
-            .Take(10));
     }
 
     private async Task AddTag(Tag tag)
@@ -625,7 +535,7 @@
             Snackbar.Add($"Достигнут лимит связей ({AppConfig.MaxTaskRelations})", Severity.Warning);
             return;
         }
-        _relations.Add(new FlowFocus.Blazor.Dialogs.RelationDto { Type = RelationType.RelatedTo });
+        _relations.Add(new RelationDto { Type = RelationType.RelatedTo });
     }
 
     private void OnAfterPriorityChanged()
@@ -633,56 +543,6 @@
         // Автоматически удаляем рудиментные повышения при изменении приоритета
         CleanupRedundantEscalations();
         StateHasChanged();
-    }
-
-    private bool IsEscalationPriorityDisabled(FlowFocus.Blazor.Dialogs.EscalationDto escalation)
-    {
-        // Проверяем, что приоритет не выше текущего
-        var currentPriorityOrder = _task.PriorityId.HasValue
-            ? _priorities.FirstOrDefault(p => p.Id == _task.PriorityId)?.Order ?? 99
-            : 99;
-        
-        var escalationPriority = _priorities.FirstOrDefault(p => p.Id == escalation.TargetPriorityId);
-        return escalationPriority != null && escalationPriority.Order >= currentPriorityOrder;
-    }
-
-    private bool IsEscalationDateDisabled(FlowFocus.Blazor.Dialogs.EscalationDto escalation)
-    {
-        return escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date < DateTime.Today;
-    }
-
-    private void AddEscalation()
-    {
-        var available = GetAvailablePrioritiesForEscalation()
-            .Where(p => _escalations.All(e => e.TargetPriorityId != p.Id))
-            .FirstOrDefault();
-
-        if (available == null) return;
-
-        _escalations.Add(new FlowFocus.Blazor.Dialogs.EscalationDto
-        {
-            TargetPriorityId = available.Id,
-            EscalationDate = DateTime.Today.AddDays(7)
-        });
-    }
-
-    private void RemoveEscalation(FlowFocus.Blazor.Dialogs.EscalationDto escalation)
-    {
-        _escalations.Remove(escalation);
-    }
-
-    private bool IsWeekDaySelected(int dayValue)
-    {
-        return (_task.RecurrenceWeekDays ?? 0 & dayValue) != 0;
-    }
-
-    private void ToggleWeekDay(int dayValue, bool selected)
-    {
-        _task.RecurrenceWeekDays ??= 0;
-        if (selected)
-            _task.RecurrenceWeekDays |= dayValue;
-        else
-            _task.RecurrenceWeekDays &= ~dayValue;
     }
 
     private void SaveTask()
@@ -886,22 +746,6 @@
     }
 
     /// <summary>
-    /// Синхронизация связей из DTO в модель задачи
-    /// </summary>
-    private void SyncRelationsToTask()
-    {
-        _task.Relations = RelationModule.SyncRelationsToTask(_relations, _task, ExistingTask);
-    }
-
-    /// <summary>
-    /// Синхронизация повышений приоритета из DTO в модель задачи
-    /// </summary>
-    private void SyncEscalationsToTask()
-    {
-        _task.PriorityEscalations = EscalationModule.SyncEscalationsToTask(_escalations, _task, ExistingTask, _priorities);
-    }
-
-    /// <summary>
     /// Проверка изменения связей
     /// </summary>
     private bool RelationsChanged()
@@ -942,7 +786,7 @@
 
     private async Task RemoveRelationById(int? relationId)
     {
-        if (relationId == null || relationId <= 0)
+        if (relationId is null or <= 0)
         {
             // If relation has no id (not persisted) remove from local DTO list
             _relations.RemoveAll(r => r.Id == relationId);

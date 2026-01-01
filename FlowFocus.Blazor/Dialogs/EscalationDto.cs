@@ -1,5 +1,3 @@
-using System;
-
 namespace FlowFocus.Blazor.Dialogs;
 
 public class EscalationDto

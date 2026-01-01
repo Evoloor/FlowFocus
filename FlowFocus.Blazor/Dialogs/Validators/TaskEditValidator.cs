@@ -1,7 +1,4 @@
 using FlowFocus.Core.Models;
-using FlowFocus.Blazor.Dialogs;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace FlowFocus.Blazor.Dialogs.Validators;
 
@@ -55,7 +52,7 @@ public static class TaskEditValidator
 
         foreach (var relation in relationList)
         {
-            if (relation.Type == Core.Enums.RelationType.Blocks || relation.Type == Core.Enums.RelationType.BlockedBy)
+            if (relation.Type is Core.Enums.RelationType.Blocks or Core.Enums.RelationType.BlockedBy)
             {
                 var targetTask = relation.TargetTask;
                 if (targetTask == null) continue;
