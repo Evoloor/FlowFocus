@@ -1,0 +1,96 @@
+@using FlowFocus.Core.Models
+@inject IPriorityRepository PriorityRepo
+
+@if (ShouldShow)
+{
+    <MudExpansionPanels>
+        <MudExpansionPanel Text="Повышение приоритета">
+            <MudText Typo="Typo.body2" Class="mb-2 text-muted">Настройте автоматическое повышение приоритета по датам</MudText>
+
+            @foreach (var escalation in Escalations)
+            {
+                var isEscalationDateDisabled = escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date < DateTime.Today;
+                <div class="escalation-row mb-2">
+                    <MudSelect T="int" @bind-Value="escalation.TargetPriorityId"
+                               Label="Приоритет"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               Dense="true"
+                               Disabled="@IsEscalationPriorityDisabled(escalation)">
+                        @foreach (var p in GetAvailablePrioritiesForEscalation())
+                        {
+                            <MudSelectItem Value="p.Id">@p.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudTooltip Text="@(isEscalationDateDisabled ? "Дата повышения не может быть в прошлом" : "")">
+                        <MudDatePicker T="DateTime?" @bind-Date="escalation.EscalationDate"
+                                       Label="Дата"
+                                       Variant="Variant.Outlined"
+                                       Margin="Margin.Dense"
+                                       MinDate="@DateTime.Today"
+                                       Disabled="@isEscalationDateDisabled" />
+                    </MudTooltip>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Size="Size.Small"
+                                   Color="Color.Error"
+                                   OnClick="@(() => RemoveEscalation(escalation))" />
+                </div>
+            }
+
+            @if (CanAddEscalation)
+            {
+                <MudButton StartIcon="@Icons.Material.Filled.Add"
+                           Variant="Variant.Text"
+                           Color="Color.Primary"
+                           OnClick="@AddEscalation">
+                    Добавить правило повышения
+                </MudButton>
+            }
+        </MudExpansionPanel>
+    </MudExpansionPanels>
+}
+
+@code {
+    [Parameter]
+    public List<EscalationDto> Escalations { get; set; } = new();
+
+    [Parameter]
+    public TaskItem Task { get; set; } = null!;
+
+    [Parameter]
+    public List<PriorityLevel> Priorities { get; set; } = new();
+
+    [Parameter]
+    public bool ShouldShow { get; set; }
+
+    private bool CanAddEscalation => GetAvailablePrioritiesForEscalation().Any(p => !Escalations.Any(e => e.TargetPriorityId == p.Id));
+
+    private List<PriorityLevel> GetAvailablePrioritiesForEscalation()
+    {
+        if (Task.PriorityId == null)
+        {
+            return Priorities;
+        }
+
+        return Priorities.Where(p => p.Id != Task.PriorityId && p.Order < (Priorities.FirstOrDefault(pp => pp.Id == Task.PriorityId)?.Order ?? 0)).ToList();
+    }
+
+    private void AddEscalation()
+    {
+        var available = GetAvailablePrioritiesForEscalation().Where(p => Escalations.All(e => e.TargetPriorityId != p.Id)).FirstOrDefault();
+        if (available == null) return;
+        Escalations.Add(new EscalationDto { TargetPriorityId = available.Id, EscalationDate = DateTime.Today.AddDays(7) });
+    }
+
+    private void RemoveEscalation(EscalationDto escalation)
+    {
+        Escalations.Remove(escalation);
+    }
+
+    private bool IsEscalationPriorityDisabled(EscalationDto escalation)
+    {
+        var currentPriorityOrder = Task.PriorityId.HasValue ? Priorities.FirstOrDefault(p => p.Id == Task.PriorityId)?.Order ?? 99 : 99;
+        var escalationPriority = Priorities.FirstOrDefault(p => p.Id == escalation.TargetPriorityId);
+        return escalationPriority != null && escalationPriority.Order >= currentPriorityOrder;
+    }
+}

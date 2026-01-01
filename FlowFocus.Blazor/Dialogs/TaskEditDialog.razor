@@ -124,57 +124,11 @@
                     </MudItem>
                 }
 
-                @* === ТАБЛИЦА ПОВЫШЕНИЯ ПРИОРИТЕТА === *@
-                @if (!IsSubtaskMode && ShouldShowEscalationTable)
+                @* === ТАБЛИЦА ПОВЫШЕНИЯ ПРИОРИТЕТА (вынесена) === *@
+                @if (!IsSubtaskMode)
                 {
                     <MudItem xs="12">
-                        <MudExpansionPanels>
-                            <MudExpansionPanel Text="Повышение приоритета">
-                                <MudText Typo="Typo.body2" Class="mb-2 text-muted">
-                                    Настройте автоматическое повышение приоритета по датам
-                                </MudText>
-
-                                @foreach (var escalation in _escalations)
-                                {
-                                    var isEscalationDateDisabled = escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date < DateTime.Today;
-                                    <div class="escalation-row mb-2">
-                                        <MudSelect T="int" @bind-Value="escalation.TargetPriorityId"
-                                                   Label="Приоритет"
-                                                   Variant="Variant.Outlined"
-                                                   Margin="Margin.Dense"
-                                                   Dense="true"
-                                                   Disabled="@IsEscalationPriorityDisabled(escalation)">
-                                            @foreach (var p in GetAvailablePrioritiesForEscalation())
-                                            {
-                                                <MudSelectItem Value="p.Id">@p.Name</MudSelectItem>
-                                            }
-                                        </MudSelect>
-                                        <MudTooltip Text="@(isEscalationDateDisabled ? "Дата повышения не может быть в прошлом" : "")">
-                                            <MudDatePicker T="DateTime?" @bind-Date="escalation.EscalationDate"
-                                                           Label="Дата"
-                                                           Variant="Variant.Outlined"
-                                                           Margin="Margin.Dense"
-                                                           MinDate="@DateTime.Today"
-                                                           Disabled="@isEscalationDateDisabled" />
-                                        </MudTooltip>
-                                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                                       Size="Size.Small"
-                                                       Color="Color.Error"
-                                                       OnClick="@(() => RemoveEscalation(escalation))" />
-                                    </div>
-                                }
-
-                                @if (CanAddEscalation)
-                                {
-                                    <MudButton StartIcon="@Icons.Material.Filled.Add"
-                                               Variant="Variant.Text"
-                                               Color="Color.Primary"
-                                               OnClick="@AddEscalation">
-                                        Добавить правило повышения
-                                    </MudButton>
-                                }
-                            </MudExpansionPanel>
-                        </MudExpansionPanels>
+                        <EscalationsEditor Escalations="_escalations" Task="_task" Priorities="_priorities" ShouldShow="ShouldShowEscalationTable" />
                     </MudItem>
                 }
 
@@ -226,33 +180,7 @@
                                 @* Связи с задачами *@
                                 <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Связи с задачами</MudText>
 
-                                @foreach (var relation in _relations)
-                                {
-                                    <div class="relation-row mb-2">
-                                        <MudSelect T="RelationType" @bind-Value="relation.Type"
-                                                   Label="Тип"
-                                                   Variant="Variant.Outlined"
-                                                   Margin="Margin.Dense"
-                                                   Dense="true"
-                                                   Style="width: 150px">
-                                            <MudSelectItem Value="RelationType.RelatedTo">Связана с</MudSelectItem>
-                                            <MudSelectItem Value="RelationType.Blocks">Блокирует</MudSelectItem>
-                                            <MudSelectItem Value="RelationType.BlockedBy">Блокирована</MudSelectItem>
-                                        </MudSelect>
-                                        <MudAutocomplete T="TaskItem" @bind-Value="relation.TargetTask"
-                                                         Label="Задача"
-                                                         SearchFunc="@SearchTasks"
-                                                         ToStringFunc="@(t => t?.Title ?? string.Empty)"
-                                                         Variant="Variant.Outlined"
-                                                         Margin="Margin.Dense"
-                                                         Dense="true"
-                                                         Class="flex-grow-1" />
-                                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                                       Size="Size.Small"
-                                                       Color="Color.Error"
-                                                       OnClick="@(() => RemoveRelationById(relation.Id))" />
-                                    </div>
-                                }
+                                <RelationsEditor Relations="_relations" AvailableTasks="_availableTasks" OnRemoveRequested="RemoveRelationById" />
 
                                 @* Показываем входящие связи (блокеры), только для чтения *@
                                 @if (_inverseRelations.Any())
@@ -802,10 +730,10 @@
             SyncSubtasksToTask();
 
             // Синхронизируем связи из DTO в модель задачи
-            SyncRelationsToTask();
+            _task.Relations = RelationModule.SyncRelationsToTask(_relations, _task, ExistingTask);
 
             // Синхронизируем повышения приоритета из DTO в модель задачи
-            SyncEscalationsToTask();
+            _task.PriorityEscalations = EscalationModule.SyncEscalationsToTask(_escalations, _task, ExistingTask, _priorities);
 
             if (IsEdit)
             {
@@ -962,62 +890,7 @@
     /// </summary>
     private void SyncRelationsToTask()
     {
-        // Фильтруем связи с валидными целевыми задачами
-        var validRelations = _relations.Where(r => r.TargetTask != null).ToList();
-        
-        // Получаем существующие связи из оригинальной задачи для получения полной информации
-        var existingRelationsSource = ExistingTask?.Relations ?? [];
-        
-        // Список для результата
-        var resultRelations = new List<TaskRelation>();
-        
-        foreach (var dto in validRelations)
-        {
-            if (dto.Id is > 0)
-            {
-                // Обновляем существующую связь
-                var existing = existingRelationsSource.FirstOrDefault(r => r.Id == dto.Id.Value);
-                if (existing != null)
-                {
-                    // Создаем новый объект с обновленными данными (используем только ID, не навигационные свойства)
-                    var updatedRelation = new TaskRelation
-                    {
-                        Id = existing.Id,
-                        SourceTaskId = _task.Id > 0 ? _task.Id : existing.SourceTaskId,
-                        TargetTaskId = dto.TargetTask!.Id,
-                        Type = dto.Type,
-                        LastChangesOn = DateTime.UtcNow
-                    };
-                    resultRelations.Add(updatedRelation);
-                }
-                else
-                {
-                    // Связь с ID не найдена - создаем новую
-                    var newRelation = new TaskRelation
-                    {
-                        SourceTaskId = _task.Id > 0 ? _task.Id : 0,
-                        TargetTaskId = dto.TargetTask!.Id,
-                        Type = dto.Type,
-                        LastChangesOn = DateTime.UtcNow
-                    };
-                    resultRelations.Add(newRelation);
-                }
-            }
-            else
-            {
-                // Создаем новую связь
-                var newRelation = new TaskRelation
-                {
-                    SourceTaskId = _task.Id > 0 ? _task.Id : 0,
-                    TargetTaskId = dto.TargetTask!.Id,
-                    Type = dto.Type,
-                    LastChangesOn = DateTime.UtcNow
-                };
-                resultRelations.Add(newRelation);
-            }
-        }
-        
-        _task.Relations = resultRelations;
+        _task.Relations = RelationModule.SyncRelationsToTask(_relations, _task, ExistingTask);
     }
 
     /// <summary>
@@ -1025,62 +898,7 @@
     /// </summary>
     private void SyncEscalationsToTask()
     {
-        // Получаем существующие повышения из оригинальной задачи для получения полной информации
-        var existingEscalationsSource = ExistingTask?.PriorityEscalations ?? [];
-        
-        // Список для результата
-        var resultEscalations = new List<PriorityEscalation>();
-        
-        foreach (var dto in _escalations)
-        {
-            if (dto.Id is > 0)
-            {
-                // Обновляем существующее повышение
-                var existing = existingEscalationsSource.FirstOrDefault(e => e.Id == dto.Id.Value);
-                if (existing != null)
-                {
-                    // Создаем новый объект с обновленными данными (используем только ID, не навигационные свойства)
-                    var updatedEscalation = new PriorityEscalation
-                    {
-                        Id = existing.Id,
-                        TaskId = _task.Id > 0 ? _task.Id : existing.TaskId,
-                        TargetPriorityId = dto.TargetPriorityId,
-                        EscalationDate = dto.EscalationDate ?? DateTime.Today,
-                        IsApplied = existing.IsApplied,
-                        LastChangesOn = DateTime.UtcNow
-                    };
-                    resultEscalations.Add(updatedEscalation);
-                }
-                else
-                {
-                    // Повышение с ID не найдено - создаем новое
-                    var newEscalation = new PriorityEscalation
-                    {
-                        TaskId = _task.Id > 0 ? _task.Id : 0,
-                        TargetPriorityId = dto.TargetPriorityId,
-                        EscalationDate = dto.EscalationDate ?? DateTime.Today,
-                        IsApplied = false,
-                        LastChangesOn = DateTime.UtcNow
-                    };
-                    resultEscalations.Add(newEscalation);
-                }
-            }
-            else
-            {
-                // Создаем новое повышение
-                var newEscalation = new PriorityEscalation
-                {
-                    TaskId = _task.Id > 0 ? _task.Id : 0,
-                    TargetPriorityId = dto.TargetPriorityId,
-                    EscalationDate = dto.EscalationDate ?? DateTime.Today,
-                    IsApplied = false,
-                    LastChangesOn = DateTime.UtcNow
-                };
-                resultEscalations.Add(newEscalation);
-            }
-        }
-        
-        _task.PriorityEscalations = resultEscalations;
+        _task.PriorityEscalations = EscalationModule.SyncEscalationsToTask(_escalations, _task, ExistingTask, _priorities);
     }
 
     /// <summary>

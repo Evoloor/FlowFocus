@@ -1,0 +1,92 @@
+@using FlowFocus.Core.Models
+@inject IDialogService DialogService
+
+<div>
+    <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Связи с задачами</MudText>
+
+    @foreach (var relation in Relations)
+    {
+        <div class="relation-row mb-2">
+            <MudSelect T="RelationType" @bind-Value="relation.Type"
+                       Label="Тип"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Dense="true"
+                       Style="width: 150px">
+                <MudSelectItem Value="RelationType.RelatedTo">Связана с</MudSelectItem>
+                <MudSelectItem Value="RelationType.Blocks">Блокирует</MudSelectItem>
+                <MudSelectItem Value="RelationType.BlockedBy">Блокирована</MudSelectItem>
+            </MudSelect>
+            <MudAutocomplete T="TaskItem" @bind-Value="relation.TargetTask"
+                             Label="Задача"
+                             SearchFunc="@SearchTasks"
+                             ToStringFunc="@(t => t?.Title ?? string.Empty)"
+                             Variant="Variant.Outlined"
+                             Margin="Margin.Dense"
+                             Dense="true"
+                             Class="flex-grow-1" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                           Size="Size.Small"
+                           Color="Color.Error"
+                           OnClick="@(() => OnDeleteClicked(relation))" />
+        </div>
+    }
+
+    @if (Relations.Count < AppConfig.MaxTaskRelations)
+    {
+        <MudButton StartIcon="@Icons.Material.Filled.Add"
+                   Variant="Variant.Text"
+                   Size="Size.Small"
+                   OnClick="@AddRelation">
+            Добавить связь (@(Relations.Count)/@AppConfig.MaxTaskRelations)
+        </MudButton>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+            Достигнут лимит связей (@AppConfig.MaxTaskRelations). Удалите существующие связи для добавления новых.
+        </MudAlert>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public List<RelationDto> Relations { get; set; } = new();
+
+    [Parameter]
+    public List<TaskItem> AvailableTasks { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<int?> OnRemoveRequested { get; set; }
+
+    private void AddRelation()
+    {
+        if (Relations.Count >= AppConfig.MaxTaskRelations)
+        {
+            return;
+        }
+        Relations.Add(new RelationDto { Type = Core.Enums.RelationType.RelatedTo });
+    }
+
+    private async Task OnDeleteClicked(RelationDto relation)
+    {
+        if (OnRemoveRequested.HasDelegate)
+        {
+            await OnRemoveRequested.InvokeAsync(relation.Id);
+            return;
+        }
+
+        Relations.Remove(relation);
+    }
+
+    private Task<IEnumerable<TaskItem>> SearchTasks(string value, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return Task.FromResult(AvailableTasks.Take(10));
+
+        return Task.FromResult(AvailableTasks
+            .Where(t => t.Title.Contains(value, StringComparison.OrdinalIgnoreCase))
+            .Where(t => t.Id != 0)
+            .Take(10));
+    }
+}

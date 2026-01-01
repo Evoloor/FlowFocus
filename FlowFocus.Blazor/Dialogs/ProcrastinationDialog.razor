@@ -54,7 +54,7 @@
     IMudDialogInstance MudDialog { get; set; } = null!;
 
     private TaskItem? _currentTask;
-    private List<int> _excludedTaskIds = [];
+    private readonly List<int> _excludedTaskIds = [];
     private UserSettings? _settings;
 
     protected override void OnInitialized()

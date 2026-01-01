@@ -19,7 +19,7 @@ public static class TaskEditValidator
             : 99;
 
         var prevPriorityOrder = currentPriorityOrder;
-        var prevDate = System.DateTime.Today;
+        var prevDate = DateTime.Today;
 
         foreach (var escalation in escalationList)
         {
@@ -28,17 +28,17 @@ public static class TaskEditValidator
 
             if (targetPriority.Order >= prevPriorityOrder)
             {
-                errors.Add($"Повышение приоритета должно быть последовательным: {targetPriority.Name} не выше текущего");
+                errors.Add($"пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ: {targetPriority.Name} пїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
             }
 
-            if (escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date < System.DateTime.Today)
+            if (escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date < DateTime.Today)
             {
-                errors.Add($"Дата повышения {escalation.EscalationDate.Value:dd.MM.yyyy} уже прошла");
+                errors.Add($"пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ {escalation.EscalationDate.Value:dd.MM.yyyy} пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ");
             }
 
             if (escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date <= prevDate)
             {
-                errors.Add("Даты повышений должны быть последовательными");
+                errors.Add("пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
             }
 
             prevPriorityOrder = targetPriority.Order;
@@ -55,13 +55,13 @@ public static class TaskEditValidator
 
         foreach (var relation in relationList)
         {
-            if (relation.Type == FlowFocus.Core.Enums.RelationType.Blocks || relation.Type == FlowFocus.Core.Enums.RelationType.BlockedBy)
+            if (relation.Type == Core.Enums.RelationType.Blocks || relation.Type == Core.Enums.RelationType.BlockedBy)
             {
                 var targetTask = relation.TargetTask;
                 if (targetTask == null) continue;
 
                 TaskItem blocker, blocked;
-                if (relation.Type == FlowFocus.Core.Enums.RelationType.Blocks)
+                if (relation.Type == Core.Enums.RelationType.Blocks)
                 {
                     blocker = task;
                     blocked = targetTask;
@@ -79,7 +79,7 @@ public static class TaskEditValidator
                 {
                     if (blockerDate.Value.Date > blockedDate.Value.Date)
                     {
-                        errors.Add($"Дата блокера \"{blocker.Title}\" ({blockerDate.Value:dd.MM.yyyy}) должна быть не позже даты блокируемой задачи ({blockedDate.Value:dd.MM.yyyy})");
+                        errors.Add($"пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ \"{blocker.Title}\" ({blockerDate.Value:dd.MM.yyyy}) пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ ({blockedDate.Value:dd.MM.yyyy})");
                     }
                 }
 
@@ -92,15 +92,15 @@ public static class TaskEditValidator
 
                 if (blockerPriorityOrder > blockedPriorityOrder)
                 {
-                    var blockerPriority = priorities.FirstOrDefault(p => p.Id == blocker.PriorityId)?.Name ?? "не задан";
-                    var blockedPriority = priorities.FirstOrDefault(p => p.Id == blocked.PriorityId)?.Name ?? "не задан";
-                    errors.Add($"Приоритет блокера \"{blocker.Title}\" ({blockerPriority}) не должен быть слабее блокируемой задачи ({blockedPriority})");
+                    var blockerPriority = priorities.FirstOrDefault(p => p.Id == blocker.PriorityId)?.Name ?? "пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ";
+                    var blockedPriority = priorities.FirstOrDefault(p => p.Id == blocked.PriorityId)?.Name ?? "пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ";
+                    errors.Add($"пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ \"{blocker.Title}\" ({blockerPriority}) пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ ({blockedPriority})");
                 }
             }
 
             if (HasCircularReference(relation, task))
             {
-                errors.Add($"Обнаружена циклическая зависимость с задачей \"{relation.TargetTask!.Title}\"");
+                errors.Add($"пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ \"{relation.TargetTask!.Title}\"");
             }
         }
 
@@ -116,8 +116,8 @@ public static class TaskEditValidator
         foreach (var r in targetRelations)
         {
             if (r.TargetTaskId == task.Id &&
-                ((r.Type == FlowFocus.Core.Enums.RelationType.Blocks && newRelation.Type == FlowFocus.Core.Enums.RelationType.BlockedBy) ||
-                 (r.Type == FlowFocus.Core.Enums.RelationType.BlockedBy && newRelation.Type == FlowFocus.Core.Enums.RelationType.Blocks)))
+                ((r.Type == Core.Enums.RelationType.Blocks && newRelation.Type == Core.Enums.RelationType.BlockedBy) ||
+                 (r.Type == Core.Enums.RelationType.BlockedBy && newRelation.Type == Core.Enums.RelationType.Blocks)))
             {
                 return true;
             }
