@@ -122,14 +122,6 @@
                     </MudItem>
                 }
 
-                @* === ТАБЛИЦА ПОВЫШЕНИЯ ПРИОРИТЕТА (вынесена) === *@
-                @if (!IsSubtaskMode)
-                {
-                    <MudItem xs="12">
-                        <EscalationsEditor Escalations="_escalations" Task="_task" Priorities="_priorities" ShouldShow="ShouldShowEscalationTable" />
-                    </MudItem>
-                }
-
                 @* === РАСШИРЕННЫЕ НАСТРОЙКИ === *@
                 @if (!IsSubtaskMode)
                 {
@@ -145,6 +137,9 @@
 
                                 @* Подзадачи (вынесено в компонент) *@
                                 <SubtasksEditor Subtasks="_subtasks" SubtasksChanged="@OnSubtasksChanged" />
+
+                                @* Повышение приоритета (перенесено сюда) *@
+                                <EscalationsEditor Escalations="_escalations" Task="_task" Priorities="_priorities" ShouldShow="ShouldShowEscalationTable" />
 
                                 @* Связи с задачами *@
                                 <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Связи с задачами</MudText>
