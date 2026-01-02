@@ -64,7 +64,7 @@
         {
             return;
         }
-        Relations.Add(new RelationDto { Type = RelationType.RelatedTo });
+        Relations.Add(new() { Type = RelationType.RelatedTo });
     }
 
     private async Task OnDeleteClicked(RelationDto relation)

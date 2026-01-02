@@ -28,7 +28,7 @@ public static class MauiProgram
         var dbPath = GetDatabasePath();
         
         // Настройка сервисов
-        builder.Services.AddDataLayer(dbPath);
+        _ = builder.Services.AddDataLayer(dbPath);
         
         // Инициализация БД
         var app = builder.Build();
@@ -39,7 +39,7 @@ public static class MauiProgram
 
     private static string GetDatabasePath()
     {
-        var dbName = "flowfocus.db";
+        const string dbName = "flowfocus.db";
         
 #if ANDROID
         var path = Path.Combine(FileSystem.AppDataDirectory, dbName);

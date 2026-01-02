@@ -95,7 +95,7 @@
     {
         if (ExistingSubtask != null)
         {
-            _subtask = new SubtaskDto
+            _subtask = new()
             {
                 Id = ExistingSubtask.Id,
                 Title = ExistingSubtask.Title,
@@ -107,7 +107,7 @@
         }
         else
         {
-            _subtask = new SubtaskDto
+            _subtask = new()
             {
                 Title = InitialTitle ?? string.Empty
             };

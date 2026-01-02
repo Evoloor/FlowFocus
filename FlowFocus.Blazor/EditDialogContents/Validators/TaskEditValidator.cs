@@ -42,7 +42,7 @@ public static class TaskEditValidator
             prevDate = escalation.EscalationDate?.Date ?? prevDate;
         }
 
-        return new ValidationResult(!errors.Any(), errors);
+        return new(!errors.Any(), errors);
     }
 
     public static ValidationResult ValidateRelations(IEnumerable<RelationDto>? relations, TaskItem task, List<PriorityLevel> priorities)
@@ -101,7 +101,7 @@ public static class TaskEditValidator
             }
         }
 
-        return new ValidationResult(!errors.Any(), errors);
+        return new(!errors.Any(), errors);
     }
 
     private static bool HasCircularReference(RelationDto newRelation, TaskItem task)

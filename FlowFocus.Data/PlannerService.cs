@@ -88,7 +88,7 @@ public class PlannerService(
             while (!CanAddToDay(task, dailyStats, settings, isLargeTask))
             {
                 currentDate = currentDate.AddDays(1);
-                dailyStats = new DailyStats();
+                dailyStats = new();
             }
 
             // Назначаем задачу на текущий день

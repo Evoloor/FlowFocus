@@ -247,8 +247,8 @@
 
         if (ExistingTask != null)
         {
-            _task = new TaskItem(ExistingTask);
-            _originalTask = new TaskItem(ExistingTask); // Сохраняем оригинал для сравнения
+            _task = new(ExistingTask);
+            _originalTask = new(ExistingTask); // Сохраняем оригинал для сравнения
             LoadExistingTaskData();
 
             // If editing existing task, and it has no user priority set, apply default from settings
@@ -259,7 +259,7 @@
         }
         else
         {
-            _task = new TaskItem
+            _task = new()
             {
                 Title = InitialTitle ?? string.Empty,
                 Status = TaskStatus.Planned,
@@ -379,7 +379,7 @@
             Snackbar.Add($"Достигнут лимит связей ({AppConfig.MaxTaskRelations})", Severity.Warning);
             return;
         }
-        _relations.Add(new RelationDto { Type = RelationType.RelatedTo });
+        _relations.Add(new() { Type = RelationType.RelatedTo });
     }
 
     private void OnAfterPriorityChanged()

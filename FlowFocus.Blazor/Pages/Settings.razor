@@ -61,19 +61,6 @@
 </MudPaper>
 
 <MudPaper Class="pa-4 mb-4" Elevation="1">
-    <MudText Typo="Typo.h6" Class="mb-3">Интерфейс</MudText>
-
-    <MudSwitch T="bool" @bind-Value="_settings.IsDarkMode"
-               Label="Тёмная тема"
-               Color="Color.Primary" />
-
-    <MudSwitch T="bool" @bind-Value="_settings.HideTaskTitlesDefault"
-               Label="Скрывать названия задач под спойлер по умолчанию"
-               Color="Color.Primary"
-               Class="mt-2" />
-</MudPaper>
-
-<MudPaper Class="pa-4 mb-4" Elevation="1">
     <MudText Typo="Typo.h6" Class="mb-3">Приоритет по умолчанию</MudText>
 
     <MudSelect T="int?" @bind-Value="_settings.DefaultPriorityId"
@@ -354,7 +341,7 @@
 
         var unusedColor = ColorPalette.FirstOrDefault(c => _priorityItems.All(p => p.Color != c)) ?? "#808080";
 
-        _priorityItems.Add(new PriorityItem
+        _priorityItems.Add(new()
         {
             Id = newId, // Отрицательный ID = новый приоритет
             Name = "Новый приоритет",

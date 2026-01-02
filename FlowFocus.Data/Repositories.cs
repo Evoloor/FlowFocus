@@ -144,7 +144,7 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
         {
             if (!trackedTagIds.Contains(sourceTag.TagId))
             {
-                Context.TaskTags.Add(new TaskTag
+                Context.TaskTags.Add(new()
                 {
                     TaskId = tracked.Id,
                     TagId = sourceTag.TagId
@@ -573,7 +573,7 @@ public class SettingsRepository(StorageContext context) : CachedRepository<UserS
         var settings = GetAll().FirstOrDefault();
         if (settings == null)
         {
-            settings = new UserSettings { Id = 1 };
+            settings = new() { Id = 1 };
             Add(settings);
         }
         return settings;

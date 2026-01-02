@@ -78,7 +78,7 @@
     {
         var available = GetAvailablePrioritiesForEscalation().Where(p => Escalations.All(e => e.TargetPriorityId != p.Id)).FirstOrDefault();
         if (available == null) return;
-        Escalations.Add(new EscalationDto { TargetPriorityId = available.Id, EscalationDate = DateTime.Today.AddDays(7) });
+        Escalations.Add(new() { TargetPriorityId = available.Id, EscalationDate = DateTime.Today.AddDays(7) });
     }
 
     private void RemoveEscalation(EscalationDto escalation)
