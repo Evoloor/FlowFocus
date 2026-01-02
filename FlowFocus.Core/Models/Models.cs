@@ -42,13 +42,13 @@ public class TaskItem : IAuditEntity
 
     /// <summary>Связанный приоритет</summary>
     [ForeignKey(nameof(PriorityId))]
-    public PriorityLevel? Priority { get; set; }
+    public PriorityLevel? Priority { get; init; }
 
     /// <summary>Текущий эффективный приоритет (после применения повышений)</summary>
     public int? EffectivePriorityId { get; set; }
 
     [ForeignKey(nameof(EffectivePriorityId))]
-    public PriorityLevel? EffectivePriority { get; set; }
+    public PriorityLevel? EffectivePriority { get; init; }
 
     // === Оценки ===
     /// <summary>Интересность задачи (1-10)</summary>
@@ -90,14 +90,14 @@ public class TaskItem : IAuditEntity
     public int? RecurrenceWeekDays { get; set; }
 
     /// <summary>ID родительской повторяющейся задачи</summary>
-    public int? RecurrenceSourceId { get; set; }
+    public int? RecurrenceSourceId { get; init; }
 
     // === Связи ===
     /// <summary>ID родительской задачи (если это подзадача)</summary>
     public int? ParentTaskId { get; set; }
 
     [ForeignKey(nameof(ParentTaskId))]
-    public TaskItem? ParentTask { get; set; }
+    public TaskItem? ParentTask { get; init; }
 
     /// <summary>Подзадачи</summary>
     public List<TaskItem> Subtasks { get; set; } = [];
@@ -109,7 +109,7 @@ public class TaskItem : IAuditEntity
     public List<TaskRelation> Relations { get; set; } = [];
 
     /// <summary>Обратные связи (задачи, которые ссылаются на эту)</summary>
-    public List<TaskRelation> InverseRelations { get; set; } = [];
+    public List<TaskRelation> InverseRelations { get; init; } = [];
 
     /// <summary>Правила повышения приоритета</summary>
     public List<PriorityEscalation> PriorityEscalations { get; set; } = [];
@@ -200,14 +200,14 @@ public class PriorityLevel : IAuditEntity
     /// <summary>Название приоритета</summary>
     [Required]
     [StringLength(50)]
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
 
     /// <summary>Цвет в формате HEX</summary>
     [StringLength(9)]
-    public string Color { get; set; } = "#808080";
+    public string Color { get; init; } = "#808080";
 
     /// <summary>Системный приоритет (нельзя удалить)</summary>
-    public bool IsSystem { get; set; }
+    public bool IsSystem { get; init; }
 }
 
 /// <summary>
@@ -220,11 +220,11 @@ public class Tag : IAuditEntity
 
     [Required]
     [StringLength(50)]
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
 
     /// <summary>Цвет фона (пастельный оттенок)</summary>
     [StringLength(9)]
-    public string BackgroundColor { get; set; } = "#E8E8E8";
+    public string BackgroundColor { get; init; } = "#E8E8E8";
 
     /// <summary>Количество использований</summary>
     public int UsageCount { get; set; }
@@ -238,15 +238,15 @@ public class Tag : IAuditEntity
 /// </summary>
 public class TaskTag
 {
-    public int Id { get; set; }
+    public int Id { get; init; }
 
-    public int TaskId { get; set; }
+    public int TaskId { get; init; }
     [ForeignKey(nameof(TaskId))]
-    public TaskItem Task { get; set; } = null!;
+    public TaskItem Task { get; init; } = null!;
 
-    public int TagId { get; set; }
+    public int TagId { get; init; }
     [ForeignKey(nameof(TagId))]
-    public Tag Tag { get; set; } = null!;
+    public Tag Tag { get; init; } = null!;
 }
 
 /// <summary>
@@ -261,16 +261,16 @@ public class TaskRelation : IAuditEntity
     public int SourceTaskId { get; set; }
 
     [ForeignKey(nameof(SourceTaskId))]
-    public TaskItem SourceTask { get; set; } = null!;
+    public TaskItem? SourceTask { get; init; }
 
     /// <summary>ID целевой задачи</summary>
-    public int TargetTaskId { get; set; }
+    public int TargetTaskId { get; init; }
 
     [ForeignKey(nameof(TargetTaskId))]
-    public TaskItem TargetTask { get; set; } = null!;
+    public TaskItem? TargetTask { get; init; }
 
     /// <summary>Тип связи</summary>
-    public RelationType Type { get; set; }
+    public RelationType Type { get; init; }
 }
 
 /// <summary>
@@ -283,16 +283,16 @@ public class PriorityEscalation : IAuditEntity
 
     public int TaskId { get; set; }
     [ForeignKey(nameof(TaskId))]
-    public TaskItem Task { get; set; } = null!;
+    public TaskItem? Task { get; init; }
 
     /// <summary>ID приоритета, до которого повышается задача</summary>
-    public int TargetPriorityId { get; set; }
+    public int TargetPriorityId { get; init; }
 
     [ForeignKey(nameof(TargetPriorityId))]
-    public PriorityLevel TargetPriority { get; set; } = null!;
+    public PriorityLevel? TargetPriority { get; init; }
 
     /// <summary>Дата, когда применяется повышение</summary>
-    public DateTime EscalationDate { get; set; }
+    public DateTime EscalationDate { get; init; }
 
     /// <summary>Применено ли уже повышение</summary>
     public bool IsApplied { get; set; }

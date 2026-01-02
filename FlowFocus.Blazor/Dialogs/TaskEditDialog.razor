@@ -7,7 +7,6 @@
 @inject ITagSessionService TagSessionService
 @inject IPlannerService PlannerService
 @inject INotificationService NotificationService
-@inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
 <MudDialog>
@@ -15,7 +14,7 @@
         <MudText Typo="Typo.h6">@(IsEdit ? "Редактировать задачу" : "Новая задача")</MudText>
     </TitleContent>
     <DialogContent>
-        <MudForm @ref="_form" @bind-IsValid="_isFormValid">
+        <MudForm @bind-IsValid="_isFormValid">
             <MudGrid Spacing="2">
                 @* === НАЗВАНИЕ === *@
                 <MudItem xs="12">
@@ -144,37 +143,8 @@
                                               Variant="Variant.Outlined"
                                               Class="mb-4" />
 
-                                @* Подзадачи *@
-                                <MudText Typo="Typo.subtitle2" Class="mb-2">Подзадачи</MudText>
-                                <div class="subtask-input mb-2">
-                                    <MudTextField T="string" @bind-Value="_newSubtaskTitle"
-                                                  Placeholder="Название подзадачи"
-                                                  Variant="Variant.Outlined"
-                                                  Margin="Margin.Dense"
-                                                  OnKeyDown="@OnSubtaskKeyDown"
-                                                  Class="flex-grow-1" />
-                                    <MudIconButton Icon="@Icons.Material.Filled.Add"
-                                                   Color="Color.Primary"
-                                                   OnClick="@AddSubtask"
-                                                   Disabled="@string.IsNullOrWhiteSpace(_newSubtaskTitle)" />
-                                </div>
-
-                                @foreach (var subtask in _subtasks.Where(s => !s.IsDeleted))
-                                {
-                                    <MudPaper Class="subtask-card mb-2 pa-2" Elevation="0" Outlined="true">
-                                        <div class="d-flex align-center gap-2">
-                                            <MudText>@subtask.Title</MudText>
-                                            <MudSpacer />
-                                            <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                                           Size="Size.Small"
-                                                           OnClick="@(() => EditSubtask(subtask))" />
-                                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                                           Size="Size.Small"
-                                                           Color="Color.Error"
-                                                           OnClick="@(() => subtask.IsDeleted = true)" />
-                                        </div>
-                                    </MudPaper>
-                                }
+                                @* Подзадачи (вынесено в компонент) *@
+                                <SubtasksEditor Subtasks="_subtasks" SubtasksChanged="@OnSubtasksChanged" />
 
                                 @* Связи с задачами *@
                                 <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Связи с задачами</MudText>
@@ -239,87 +209,6 @@
     </DialogActions>
 </MudDialog>
 
-<style>
-    .priority-option {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .priority-color {
-        width: 16px;
-        height: 16px;
-        border-radius: 4px;
-    }
-
-    .suggested-tags,
-    .selected-tags {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
-    }
-
-    .suggested-tag-chip {
-        transition: all 0.2s ease;
-    }
-
-    .suggested-tag-chip:hover {
-        transform: scale(1.05);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-
-    .tag-input-container {
-        position: relative;
-    }
-
-    .tag-add-button {
-        min-width: 100px;
-    }
-
-    .tag-search-results {
-        padding: 8px;
-        background: var(--mud-palette-background-gray);
-        border-radius: 4px;
-        border: 1px solid var(--mud-palette-lines-default);
-    }
-
-    .search-result-tags {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
-    }
-
-    .search-result-chip {
-        transition: all 0.2s ease;
-    }
-
-    .search-result-chip:hover {
-        transform: scale(1.05);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        background-color: var(--mud-palette-primary) !important;
-        color: var(--mud-palette-primary-text) !important;
-    }
-
-    .escalation-row,
-    .relation-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .subtask-input {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-    }
-
-    .weekday-select {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-</style>
-
 @code {
     [CascadingParameter]
     IMudDialogInstance MudDialog { get; set; } = null!;
@@ -333,7 +222,6 @@
     [Parameter]
     public bool IsSubtaskMode { get; set; }
 
-    private MudForm _form = null!;
     private bool _isFormValid;
     private TaskItem _task = new();
     private TaskItem? _originalTask; // Для отслеживания изменений
@@ -342,7 +230,6 @@
     private List<Tag> _selectedTags = [];
     private HashSet<int> _selectedTagIds = [];
     private List<SubtaskDto> _subtasks = [];
-    private string _newSubtaskTitle = string.Empty;
     private List<RelationDto> _relations = [];
     private readonly List<EscalationDto> _escalations = [];
     private List<TaskItem> _availableTasks = [];
@@ -475,7 +362,7 @@
         if (_suggestedTags.Count < 5)
         {
             var popular = TagRepo.GetPopularTags(10);
-            foreach (var tag in popular.TakeWhile(tag => _suggestedTags.Count < 5).Where(tag => !_selectedTagIds.Contains(tag.Id) && _suggestedTags.All(t => t.Id != tag.Id)))
+            foreach (var tag in popular.TakeWhile(_ => _suggestedTags.Count < 5).Where(tag => !_selectedTagIds.Contains(tag.Id) && _suggestedTags.All(t => t.Id != tag.Id)))
             {
                 _suggestedTags.Add(tag);
             }
@@ -488,44 +375,6 @@
     {
         _selectedTags.Remove(tag);
         _selectedTagIds.Remove(tag.Id);
-    }
-
-    private void AddSubtask()
-    {
-        if (string.IsNullOrWhiteSpace(_newSubtaskTitle)) return;
-
-        _subtasks.Add(new SubtaskDto { Title = _newSubtaskTitle.Trim() });
-        _newSubtaskTitle = string.Empty;
-    }
-
-    private void OnSubtaskKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter")
-        {
-            AddSubtask();
-        }
-    }
-
-    private async Task EditSubtask(SubtaskDto subtask)
-    {
-        var parameters = new DialogParameters<SubtaskEditDialog>
-        {
-            { x => x.ExistingSubtask, subtask }
-        };
-
-        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<SubtaskEditDialog>("Редактировать подзадачу", parameters, options);
-        var result = await dialog.Result;
-
-        if (result is { Canceled: false, Data: SubtaskDto updatedSubtask })
-        {
-            // Обновляем подзадачу в списке
-            var index = _subtasks.IndexOf(subtask);
-            if (index >= 0)
-            {
-                _subtasks[index] = updatedSubtask;
-            }
-        }
     }
 
     private void AddRelation()
@@ -811,6 +660,12 @@
         {
             Snackbar.Add($"Не удалось удалить связь: {ex.Message}", Severity.Error);
         }
+    }
+
+    private async Task OnSubtasksChanged(List<SubtaskDto>? updated)
+    {
+        _subtasks = updated ?? [];
+        await InvokeAsync(StateHasChanged);
     }
 
 }

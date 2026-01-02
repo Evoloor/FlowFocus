@@ -1,0 +1,97 @@
+@using SubtaskDto = FlowFocus.WebApp.Dialogs.SubtaskDto
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<div>
+    <MudText Typo="Typo.subtitle2" Class="mb-2">Подзадачи</MudText>
+    <div class="subtask-input mb-2">
+        <MudTextField T="string" @bind-Value="NewSubtaskTitle"
+                      Placeholder="Название подзадачи"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      OnKeyDown="OnSubtaskKeyDown"
+                      Class="flex-grow-1" />
+        <MudIconButton Icon="@Icons.Material.Filled.Add"
+                       Color="Color.Primary"
+                       OnClick="AddSubtask"
+                       Disabled="@string.IsNullOrWhiteSpace(NewSubtaskTitle)" />
+    </div>
+
+    @foreach (var subtask in Subtasks.Where(s => !s.IsDeleted))
+    {
+        <MudPaper Class="subtask-card mb-2 pa-2" Elevation="0" Outlined="true">
+            <div class="d-flex align-center gap-2">
+                <MudText>@subtask.Title</MudText>
+                <MudSpacer />
+                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                               Size="Size.Small"
+                               OnClick="@(async () => await EditSubtask(subtask))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                               Size="Size.Small"
+                               Color="Color.Error"
+                               OnClick="@( () => RemoveSubtask(subtask) )" />
+            </div>
+        </MudPaper>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public List<SubtaskDto> Subtasks { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<List<SubtaskDto>> SubtasksChanged { get; set; }
+
+    private string NewSubtaskTitle { get; set; } = string.Empty;
+
+    private void AddSubtask()
+    {
+        if (string.IsNullOrWhiteSpace(NewSubtaskTitle)) return;
+        Subtasks.Add(new SubtaskDto { Title = NewSubtaskTitle.Trim() });
+        NewSubtaskTitle = string.Empty;
+        _ = SubtasksChanged.InvokeAsync(Subtasks);
+    }
+
+    private void RemoveSubtask(SubtaskDto dto)
+    {
+        if (dto.Id is > 0)
+        {
+            dto.IsDeleted = true;
+        }
+        else
+        {
+            Subtasks.Remove(dto);
+        }
+        _ = SubtasksChanged.InvokeAsync(Subtasks);
+    }
+
+    private async Task EditSubtask(SubtaskDto subtask)
+    {
+        var parameters = new DialogParameters<SubtaskEditDialog>
+        {
+            { x => x.ExistingSubtask, subtask }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<SubtaskEditDialog>("Редактировать подзадачу", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: SubtaskDto updatedSubtask })
+        {
+            var index = Subtasks.IndexOf(subtask);
+            if (index >= 0)
+            {
+                Subtasks[index] = updatedSubtask;
+                await SubtasksChanged.InvokeAsync(Subtasks);
+            }
+        }
+    }
+
+    private void OnSubtaskKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            AddSubtask();
+        }
+    }
+}
