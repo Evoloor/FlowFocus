@@ -24,14 +24,14 @@
                                   Required="true"
                                   RequiredError="Название обязательно"
                                   Variant="Variant.Outlined"
-                                  Immediate="true" />
+                                  Immediate="true"/>
                 </MudItem>
-                
+
                 @if (!IsSubtaskMode)
                 {
                     <MudItem xs="12" sm="6">
                         <MudCheckBox T="bool" @bind-Value="_task.HideUnderSpoiler"
-                                     Label="Скрывать под спойлер" />
+                                     Label="Скрывать под спойлер"/>
                     </MudItem>
                 }
 
@@ -43,7 +43,7 @@
                                        Label="Дата назначения"
                                        Placeholder="Автоматически"
                                        Variant="Variant.Outlined"
-                                       Clearable="true" />
+                                       Clearable="true"/>
                     </MudItem>
                 }
 
@@ -53,7 +53,7 @@
                                  Label="Избранное"
                                  Color="Color.Warning"
                                  CheckedIcon="@Icons.Material.Filled.Star"
-                                 UncheckedIcon="@Icons.Material.Outlined.StarBorder" />
+                                 UncheckedIcon="@Icons.Material.Outlined.StarBorder"/>
                 </MudItem>
 
                 @* === ПРИОРИТЕТ === *@
@@ -84,7 +84,7 @@
                     <MudNumericField T="int?" @bind-Value="_task.Interest"
                                      Label="Интересность"
                                      Min="1" Max="10"
-                                     Variant="Variant.Outlined" />
+                                     Variant="Variant.Outlined"/>
                 </MudItem>
 
                 @* === СЛОЖНОСТЬ === *@
@@ -92,7 +92,7 @@
                     <MudNumericField T="int?" @bind-Value="_task.Complexity"
                                      Label="Сложность"
                                      Min="1" Max="100"
-                                     Variant="Variant.Outlined" />
+                                     Variant="Variant.Outlined"/>
                 </MudItem>
 
                 @* === ВРЕМЯ ВЫПОЛНЕНИЯ === *@
@@ -102,7 +102,7 @@
                                          Label="Время"
                                          Min="1"
                                          Variant="Variant.Outlined"
-                                         Class="flex-grow-1" />
+                                         Class="flex-grow-1"/>
                         <MudSelect T="TimeFormat" @bind-Value="_timeFormat"
                                    Label="Формат"
                                    Variant="Variant.Outlined"
@@ -117,9 +117,14 @@
                 @if (!IsSubtaskMode)
                 {
                     <MudItem xs="12">
-                        <TagInput SuggestedTags="_suggestedTags" SelectedTags="_selectedTags" SelectedTagIds="_selectedTagIds"
+                        <TagInput SuggestedTags="_suggestedTags" SelectedTags="_selectedTags"
+                                  SelectedTagIds="_selectedTagIds"
                                   OnTagAdded="@(async (Tag t) => await AddTag(t))"
-                                  OnTagRemoved="@(async (Tag t) => { RemoveTag(t); await InvokeAsync(StateHasChanged); })" />
+                                  OnTagRemoved="@(async (Tag t) =>
+                                                {
+                                                    RemoveTag(t);
+                                                    await InvokeAsync(StateHasChanged);
+                                                })"/>
                     </MudItem>
                 }
 
@@ -134,59 +139,20 @@
                                               Label="Описание"
                                               Lines="3"
                                               Variant="Variant.Outlined"
-                                              Class="mb-4" />
+                                              Class="mb-4"/>
 
                                 @* Подзадачи (вынесено в компонент) *@
-                                <SubtasksEditor Subtasks="_subtasks" SubtasksChanged="@OnSubtasksChanged" />
+                                <SubtasksEditor Subtasks="_subtasks" SubtasksChanged="@OnSubtasksChanged"/>
 
                                 @* Повышение приоритета (перенесено сюда) *@
-                                <EscalationsEditor Escalations="_escalations" Task="_task" Priorities="_priorities" ShouldShow="ShouldShowEscalationTable" />
+                                <EscalationsEditor Escalations="_escalations" Task="_task" Priorities="_priorities"
+                                                   ShouldShow="ShouldShowEscalationTable"/>
 
-                                @* Связи с задачами *@
-                                <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Связи с задачами</MudText>
-
-                                <RelationsEditor Relations="_relations" AvailableTasks="_availableTasks" OnRemoveRequested="RemoveRelationById" />
-
-                                @* Показываем входящие связи (блокеры), только для чтения *@
-                                @if (_inverseRelations.Any())
-                                {
-                                    <div class="mt-3">
-                                        <MudText Typo="Typo.subtitle2" Class="mb-2">Блокируют эту задачу</MudText>
-                                        @foreach (var inv in _inverseRelations)
-                                        {
-                                            @if (inv.SourceTask != null)
-                                            {
-                                                <MudPaper Class="mb-2 pa-2" Elevation="0" Outlined="true">
-                                                    <div class="d-flex align-center gap-2">
-                                                        <MudText>@inv.SourceTask.Title</MudText>
-                                                        <MudSpacer />
-                                                        <MudText Typo="Typo.caption" Class="text-muted">@inv.Type.ToString()</MudText>
-                                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => RemoveRelationById(inv.Id))" />
-                                                    </div>
-                                                </MudPaper>
-                                            }
-                                        }
-                                    </div>
-                                }
-
-                                @if (_relations.Count < AppConfig.MaxTaskRelations)
-                                {
-                                    <MudButton StartIcon="@Icons.Material.Filled.Add"
-                                               Variant="Variant.Text"
-                                               Size="Size.Small"
-                                               OnClick="@AddRelation">
-                                        Добавить связь (@(_relations.Count)/@AppConfig.MaxTaskRelations)
-                                    </MudButton>
-                                }
-                                else
-                                {
-                                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
-                                        Достигнут лимит связей (@AppConfig.MaxTaskRelations). Удалите существующие связи для добавления новых.
-                                    </MudAlert>
-                                }
+                                <RelationsEditor Relations="_relations" AvailableTasks="_availableTasks"
+                                                 OnRemoveRequested="RemoveRelationById"/>
 
                                 @* Повторение *@
-                                <RecurrenceEditor Task="_task" />
+                                <RecurrenceEditor Task="_task"/>
                             </MudExpansionPanel>
                         </MudExpansionPanels>
                     </MudItem>
@@ -206,17 +172,13 @@
 </MudDialog>
 
 @code {
-    [CascadingParameter]
-    IMudDialogInstance MudDialog { get; set; } = null!;
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
 
-    [Parameter]
-    public TaskItem? ExistingTask { get; set; }
+    [Parameter] public TaskItem? ExistingTask { get; set; }
 
-    [Parameter]
-    public string? InitialTitle { get; set; }
+    [Parameter] public string? InitialTitle { get; set; }
 
-    [Parameter]
-    public bool IsSubtaskMode { get; set; }
+    [Parameter] public bool IsSubtaskMode { get; set; }
 
     private bool _isFormValid;
     private TaskItem _task = new();
@@ -347,13 +309,13 @@
         // Обновляем предложенные теги после добавления
         await RefreshSuggestedTags();
     }
-    
+
     private async Task RefreshSuggestedTags()
     {
         // Получаем новые предлагаемые теги (исключая уже добавленные)
         var allSuggested = TagSessionService.GetSuggestedTags(10); // Берем больше, чтобы было из чего выбирать
         _suggestedTags = allSuggested.Where(t => !_selectedTagIds.Contains(t.Id)).Take(5).ToList();
-        
+
         // Если не хватает до 5, добавляем популярные теги
         if (_suggestedTags.Count < 5)
         {
@@ -363,7 +325,7 @@
                 _suggestedTags.Add(tag);
             }
         }
-        
+
         await InvokeAsync(StateHasChanged);
     }
 
@@ -371,16 +333,6 @@
     {
         _selectedTags.Remove(tag);
         _selectedTagIds.Remove(tag.Id);
-    }
-
-    private void AddRelation()
-    {
-        if (_relations.Count >= AppConfig.MaxTaskRelations)
-        {
-            Snackbar.Add($"Достигнут лимит связей ({AppConfig.MaxTaskRelations})", Severity.Warning);
-            return;
-        }
-        _relations.Add(new() { Type = RelationType.RelatedTo });
     }
 
     private void OnAfterPriorityChanged()
@@ -402,6 +354,7 @@
                 {
                     Snackbar.Add(error, Severity.Warning);
                 }
+
                 return;
             }
 
@@ -524,13 +477,13 @@
     {
         // Фильтруем удаленные подзадачи
         var activeSubtasks = _subtasks.Where(s => !s.IsDeleted).ToList();
-        
+
         // Получаем существующие подзадачи из оригинальной задачи для получения полной информации
         var existingSubtasksSource = ExistingTask?.Subtasks ?? [];
-        
+
         // Список для результата
         var resultSubtasks = new List<TaskItem>();
-        
+
         foreach (var dto in activeSubtasks)
         {
             if (dto.Id is > 0)
@@ -586,7 +539,7 @@
                 resultSubtasks.Add(newSubtask);
             }
         }
-        
+
         _task.Subtasks = resultSubtasks;
     }
 
@@ -665,3 +618,85 @@
     }
 
 }
+
+<style>
+    .priority-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .priority-color {
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+    }
+
+    .suggested-tags,
+    .selected-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .suggested-tag-chip {
+        transition: all 0.2s ease;
+    }
+
+    .suggested-tag-chip:hover {
+        transform: scale(1.05);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .tag-input-container {
+        position: relative;
+    }
+
+    .tag-add-button {
+        min-width: 100px;
+    }
+
+    .tag-search-results {
+        padding: 8px;
+        background: var(--mud-palette-background-gray);
+        border-radius: 4px;
+        border: 1px solid var(--mud-palette-lines-default);
+    }
+
+    .search-result-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .search-result-chip {
+        transition: all 0.2s ease;
+    }
+
+    .search-result-chip:hover {
+        transform: scale(1.05);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        background-color: var(--mud-palette-primary) !important;
+        color: var(--mud-palette-primary-text) !important;
+    }
+
+    .escalation-row,
+    .relation-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .subtask-input {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .weekday-select {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+</style>
