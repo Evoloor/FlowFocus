@@ -50,10 +50,10 @@
 
 @code {
     [Parameter]
-    public List<RelationDto> Relations { get; set; } = new();
+    public List<RelationDto> Relations { get; set; } = [];
 
     [Parameter]
-    public List<TaskItem> AvailableTasks { get; set; } = new();
+    public List<TaskItem> AvailableTasks { get; set; } = [];
 
     [Parameter]
     public EventCallback<int?> OnRemoveRequested { get; set; }

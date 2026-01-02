@@ -1,4 +1,4 @@
-namespace FlowFocus.Blazor.Dialogs;
+namespace FlowFocus.Blazor.EditDialogContents;
 
 public class EscalationDto
 {

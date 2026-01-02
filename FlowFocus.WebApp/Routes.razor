@@ -1,8 +1,8 @@
 ﻿@code {
-    private static readonly System.Reflection.Assembly[] AdditionalAssemblies = new[] 
-    { 
+    private static readonly System.Reflection.Assembly[] AdditionalAssemblies =
+    [
         typeof(MainLayout).Assembly
-    };
+    ];
 }
 
 <Router AppAssembly="@AppAssembly.Value" AdditionalAssemblies="@AdditionalAssemblies">

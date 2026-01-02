@@ -1,4 +1,4 @@
-namespace FlowFocus.WebApp.Dialogs;
+namespace FlowFocus.Blazor.EditDialogContents;
 
 /// <summary>
 /// DTO для подзадачи в диалоге редактирования

@@ -1,4 +1,4 @@
-namespace FlowFocus.WebApp.Components;
+namespace FlowFocus.Blazor.Components;
 
 /// <summary>
 /// Фильтр для списка задач

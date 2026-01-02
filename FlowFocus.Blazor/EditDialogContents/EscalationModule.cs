@@ -1,13 +1,13 @@
 using FlowFocus.Core.Models;
 
-namespace FlowFocus.Blazor.Dialogs;
+namespace FlowFocus.Blazor.EditDialogContents;
 
 public static class EscalationModule
 {
     // Move SyncEscalationsToTask logic here so TaskEditDialog can call it
     public static List<PriorityEscalation> SyncEscalationsToTask(List<EscalationDto> dtos, TaskItem task, TaskItem? existingTask, List<PriorityLevel> priorities)
     {
-        var existingEscalationsSource = existingTask?.PriorityEscalations ?? new List<PriorityEscalation>();
+        var existingEscalationsSource = existingTask?.PriorityEscalations ?? [];
         var resultEscalations = new List<PriorityEscalation>();
 
         foreach (var dto in dtos)

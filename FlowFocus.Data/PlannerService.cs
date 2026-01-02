@@ -31,7 +31,7 @@ public class PlannerService(
                 .OrderBy(e => e.TargetPriority?.Order ?? 99)
                 .ToList();
 
-            if (escalations.Any())
+            if (escalations.Count != 0)
             {
                 var highestEscalation = escalations.First();
                 

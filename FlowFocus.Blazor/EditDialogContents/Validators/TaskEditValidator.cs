@@ -1,6 +1,6 @@
 using FlowFocus.Core.Models;
 
-namespace FlowFocus.Blazor.Dialogs.Validators;
+namespace FlowFocus.Blazor.EditDialogContents.Validators;
 
 public static class TaskEditValidator
 {
@@ -9,7 +9,8 @@ public static class TaskEditValidator
     public static ValidationResult ValidateEscalations(IEnumerable<EscalationDto>? escalations, TaskItem task, List<PriorityLevel> priorities)
     {
         var errors = new List<string>();
-        var escalationList = escalations?.Where(e => e.EscalationDate != null).OrderBy(e => e.EscalationDate).ToList() ?? new List<EscalationDto>();
+        var escalationList = escalations?.Where(e => e.EscalationDate != null).OrderBy(e => e.EscalationDate).ToList() ??
+                             [];
 
         var currentPriorityOrder = task.PriorityId.HasValue
             ? priorities.FirstOrDefault(p => p.Id == task.PriorityId)?.Order ?? 99
@@ -42,13 +43,13 @@ public static class TaskEditValidator
             prevDate = escalation.EscalationDate?.Date ?? prevDate;
         }
 
-        return new(!errors.Any(), errors);
+        return new(errors.Count == 0, errors);
     }
 
     public static ValidationResult ValidateRelations(IEnumerable<RelationDto>? relations, TaskItem task, List<PriorityLevel> priorities)
     {
         var errors = new List<string>();
-        var relationList = relations?.Where(r => r.TargetTask != null).ToList() ?? new List<RelationDto>();
+        var relationList = relations?.Where(r => r.TargetTask != null).ToList() ?? [];
 
         foreach (var relation in relationList)
         {
@@ -101,7 +102,7 @@ public static class TaskEditValidator
             }
         }
 
-        return new(!errors.Any(), errors);
+        return new(errors.Count == 0, errors);
     }
 
     private static bool HasCircularReference(RelationDto newRelation, TaskItem task)
@@ -109,17 +110,7 @@ public static class TaskEditValidator
         if (newRelation.TargetTask == null) return false;
         if (newRelation.TargetTask.Id == task.Id) return true;
 
-        var targetRelations = newRelation.TargetTask.Relations ?? new List<TaskRelation>();
-        foreach (var r in targetRelations)
-        {
-            if (r.TargetTaskId == task.Id &&
-                ((r.Type == Core.Enums.RelationType.Blocks && newRelation.Type == Core.Enums.RelationType.BlockedBy) ||
-                 (r.Type == Core.Enums.RelationType.BlockedBy && newRelation.Type == Core.Enums.RelationType.Blocks)))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        var targetRelations = newRelation.TargetTask.Relations ?? [];
+        return targetRelations.Any(r => r.TargetTaskId == task.Id && ((r.Type == Core.Enums.RelationType.Blocks && newRelation.Type == Core.Enums.RelationType.BlockedBy) || (r.Type == Core.Enums.RelationType.BlockedBy && newRelation.Type == Core.Enums.RelationType.Blocks)));
     }
 }

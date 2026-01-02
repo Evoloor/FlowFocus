@@ -1,9 +1,8 @@
 @inject ITagRepository TagRepo
 @inject ITagSessionService TagSessionService
-@inject ISnackbar Snackbar
 
 <div class="tag-input-container">
-    <MudText Typo="Typo.subtitle2" Class="mb-2">����</MudText>
+    <MudText Typo="Typo.subtitle2" Class="mb-2">Теги</MudText>
     <div class="suggested-tags mb-3">
         @foreach (var tag in SuggestedTags)
         {
@@ -17,17 +16,17 @@
 
     <div class="d-flex gap-2 align-end mb-3">
         <MudTextField T="string" @bind-Value="NewTagInput" @bind-Value:after="OnTagInputChanged"
-                     Label="������� ����� ��� ��� ������� ������������" Variant="Variant.Outlined" Margin="Margin.Dense"
+                     Label="Название тега или поиск" Variant="Variant.Outlined" Margin="Margin.Dense"
                      OnKeyDown="OnTagKeyDown" Immediate="true" Clearable="true" Class="flex-grow-1" />
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddNewTag" Disabled="@IsAddTagButtonDisabled">
-            ��������
+            Добавить
         </MudButton>
     </div>
 
     @if (TagSearchResults.Any() && !string.IsNullOrWhiteSpace(NewTagInput))
     {
         <div class="tag-search-results mt-2">
-            <MudText Typo="Typo.caption" Class="mb-1 text-muted">�������:</MudText>
+            <MudText Typo="Typo.caption" Class="mb-1 text-muted">Результаты поиска:</MudText>
             <div class="search-result-tags">
                 @foreach (var tag in TagSearchResults.Where(tag => !SelectedTagIds.Contains(tag.Id)))
                 {
@@ -41,7 +40,7 @@
 
     @if (SelectedTags.Any())
     {
-        <MudText Typo="Typo.caption" Class="mt-2 mb-1 font-weight-medium">�����������:</MudText>
+        <MudText Typo="Typo.caption" Class="mt-2 mb-1 font-weight-medium">Выбранные:</MudText>
         <div class="selected-tags">
             @foreach (var tag in SelectedTags)
             {
@@ -55,13 +54,13 @@
 
 @code {
     [Parameter]
-    public List<Tag> SuggestedTags { get; set; } = new();
+    public List<Tag> SuggestedTags { get; set; } = [];
 
     [Parameter]
-    public List<Tag> SelectedTags { get; set; } = new();
+    public List<Tag> SelectedTags { get; set; } = [];
 
     [Parameter]
-    public HashSet<int> SelectedTagIds { get; set; } = new();
+    public HashSet<int> SelectedTagIds { get; set; } = [];
 
     [Parameter]
     public EventCallback<Tag> OnTagAdded { get; set; }
@@ -70,15 +69,15 @@
     public EventCallback<Tag> OnTagRemoved { get; set; }
 
     private string NewTagInput { get; set; } = string.Empty;
-    private List<Tag> TagSearchResults { get; set; } = new();
+    private List<Tag> TagSearchResults { get; set; } = [];
 
-    private bool IsAddTagButtonDisabled => string.IsNullOrWhiteSpace(NewTagInput?.Trim());
+    private bool IsAddTagButtonDisabled => string.IsNullOrWhiteSpace(NewTagInput.Trim());
 
     private async Task OnTagInputChanged()
     {
         if (string.IsNullOrWhiteSpace(NewTagInput))
         {
-            TagSearchResults = new();
+            TagSearchResults = [];
             await InvokeAsync(StateHasChanged);
             return;
         }
@@ -89,7 +88,7 @@
 
     private async Task OnTagKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(NewTagInput?.Trim()))
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(NewTagInput.Trim()))
         {
             await AddNewTag();
         }
@@ -112,7 +111,7 @@
         }
 
         NewTagInput = string.Empty;
-        TagSearchResults = new();
+        TagSearchResults = [];
         await InvokeAsync(StateHasChanged);
     }
 

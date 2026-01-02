@@ -1,6 +1,6 @@
 using FlowFocus.Core.Models;
 
-namespace FlowFocus.Blazor.Dialogs;
+namespace FlowFocus.Blazor.EditDialogContents;
 
 public class RelationDto
 {

@@ -1,13 +1,13 @@
 using FlowFocus.Core.Models;
 
-namespace FlowFocus.Blazor.Dialogs;
+namespace FlowFocus.Blazor.EditDialogContents;
 
 public static class RelationModule
 {
     public static List<TaskRelation> SyncRelationsToTask(List<RelationDto> dtos, TaskItem task, TaskItem? existingTask)
     {
         var validRelations = dtos.Where(r => r.TargetTask != null).ToList();
-        var existingRelationsSource = existingTask?.Relations ?? new List<TaskRelation>();
+        var existingRelationsSource = existingTask?.Relations ?? [];
         var resultRelations = new List<TaskRelation>();
 
         foreach (var dto in validRelations)

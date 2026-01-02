@@ -25,7 +25,7 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
             entity.LastChangesOn = DateTime.UtcNow;
             
             // Устанавливаем ParentTaskId для подзадач перед сохранением
-            if (entity.Subtasks.Any())
+            if (entity.Subtasks.Count != 0)
             {
                 foreach (var subtask in entity.Subtasks)
                 {
@@ -42,7 +42,7 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
             }
             
             // Устанавливаем SourceTaskId для связей перед сохранением
-            if (entity.Relations.Any())
+            if (entity.Relations.Count != 0)
             {
                 foreach (var relation in entity.Relations)
                 {
@@ -55,7 +55,7 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
             }
             
             // Устанавливаем TaskId для повышений приоритета перед сохранением
-            if (entity.PriorityEscalations.Any())
+            if (entity.PriorityEscalations.Count != 0)
             {
                 foreach (var escalation in entity.PriorityEscalations)
                 {
@@ -153,7 +153,7 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
         }
         
         // Проверяем и удаляем неиспользуемые теги
-        if (removedTagIds.Any())
+        if (removedTagIds.Count != 0)
         {
             var tagRepo = new TagRepository(Context);
             tagRepo.CleanupUnusedTags(removedTagIds);
@@ -528,7 +528,7 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
 
             // Удаляем связи, где эта задача является источником или целью
             var relations = Context.TaskRelations.Where(r => r.SourceTaskId == id || r.TargetTaskId == id).ToList();
-            if (relations.Any())
+            if (relations.Count != 0)
             {
                 Context.TaskRelations.RemoveRange(relations);
             }
@@ -538,7 +538,7 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
             Context.SaveChanges();
             
             // Проверяем и удаляем неиспользуемые теги
-            if (tagIds.Any())
+            if (tagIds.Count != 0)
             {
                 var tagRepo = new TagRepository(Context);
                 tagRepo.CleanupUnusedTags(tagIds);
@@ -689,7 +689,7 @@ public class TagRepository(StorageContext context) : CachedRepository<Tag>(conte
     
     public void CleanupUnusedTags(List<int> tagIds)
     {
-        if (tagIds == null || !tagIds.Any()) return;
+        if (tagIds == null || tagIds.Count == 0) return;
         
         lock (CacheLock)
         {
