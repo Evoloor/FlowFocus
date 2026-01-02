@@ -1,0 +1,74 @@
+.priority-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.priority-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+}
+
+.priority-container {
+    min-height: 100px;
+}
+
+.priority-dropzone {
+    min-height: 100px;
+    border: 2px dashed transparent;
+    border-radius: 8px;
+    transition: border-color 0.2s;
+}
+
+.priority-dropzone.mud-drop-zone-drag-block {
+    border-color: var(--mud-palette-primary);
+}
+
+.priority-item {
+    cursor: grab;
+    transition: all 0.2s;
+    border-left: 4px solid var(--mud-palette-lines-default);
+}
+
+.priority-item:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.priority-item:active {
+    cursor: grabbing;
+}
+
+.drag-handle {
+    cursor: grab;
+    opacity: 0.5;
+}
+
+.drag-handle:hover {
+    opacity: 1;
+}
+
+.color-palette {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+}
+
+.color-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.color-swatch:hover {
+    transform: scale(1.1);
+}
+
+.color-swatch.selected {
+    border-color: var(--mud-palette-text-primary);
+    box-shadow: 0 0 0 2px var(--mud-palette-background);
+}

@@ -151,61 +151,6 @@
     }
 </div>
 
-<style>
-    .task-list-header {
-        margin-bottom: 16px;
-    }
-
-    .task-list-controls {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        align-items: center;
-    }
-
-    .search-field {
-        min-width: 200px;
-        flex: 1;
-        max-width: 400px;
-    }
-
-    .task-list-filters {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        align-items: flex-start;
-    }
-
-    .task-list-filters > * {
-        min-width: 150px;
-    }
-
-    .display-mode-toggle {
-        flex-shrink: 0;
-    }
-
-    .task-list-content {
-        min-height: 200px;
-    }
-
-    .task-list-content-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        gap: 12px;
-    }
-
-    .task-list-pagination {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 16px;
-    }
-
-    .page-size-select {
-        width: 100px;
-    }
-</style>
-
 @code {
     // === Параметры отображения ===
     [Parameter]
