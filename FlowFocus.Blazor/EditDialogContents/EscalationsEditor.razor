@@ -3,15 +3,15 @@
 @if (ShouldShow)
 {
     <MudExpansionPanels>
-        <MudExpansionPanel Text="��������� ����������">
-            <MudText Typo="Typo.body2" Class="mb-2 text-muted">��������� �������������� ��������� ���������� �� �����</MudText>
+        <MudExpansionPanel Text="Повышение приоритета">
+            <MudText Typo="Typo.body2" Class="mb-2 text-muted">Настройки автоматического повышения приоритета по времени</MudText>
 
             @foreach (var escalation in Escalations)
             {
                 var isEscalationDateDisabled = escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date < DateTime.Today;
                 <div class="escalation-row mb-2">
                     <MudSelect T="int" @bind-Value="escalation.TargetPriorityId"
-                               Label="���������"
+                               Label="Приоритет"
                                Variant="Variant.Outlined"
                                Margin="Margin.Dense"
                                Dense="true"
@@ -21,9 +21,9 @@
                             <MudSelectItem Value="p.Id">@p.Name</MudSelectItem>
                         }
                     </MudSelect>
-                    <MudTooltip Text="@(isEscalationDateDisabled ? "���� ��������� �� ����� ���� � �������" : "")">
+                    <MudTooltip Text="@(isEscalationDateDisabled ? "Дата уже прошла и изменить её нельзя" : "")">
                         <MudDatePicker T="DateTime?" @bind-Date="escalation.EscalationDate"
-                                       Label="����"
+                                       Label="Дата"
                                        Variant="Variant.Outlined"
                                        Margin="Margin.Dense"
                                        MinDate="@DateTime.Today"
@@ -42,7 +42,7 @@
                            Variant="Variant.Text"
                            Color="Color.Primary"
                            OnClick="@AddEscalation">
-                    �������� ������� ���������
+                    Добавить повышение приоритета
                 </MudButton>
             }
         </MudExpansionPanel>

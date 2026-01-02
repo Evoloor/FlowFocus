@@ -3,10 +3,10 @@
 @inject ISnackbar Snackbar
 
 <div>
-    <MudText Typo="Typo.subtitle2" Class="mb-2">���������</MudText>
+    <MudText Typo="Typo.subtitle2" Class="mb-2">Подзадачи</MudText>
     <div class="subtask-input mb-2">
         <MudTextField T="string" @bind-Value="NewSubtaskTitle"
-                      Placeholder="�������� ���������"
+                      Placeholder="Название подзадачи"
                       Variant="Variant.Outlined"
                       Margin="Margin.Dense"
                       OnKeyDown="OnSubtaskKeyDown"
@@ -73,7 +73,7 @@
         };
 
         var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<SubtaskEditDialog>("������������� ���������", parameters, options);
+        var dialog = await DialogService.ShowAsync<SubtaskEditDialog>("Редактировать подзадачу", parameters, options);
         var result = await dialog.Result;
 
         if (result is { Canceled: false, Data: SubtaskDto updatedSubtask })

@@ -25,17 +25,17 @@ public static class TaskEditValidator
 
             if (targetPriority.Order >= prevPriorityOrder)
             {
-                errors.Add($"��������� ���������� ������ ���� ����������������: {targetPriority.Name} �� ���� ��������");
+                errors.Add($"Нельзя задать повышение приоритета до \"{targetPriority.Name}\" — он не выше предыдущего.");
             }
 
             if (escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date < DateTime.Today)
             {
-                errors.Add($"���� ��������� {escalation.EscalationDate.Value:dd.MM.yyyy} ��� ������");
+                errors.Add($"Дата повышения {escalation.EscalationDate.Value:dd.MM.yyyy} уже в прошлом");
             }
 
             if (escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date <= prevDate)
             {
-                errors.Add("���� ��������� ������ ���� �����������������");
+                errors.Add("Дата повышения должна быть позже предыдущей даты.");
             }
 
             prevPriorityOrder = targetPriority.Order;
@@ -76,7 +76,7 @@ public static class TaskEditValidator
                 {
                     if (blockerDate.Value.Date > blockedDate.Value.Date)
                     {
-                        errors.Add($"���� ������� \"{blocker.Title}\" ({blockerDate.Value:dd.MM.yyyy}) ������ ���� �� ����� ���� ����������� ������ ({blockedDate.Value:dd.MM.yyyy})");
+                        errors.Add($"Дата задачи \"{blocker.Title}\" ({blockerDate.Value:dd.MM.yyyy}) позже даты задачи, которую она блокирует ({blockedDate.Value:dd.MM.yyyy})");
                     }
                 }
 
@@ -89,15 +89,15 @@ public static class TaskEditValidator
 
                 if (blockerPriorityOrder > blockedPriorityOrder)
                 {
-                    var blockerPriority = priorities.FirstOrDefault(p => p.Id == blocker.PriorityId)?.Name ?? "�� �����";
-                    var blockedPriority = priorities.FirstOrDefault(p => p.Id == blocked.PriorityId)?.Name ?? "�� �����";
-                    errors.Add($"��������� ������� \"{blocker.Title}\" ({blockerPriority}) �� ������ ���� ������ ����������� ������ ({blockedPriority})");
+                    var blockerPriority = priorities.FirstOrDefault(p => p.Id == blocker.PriorityId)?.Name ?? "Не задан";
+                    var blockedPriority = priorities.FirstOrDefault(p => p.Id == blocked.PriorityId)?.Name ?? "Не задан";
+                    errors.Add($"Приоритет задачи \"{blocker.Title}\" ({blockerPriority}) ниже приоритета связанной задачи ({blockedPriority})");
                 }
             }
 
             if (HasCircularReference(relation, task))
             {
-                errors.Add($"���������� ����������� ����������� � ������� \"{relation.TargetTask!.Title}\"");
+                errors.Add($"Обнаружена циклическая зависимость в отношении к задаче \"{relation.TargetTask!.Title}\"");
             }
         }
 

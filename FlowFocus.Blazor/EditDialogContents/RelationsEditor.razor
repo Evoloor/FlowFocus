@@ -1,23 +1,23 @@
 @inject IDialogService DialogService
 
 <div>
-    <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">����� � ��������</MudText>
+    <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Связи с задачами</MudText>
 
     @foreach (var relation in Relations)
     {
         <div class="relation-row mb-2">
             <MudSelect T="RelationType" @bind-Value="relation.Type"
-                       Label="���"
+                       Label="Тип"
                        Variant="Variant.Outlined"
                        Margin="Margin.Dense"
                        Dense="true"
                        Style="width: 150px">
-                <MudSelectItem Value="RelationType.RelatedTo">������� �</MudSelectItem>
-                <MudSelectItem Value="RelationType.Blocks">���������</MudSelectItem>
-                <MudSelectItem Value="RelationType.BlockedBy">�����������</MudSelectItem>
+                <MudSelectItem Value="RelationType.RelatedTo">Связана с</MudSelectItem>
+                <MudSelectItem Value="RelationType.Blocks">Блокирует</MudSelectItem>
+                <MudSelectItem Value="RelationType.BlockedBy">Заблокирована</MudSelectItem>
             </MudSelect>
             <MudAutocomplete T="TaskItem" @bind-Value="relation.TargetTask"
-                             Label="������"
+                             Label="Задача"
                              SearchFunc="@SearchTasks"
                              ToStringFunc="@(t => t?.Title ?? string.Empty)"
                              Variant="Variant.Outlined"
@@ -37,13 +37,13 @@
                    Variant="Variant.Text"
                    Size="Size.Small"
                    OnClick="@AddRelation">
-            �������� ����� (@(Relations.Count)/@AppConfig.MaxTaskRelations)
+            Добавить связь (@(Relations.Count)/@AppConfig.MaxTaskRelations)
         </MudButton>
     }
     else
     {
         <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
-            ��������� ����� ������ (@AppConfig.MaxTaskRelations). ������� ������������ ����� ��� ���������� �����.
+            Достигнут лимит связей (@AppConfig.MaxTaskRelations). Удалите существующие связи для добавления новых.
         </MudAlert>
     }
 </div>

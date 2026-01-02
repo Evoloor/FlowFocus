@@ -1,25 +1,25 @@
 <div class="recurrence-block">
-    <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">����������</MudText>
-    <MudCheckBox T="bool" @bind-Value="Task.IsRecurring" Label="������������� ������" />
+    <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Повторение</MudText>
+    <MudCheckBox T="bool" @bind-Value="Task.IsRecurring" Label="Повторяющаяся задача" />
 
     @if (Task.IsRecurring)
     {
         <div class="recurrence-options mt-2">
             <MudRadioGroup T="RecurrenceType" @bind-Value="Task.RecurrenceType">
-                <MudRadio Value="RecurrenceType.Daily" Color="Color.Primary">���������</MudRadio>
+                <MudRadio Value="RecurrenceType.Daily" Color="Color.Primary">Ежедневно</MudRadio>
                 <MudRadio Value="RecurrenceType.EveryNDays" Color="Color.Primary">
                     <div class="d-flex align-center gap-2">
-                        <span>������</span>
+                        <span>Каждые</span>
                         <MudNumericField T="int?" @bind-Value="Task.RecurrenceInterval"
                                          Min="2" Max="365"
                                          Variant="Variant.Outlined"
                                          Margin="Margin.Dense"
                                          Style="width: 80px"
                                          Disabled="@(Task.RecurrenceType != RecurrenceType.EveryNDays)" />
-                        <span>����</span>
+                        <span>дня</span>
                     </div>
                 </MudRadio>
-                <MudRadio Value="RecurrenceType.WeekDays" Color="Color.Primary">�� ���� ������</MudRadio>
+                <MudRadio Value="RecurrenceType.WeekDays" Color="Color.Primary">По рабочим дням</MudRadio>
             </MudRadioGroup>
 
             @if (Task.RecurrenceType == RecurrenceType.WeekDays)
@@ -45,7 +45,7 @@
 
     private static readonly (string Name, int Value)[] WeekDays =
     [
-        ("��", 1), ("��", 2), ("��", 4), ("��", 8), ("��", 16), ("��", 32), ("��", 64)
+        ("Пн", 1), ("Вт", 2), ("Ср", 4), ("Чт", 8), ("Пт", 16), ("Сб", 32), ("Вс", 64)
     ];
 
     private bool IsWeekDaySelected(int dayValue)
