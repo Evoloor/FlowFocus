@@ -284,14 +284,33 @@
         }).ToList();
 
         // Загружаем связи из source (чтобы получить навигационные TargetTask / SourceTask)
-        _relations = (source?.Relations ?? []).Select(r => new RelationDto
+        var outgoing = (source?.Relations ?? []).Select(r => new RelationDto
         {
             Id = r.Id,
             Type = r.Type,
             TargetTask = r.TargetTask
-        }).ToList();
+        });
 
-        // Load inverse relations into DTOs for display as readonly list
+        // Преобразуем входящие (InverseRelations) в представление для текущей задачи:
+        // если другая задача блокирует текущую (inverse.Type == Blocks, SourceTask == other),
+        // то с точки зрения текущей задачи это BlockedBy с Target = other.
+        var incoming = (source?.InverseRelations ?? []).Select(r => new RelationDto
+        {
+            Id = r.Id,
+            Type = r.Type == RelationType.Blocks ? RelationType.BlockedBy
+                   : r.Type == RelationType.BlockedBy ? RelationType.Blocks
+                   : r.Type,
+            TargetTask = r.SourceTask
+        });
+
+        // Объединяем исходящие и входящие, убираем дубликаты по (TargetTaskId, Type)
+        _relations = outgoing.Concat(incoming)
+            .Where(r => r.TargetTask != null)
+            .GroupBy(r => new { Id = r.TargetTask!.Id, Type = r.Type })
+            .Select(g => g.First())
+            .ToList();
+
+        // Сохраняем оригинальные inverse relations отдельно, если понадобятся как readonly
         _inverseRelations = source?.InverseRelations ?? [];
     }
 
