@@ -217,8 +217,8 @@
             // If editing existing task, and it has no user priority set, apply default from settings
             _task.PriorityId ??= _settings?.DefaultPriorityId;
 
-            // Load inverse relations for display
-            _inverseRelations = ExistingTask.InverseRelations ?? [];
+            // NOTE: _inverseRelations initialized in LoadExistingTaskData from tracked source; don't overwrite here
+            // _inverseRelations = ExistingTask.InverseRelations ?? [];
         }
         else
         {
@@ -251,10 +251,19 @@
 
     private void LoadExistingTaskData()
     {   
-        // Загружаем теги из оригинальной задачи (конструктор копирования не копирует навигационные свойства)
-        if (ExistingTask != null && ExistingTask.Tags.Any())
+        // Если у нас есть существующая задача, пытаемся получить полную (tracked) версию из репозитория,
+        // чтобы иметь навигационные свойства (Tags, Subtasks, Relations, InverseRelations).
+        var source = ExistingTask;
+        if (ExistingTask != null && ExistingTask.Id > 0)
         {
-            _selectedTags = ExistingTask.Tags.Select(tt => tt.Tag).Where(t => t != null).ToList();
+            var repoVersion = TaskRepo.GetById(ExistingTask.Id);
+            if (repoVersion != null) source = repoVersion;
+        }
+
+        // Загружаем теги из оригинальной задачи (конструктор копирования не копирует навигационные свойства)
+        if (source != null && source.Tags.Any())
+        {
+            _selectedTags = source.Tags.Select(tt => tt.Tag).Where(t => t != null).ToList();
             _selectedTagIds = _selectedTags.Select(t => t.Id).ToHashSet();
         }
         else
@@ -264,7 +273,7 @@
         }
 
         // Загружаем подзадачи из оригинальной задачи (конструктор копирования не копирует навигационные свойства)
-        _subtasks = (ExistingTask?.Subtasks ?? []).Select(s => new SubtaskDto
+        _subtasks = (source?.Subtasks ?? []).Select(s => new SubtaskDto
         {
             Id = s.Id,
             Title = s.Title,
@@ -274,8 +283,8 @@
             EstimatedMinutes = s.EstimatedMinutes
         }).ToList();
 
-        // Загружаем связи
-        _relations = _task.Relations.Select(r => new RelationDto
+        // Загружаем связи из source (чтобы получить навигационные TargetTask / SourceTask)
+        _relations = (source?.Relations ?? []).Select(r => new RelationDto
         {
             Id = r.Id,
             Type = r.Type,
@@ -283,7 +292,7 @@
         }).ToList();
 
         // Load inverse relations into DTOs for display as readonly list
-        _inverseRelations = ExistingTask?.InverseRelations ?? [];
+        _inverseRelations = source?.InverseRelations ?? [];
     }
 
     private bool ShouldShowEscalationTable
@@ -388,7 +397,8 @@
             SyncSubtasksToTask();
 
             // Синхронизируем связи из DTO в модель задачи
-            _task.Relations = RelationModule.SyncRelationsToTask(_relations, _task, ExistingTask);
+            var existingTracked = ExistingTask != null && ExistingTask.Id > 0 ? TaskRepo.GetById(ExistingTask.Id) : null;
+            _task.Relations = RelationModule.SyncRelationsToTask(_relations, _task, existingTracked);
 
             // Синхронизируем повышения приоритета из DTO в модель задачи
             _task.PriorityEscalations = EscalationModule.SyncEscalationsToTask(_escalations, _task, ExistingTask, _priorities);
