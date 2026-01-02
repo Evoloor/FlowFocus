@@ -147,13 +147,18 @@ public class PlannerService(
             if (task.Status is TaskStatus.Completed or TaskStatus.Irrelevant)
                 continue;
 
-            // Consider both incoming "Blocks" relations (inverse) and outgoing "BlockedBy" relations
-            var hasActiveBlockers = task.InverseRelations
-                .Any(r => r.Type == RelationType.Blocks && r.SourceTask != null &&
-                          r.SourceTask.Status != TaskStatus.Completed && r.SourceTask.Status != TaskStatus.Irrelevant)
-                || task.Relations
-                .Any(r => r.Type == RelationType.BlockedBy && r.TargetTask != null &&
-                          r.TargetTask.Status != TaskStatus.Completed && r.TargetTask.Status != TaskStatus.Irrelevant);
+            // Собираем всех активных блокеров как из явных связей BlockedBy, так и из обратных связей Blocks
+            var blockers = new List<TaskItem?>();
+
+            blockers.AddRange(task.Relations
+                .Where(r => r.Type == RelationType.BlockedBy)
+                .Select(r => r.TargetTask));
+
+            blockers.AddRange(task.InverseRelations
+                .Where(r => r.Type == RelationType.Blocks)
+                .Select(r => r.SourceTask));
+
+            var hasActiveBlockers = blockers.Any(b => b != null && b.Status != TaskStatus.Completed && b.Status != TaskStatus.Irrelevant);
 
             var trackedTask = context.Tasks.Find(task.Id);
             if (trackedTask != null)

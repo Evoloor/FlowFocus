@@ -210,7 +210,11 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
             }
             else
             {
-                sourceRelation.SourceTaskId = tracked.Id;
+                // Preserve explicit SourceTaskId when provided (e.g., relation created from the other task as BlockedBy)
+                if (sourceRelation.SourceTaskId == 0)
+                {
+                    sourceRelation.SourceTaskId = tracked.Id;
+                }
                 Context.TaskRelations.Add(sourceRelation);
             }
         }
@@ -324,31 +328,27 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
         var all = GetAll();
         return all
             .Where(t =>
-                // either this task has an incoming Blocks relation from taskId (A blocks this)
-                t.InverseRelations.Any(r => r.SourceTaskId == taskId && r.Type == RelationType.Blocks)
-                // or this task has an outgoing BlockedBy relation pointing to taskId (stored in other orientation)
-                || t.Relations.Any(r => r.Type == RelationType.BlockedBy && r.TargetTaskId == taskId)
+                // Either this task has an explicit BlockedBy relation pointing to taskId
+                t.Relations.Any(r => r.Type == RelationType.BlockedBy && r.TargetTaskId == taskId)
+                // Or this task is referenced by an inverse relation where another task blocks it (SourceTask -> this)
+                || t.InverseRelations.Any(r => r.Type == RelationType.Blocks && r.SourceTaskId == taskId)
             )
             .Where(t =>
             {
-                // Проверяем, что это был единственный активный блокер
-                var otherBlockers = new List<TaskRelation>();
+                // Собираем всех других блокеров, учитывая как Relations(BlockedBy), так и InverseRelations(Blocks)
+                var otherBlockers = t.Relations
+                    .Where(r => r.Type == RelationType.BlockedBy && r.TargetTaskId != taskId)
+                    .Select(r => r.TargetTask)
+                    .Where(blocker => blocker != null && blocker.Status != TaskStatus.Completed && blocker.Status != TaskStatus.Irrelevant)
+                    .ToList();
 
-                // Other incoming blockers excluding the one we are completing
-                otherBlockers.AddRange(t.InverseRelations
-                    .Where(r => r.Type == RelationType.Blocks && r.SourceTaskId != taskId));
+                var otherInverseBlockers = t.InverseRelations
+                    .Where(r => r.Type == RelationType.Blocks && r.SourceTaskId != taskId)
+                    .Select(r => r.SourceTask)
+                    .Where(blocker => blocker != null && blocker.Status != TaskStatus.Completed && blocker.Status != TaskStatus.Irrelevant)
+                    .ToList();
 
-                // Other outgoing BlockedBy relations excluding the one referenced to taskId
-                otherBlockers.AddRange(t.Relations
-                    .Where(r => r.Type == RelationType.BlockedBy && r.TargetTaskId != taskId));
-
-                var active = otherBlockers
-                    .Select(r => r.SourceTask ?? r.TargetTask) // source for incoming, target for outgoing
-                    .Where(blocker => blocker != null &&
-                                      blocker.Status != TaskStatus.Completed &&
-                                      blocker.Status != TaskStatus.Irrelevant);
-
-                return !active.Any();
+                return !otherBlockers.Any() && !otherInverseBlockers.Any();
             })
             .ToList();
     }

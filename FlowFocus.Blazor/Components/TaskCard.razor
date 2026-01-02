@@ -206,60 +206,63 @@
 
                     @* Связанные задачи (свёрнуты) *@
                     @{
-                        var relatedTo = Task.Relations.Where(r => r.Type == RelationType.RelatedTo).ToList();
-                        var blocks = Task.Relations.Where(r => r.Type == RelationType.Blocks).ToList();
-                        var blockedByOutgoing = Task.Relations.Where(r => r.Type == RelationType.BlockedBy).ToList();
-                        var blockedByIncoming = Task.InverseRelations.Where(r => r.Type == RelationType.Blocks).ToList();
+                        // Собираем списки задач из исходящих и входящих связей и приводим к задачам для удобного рендера
+                        var relatedToTasks = Task.Relations.Where(r => r.Type == RelationType.RelatedTo).Select(r => r.TargetTask).Where(t => t != null).ToList();
+                        relatedToTasks.AddRange(Task.InverseRelations.Where(r => r.Type == RelationType.RelatedTo).Select(r => r.SourceTask).Where(t => t != null));
+
+                        var blocksTasks = Task.Relations.Where(r => r.Type == RelationType.Blocks).Select(r => r.TargetTask).Where(t => t != null).ToList();
+                        // Входящие связи, где другой пометил эту задачу как BlockedBy (тогда в InverseRelations.Type == BlockedBy) — такие задачи фактически блокируются этим
+                        blocksTasks.AddRange(Task.InverseRelations.Where(r => r.Type == RelationType.BlockedBy).Select(r => r.SourceTask).Where(t => t != null));
+
+                        var blockedByTasks = Task.Relations.Where(r => r.Type == RelationType.BlockedBy).Select(r => r.TargetTask).Where(t => t != null).ToList();
+                        // Входящие связи, где другой пометил себя как Blocks (т.е. Source blocks this)
+                        blockedByTasks.AddRange(Task.InverseRelations.Where(r => r.Type == RelationType.Blocks).Select(r => r.SourceTask).Where(t => t != null));
+
+                        // Убираем дубликаты
+                        relatedToTasks = relatedToTasks.Distinct().ToList();
+                        blocksTasks = blocksTasks.Distinct().ToList();
+                        blockedByTasks = blockedByTasks.Distinct().ToList();
                     }
 
-                    @if (relatedTo.Any())
+                    @if (relatedToTasks.Any())
                     {
                         <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
-                            <MudExpansionPanel Text="@($"Связана с ({relatedTo.Count})")" IsInitiallyExpanded="false">
-                                @foreach (var relation in relatedTo)
+                            <MudExpansionPanel Text="@($"Связана с ({relatedToTasks.Count})")" IsInitiallyExpanded="false">
+                                @foreach (var relatedTask in relatedToTasks)
                                 {
-                                    @if (relation.TargetTask != null)
+                                    @if (relatedTask != null)
                                     {
-                                        <TaskCard Task="relation.TargetTask" IsNested="true" DisplayMode="DisplayMode.Compact" />
+                                        <TaskCard Task="relatedTask" IsNested="true" DisplayMode="DisplayMode.Compact" />
                                     }
                                 }
                             </MudExpansionPanel>
                         </MudExpansionPanels>
                     }
 
-                    @if (blocks.Any())
+                    @if (blocksTasks.Any())
                     {
                         <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
-                            <MudExpansionPanel Text="@($"Блокирует ({blocks.Count})")" IsInitiallyExpanded="false">
-                                @foreach (var relation in blocks)
+                            <MudExpansionPanel Text="@($"Блокирует ({blocksTasks.Count})")" IsInitiallyExpanded="false">
+                                @foreach (var blockedTask in blocksTasks)
                                 {
-                                    @if (relation.TargetTask != null)
+                                    @if (blockedTask != null)
                                     {
-                                        <TaskCard Task="relation.TargetTask" IsNested="true" DisplayMode="DisplayMode.Compact" />
+                                        <TaskCard Task="blockedTask" IsNested="true" DisplayMode="DisplayMode.Compact" />
                                     }
                                 }
                             </MudExpansionPanel>
                         </MudExpansionPanels>
                     }
 
-                    @* Показываем блокирующие задачи: как исходящие BlockedBy, так и входящие Blocks *@
-                    @if (blockedByOutgoing.Any() || blockedByIncoming.Any())
+                    @if (blockedByTasks.Any())
                     {
-                        var totalBlockedBy = blockedByOutgoing.Count + blockedByIncoming.Count;
                         <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
-                            <MudExpansionPanel Text="@($"Блокирована ({totalBlockedBy})")" IsInitiallyExpanded="false">
-                                @foreach (var relation in blockedByOutgoing)
+                            <MudExpansionPanel Text="@($"Блокирована ({blockedByTasks.Count})")" IsInitiallyExpanded="false">
+                                @foreach (var blocker in blockedByTasks)
                                 {
-                                    @if (relation.TargetTask != null)
+                                    @if (blocker != null)
                                     {
-                                        <TaskCard Task="relation.TargetTask" IsNested="true" DisplayMode="DisplayMode.Compact" />
-                                    }
-                                }
-                                @foreach (var relation in blockedByIncoming)
-                                {
-                                    @if (relation.SourceTask != null)
-                                    {
-                                        <TaskCard Task="relation.SourceTask" IsNested="true" DisplayMode="DisplayMode.Compact" />
+                                        <TaskCard Task="blocker" IsNested="true" DisplayMode="DisplayMode.Compact" />
                                     }
                                 }
                             </MudExpansionPanel>
