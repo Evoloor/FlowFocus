@@ -190,32 +190,57 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
     
     private void UpdateRelations(TaskItem tracked, TaskItem source)
     {
-        // Удаляем старые связи
-        var relationsToRemove = tracked.Relations.Where(r => !source.Relations.Any(sr => sr.Id == r.Id && sr.Id > 0)).ToList();
-        foreach (var relation in relationsToRemove)
+        // Синхронизируем связи в БД с желаемым набором из source.Relations.
+        // Желанные связи (canonical) могут содержать записи, где tracked является и Source, и Target.
+        var desired = source.Relations ?? new List<TaskRelation>();
+        
+        // Собираем все существующие записи, где tracked является Source или Target
+        var trackedOutgoing = tracked.Relations ?? new List<TaskRelation>();
+        var trackedIncoming = tracked.InverseRelations ?? new List<TaskRelation>();
+        var trackedAll = trackedOutgoing.Concat(trackedIncoming).ToList();
+        
+        // Удаляем те существующие записи (outgoing или incoming), которых нет в desired
+        var toRemove = trackedAll.Where(r =>
+            // Если у записи есть Id, ищем по Id в desired
+            (r.Id > 0 && !desired.Any(d => d.Id > 0 && d.Id == r.Id))
+            // Или, если нет Id, пытаемся сверить по Source/Target/Type
+            || (!desired.Any(d => d.SourceTaskId == r.SourceTaskId && d.TargetTaskId == r.TargetTaskId && d.Type == r.Type))
+        ).ToList();
+        
+        foreach (var rel in toRemove)
         {
-            Context.TaskRelations.Remove(relation);
+            Context.TaskRelations.Remove(rel);
         }
         
-        // Обновляем существующие и добавляем новые связи
-        foreach (var sourceRelation in source.Relations)
+        // Обновляем или добавляем желаемые записи
+        foreach (var desiredRel in desired)
         {
-            if (sourceRelation.Id > 0)
+            TaskRelation? existing = null;
+            
+            if (desiredRel.Id > 0)
             {
-                var existing = tracked.Relations.FirstOrDefault(r => r.Id == sourceRelation.Id);
-                if (existing != null)
-                {
-                    Context.Entry(existing).CurrentValues.SetValues(sourceRelation);
-                }
+                existing = trackedAll.FirstOrDefault(r => r.Id == desiredRel.Id);
+            }
+            
+            // Если не найдено по Id, ищем по Source/Target/Type
+            if (existing == null)
+            {
+                existing = trackedAll.FirstOrDefault(r => r.SourceTaskId == desiredRel.SourceTaskId && r.TargetTaskId == desiredRel.TargetTaskId && r.Type == desiredRel.Type);
+            }
+            
+            if (existing != null)
+            {
+                // Обновляем значения
+                Context.Entry(existing).CurrentValues.SetValues(desiredRel);
             }
             else
             {
-                // Preserve explicit SourceTaskId when provided (e.g., relation created from the other task as BlockedBy)
-                if (sourceRelation.SourceTaskId == 0)
+                // Если SourceTaskId не задан (0), и мы обновляем tracked (новая задача), устанавливаем Source = tracked.Id
+                if (desiredRel.SourceTaskId == 0)
                 {
-                    sourceRelation.SourceTaskId = tracked.Id;
+                    desiredRel.SourceTaskId = tracked.Id;
                 }
-                Context.TaskRelations.Add(sourceRelation);
+                Context.TaskRelations.Add(desiredRel);
             }
         }
     }
@@ -328,27 +353,19 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
         var all = GetAll();
         return all
             .Where(t =>
-                // Either this task has an explicit BlockedBy relation pointing to taskId
-                t.Relations.Any(r => r.Type == RelationType.BlockedBy && r.TargetTaskId == taskId)
-                // Or this task is referenced by an inverse relation where another task blocks it (SourceTask -> this)
-                || t.InverseRelations.Any(r => r.Type == RelationType.Blocks && r.SourceTaskId == taskId)
+                // If another task blocks this task, it's represented as an inverse relation where SourceTask (blocker) has Type == Blocks
+                t.InverseRelations.Any(r => r.Type == RelationType.Blocks && r.SourceTaskId == taskId)
             )
             .Where(t =>
             {
-                // Собираем всех других блокеров, учитывая как Relations(BlockedBy), так и InverseRelations(Blocks)
-                var otherBlockers = t.Relations
-                    .Where(r => r.Type == RelationType.BlockedBy && r.TargetTaskId != taskId)
-                    .Select(r => r.TargetTask)
-                    .Where(blocker => blocker != null && blocker.Status != TaskStatus.Completed && blocker.Status != TaskStatus.Irrelevant)
-                    .ToList();
-
+                // Собираем всех других блокеров (теперь мы учитываем только inverse relations с Type == Blocks)
                 var otherInverseBlockers = t.InverseRelations
                     .Where(r => r.Type == RelationType.Blocks && r.SourceTaskId != taskId)
                     .Select(r => r.SourceTask)
                     .Where(blocker => blocker != null && blocker.Status != TaskStatus.Completed && blocker.Status != TaskStatus.Irrelevant)
                     .ToList();
 
-                return !otherBlockers.Any() && !otherInverseBlockers.Any();
+                return !otherInverseBlockers.Any();
             })
             .ToList();
     }

@@ -210,13 +210,10 @@
                         var relatedToTasks = Task.Relations.Where(r => r.Type == RelationType.RelatedTo).Select(r => r.TargetTask).Where(t => t != null).ToList();
                         relatedToTasks.AddRange(Task.InverseRelations.Where(r => r.Type == RelationType.RelatedTo).Select(r => r.SourceTask).Where(t => t != null));
 
+                        // Задачи, которые блокирует текущая (исходящие Blocks)
                         var blocksTasks = Task.Relations.Where(r => r.Type == RelationType.Blocks).Select(r => r.TargetTask).Where(t => t != null).ToList();
-                        // Входящие связи, где другой пометил эту задачу как BlockedBy (тогда в InverseRelations.Type == BlockedBy) — такие задачи фактически блокируются этим
-                        blocksTasks.AddRange(Task.InverseRelations.Where(r => r.Type == RelationType.BlockedBy).Select(r => r.SourceTask).Where(t => t != null));
-
-                        var blockedByTasks = Task.Relations.Where(r => r.Type == RelationType.BlockedBy).Select(r => r.TargetTask).Where(t => t != null).ToList();
-                        // Входящие связи, где другой пометил себя как Blocks (т.е. Source blocks this)
-                        blockedByTasks.AddRange(Task.InverseRelations.Where(r => r.Type == RelationType.Blocks).Select(r => r.SourceTask).Where(t => t != null));
+                        // Задачи, которые блокируют текущую (входящие Blocks)
+                        var blockedByTasks = Task.InverseRelations.Where(r => r.Type == RelationType.Blocks).Select(r => r.SourceTask).Where(t => t != null).ToList();
 
                         // Убираем дубликаты
                         relatedToTasks = relatedToTasks.Distinct().ToList();

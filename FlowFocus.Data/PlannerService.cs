@@ -147,12 +147,8 @@ public class PlannerService(
             if (task.Status is TaskStatus.Completed or TaskStatus.Irrelevant)
                 continue;
 
-            // Собираем всех активных блокеров как из явных связей BlockedBy, так и из обратных связей Blocks
+            // Собираем всех активных блокеров как из обратных связей Blocks (Source -> this)
             var blockers = new List<TaskItem?>();
-
-            blockers.AddRange(task.Relations
-                .Where(r => r.Type == RelationType.BlockedBy)
-                .Select(r => r.TargetTask));
 
             blockers.AddRange(task.InverseRelations
                 .Where(r => r.Type == RelationType.Blocks)

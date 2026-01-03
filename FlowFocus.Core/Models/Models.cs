@@ -117,13 +117,10 @@ public class TaskItem : IAuditEntity
     // === Вычисляемые свойства ===
     [NotMapped]
     public bool IsBlocked =>
-        // Учёт как явных связей типа BlockedBy, так и обратных связей, где другая задача имеет тип Blocks
-        Relations.Any(r => r.Type == RelationType.BlockedBy &&
-                            r.TargetTask?.Status != TaskStatus.Completed &&
-                            r.TargetTask?.Status != TaskStatus.Irrelevant)
-        || InverseRelations.Any(r => r.Type == RelationType.Blocks &&
-                                     r.SourceTask?.Status != TaskStatus.Completed &&
-                                     r.SourceTask?.Status != TaskStatus.Irrelevant);
+        // Учёт через обратные связи, где другая задача имеет тип Blocks (SourceTask -> this)
+        InverseRelations.Any(r => r.Type == RelationType.Blocks &&
+                                   r.SourceTask?.Status != TaskStatus.Completed &&
+                                   r.SourceTask?.Status != TaskStatus.Irrelevant);
 
     [NotMapped]
     public bool IsSubtask => ParentTaskId != null;
