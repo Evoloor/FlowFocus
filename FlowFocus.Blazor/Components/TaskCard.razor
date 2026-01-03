@@ -1,6 +1,5 @@
 @inject ITaskRepository TaskRepo
 @inject ISettingsRepository SettingsRepo
-@inject IPriorityRepository PriorityRepo
 @inject INotificationService NotificationService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
@@ -26,22 +25,26 @@
                     {
                         <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Color="Color.Warning" />
                     }
-                    else if (Task.Status == TaskStatus.Irrelevant)
-                    {
-                        <MudText Typo="Typo.caption" Class="vertical-text text-muted">Неактуально</MudText>
-                    }
-                    else if (Task.Status == TaskStatus.Completed)
-                    {
-                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" />
-                    }
                     else
-                    {
-                        <MudCheckBox T="bool" Value="@(Task.Status == TaskStatus.Completed)"
-                                     ValueChanged="@OnTaskCompleted"
-                                     Size="Size.Small"
-                                     Color="Color.Primary"
-                                     Disabled="@(Task.Status == TaskStatus.NotConfigured)" />
-                    }
+                        switch (Task.Status)
+                        {
+                            case TaskStatus.Irrelevant:
+                                <MudText Typo="Typo.caption" Class="vertical-text text-muted">Неактуально</MudText>
+                                break;
+                            case TaskStatus.Completed:
+                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" />
+                                break;
+                            case TaskStatus.NotConfigured:
+                            case TaskStatus.Planned:
+                            case TaskStatus.Blocked:
+                            default:
+                                <MudCheckBox T="bool" Value="@(Task.Status == TaskStatus.Completed)"
+                                             ValueChanged="@OnTaskCompleted"
+                                             Size="Size.Small"
+                                             Color="Color.Primary"
+                                             Disabled="@(Task.Status == TaskStatus.NotConfigured)" />
+                                break;
+                        }
                 </div>
 
                 @* Название *@
@@ -225,12 +228,9 @@
                     {
                         <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
                             <MudExpansionPanel Text="@($"Связана с ({relatedToTasks.Count})")" IsInitiallyExpanded="false">
-                                @foreach (var relatedTask in relatedToTasks)
+                                @foreach (var relatedTask in relatedToTasks.OfType<TaskItem>())
                                 {
-                                    @if (relatedTask != null)
-                                    {
-                                        <TaskCard Task="relatedTask" IsNested="true" DisplayMode="DisplayMode.Compact" />
-                                    }
+                                    <TaskCard Task="relatedTask" IsNested="true" DisplayMode="DisplayMode.Compact" />
                                 }
                             </MudExpansionPanel>
                         </MudExpansionPanels>
@@ -240,12 +240,9 @@
                     {
                         <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
                             <MudExpansionPanel Text="@($"Блокирует ({blocksTasks.Count})")" IsInitiallyExpanded="false">
-                                @foreach (var blockedTask in blocksTasks)
+                                @foreach (var blockedTask in blocksTasks.OfType<TaskItem>())
                                 {
-                                    @if (blockedTask != null)
-                                    {
-                                        <TaskCard Task="blockedTask" IsNested="true" DisplayMode="DisplayMode.Compact" />
-                                    }
+                                    <TaskCard Task="blockedTask" IsNested="true" DisplayMode="DisplayMode.Compact" />
                                 }
                             </MudExpansionPanel>
                         </MudExpansionPanels>
@@ -255,12 +252,9 @@
                     {
                         <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
                             <MudExpansionPanel Text="@($"Блокирована ({blockedByTasks.Count})")" IsInitiallyExpanded="false">
-                                @foreach (var blocker in blockedByTasks)
+                                @foreach (var blocker in blockedByTasks.OfType<TaskItem>())
                                 {
-                                    @if (blocker != null)
-                                    {
-                                        <TaskCard Task="blocker" IsNested="true" DisplayMode="DisplayMode.Compact" />
-                                    }
+                                    <TaskCard Task="blocker" IsNested="true" DisplayMode="DisplayMode.Compact" />
                                 }
                             </MudExpansionPanel>
                         </MudExpansionPanels>

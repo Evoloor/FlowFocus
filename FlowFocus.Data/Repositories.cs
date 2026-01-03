@@ -404,6 +404,9 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
             t.CompletedDate = completedDate;
         });
 
+        // Обновляем локальную копию даты завершения, чтобы CalculateNextRecurrenceDate использовал корректную базу
+        task.CompletedDate = completedDate;
+
         // Создаём следующую копию для повторяющихся задач
         if (task.IsRecurring && task.RecurrenceType != RecurrenceType.None)
         {
@@ -416,31 +419,50 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
     /// </summary>
     private void CreateNextRecurrence(TaskItem sourceTask)
     {
-        var nextDate = CalculateNextRecurrenceDate(sourceTask);
-        if (nextDate == null) return;
-
-        var newTask = new TaskItem
+        try
         {
-            Title = sourceTask.Title,
-            Description = sourceTask.Description,
-            Status = TaskStatus.Planned,
-            PriorityId = sourceTask.PriorityId,
-            Interest = sourceTask.Interest,
-            Complexity = sourceTask.Complexity,
-            EstimatedMinutes = sourceTask.EstimatedMinutes,
-            IsFavorite = sourceTask.IsFavorite,
-            HideUnderSpoiler = sourceTask.HideUnderSpoiler,
-            UserAssignedDate = nextDate,
-            ActualAssignedDate = nextDate,
-            IsRecurring = true,
-            RecurrenceType = sourceTask.RecurrenceType,
-            RecurrenceInterval = sourceTask.RecurrenceInterval,
-            RecurrenceWeekDays = sourceTask.RecurrenceWeekDays,
-            RecurrenceSourceId = sourceTask.RecurrenceSourceId ?? sourceTask.Id,
-            CreatedDate = DateTime.UtcNow
-        };
+            var nextDate = CalculateNextRecurrenceDate(sourceTask);
+            if (nextDate == null) return;
 
-        Add(newTask);
+            // Защита от дублирования: если уже есть задача-реплика с тем же источником и датой, не создаём
+            var sourceId = sourceTask.RecurrenceSourceId ?? sourceTask.Id;
+            var start = nextDate.Value.Date;
+            var end = start.AddDays(1);
+            var exists = Context.Tasks
+                .AsNoTracking()
+                .Any(t => ((t.RecurrenceSourceId.HasValue && t.RecurrenceSourceId.Value == sourceId) || (!t.RecurrenceSourceId.HasValue && t.Id == sourceId))
+                          && t.UserAssignedDate.HasValue && t.UserAssignedDate.Value >= start && t.UserAssignedDate.Value < end);
+            if (exists) return;
+             
+
+            var newTask = new TaskItem
+            {
+                Title = sourceTask.Title,
+                Description = sourceTask.Description,
+                Status = TaskStatus.Planned,
+                PriorityId = sourceTask.PriorityId,
+                Interest = sourceTask.Interest,
+                Complexity = sourceTask.Complexity,
+                EstimatedMinutes = sourceTask.EstimatedMinutes,
+                IsFavorite = sourceTask.IsFavorite,
+                HideUnderSpoiler = sourceTask.HideUnderSpoiler,
+                UserAssignedDate = nextDate,
+                ActualAssignedDate = nextDate,
+                IsRecurring = true,
+                RecurrenceType = sourceTask.RecurrenceType,
+                RecurrenceInterval = sourceTask.RecurrenceInterval,
+                RecurrenceWeekDays = sourceTask.RecurrenceWeekDays,
+                RecurrenceSourceId = sourceTask.RecurrenceSourceId ?? sourceTask.Id,
+                CreatedDate = DateTime.UtcNow
+            };
+
+            Add(newTask);
+        }
+        catch (Exception ex)
+        {
+            // Логируем и не даём упасть приложению
+            Console.WriteLine($"CreateNextRecurrence error for task {sourceTask?.Id}: {ex}");
+        }
     }
 
     /// <summary>
@@ -487,10 +509,36 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
 
     public void MarkIrrelevant(int taskId)
     {
+        // Получаем задачу, чтобы рассчитать дату завершения так же, как в CompleteTask
+        var task = GetById(taskId);
+        if (task == null) return;
+
+        // Для просроченных задач дата завершения должна быть равна дате назначения
+        var completedDate = task.ActualAssignedDate ?? task.UserAssignedDate;
+        if (completedDate != null && completedDate.Value.Date < DateTime.UtcNow.Date)
+        {
+            // Задача просрочена - используем дату назначения
+            completedDate = completedDate.Value.Date;
+        }
+        else
+        {
+            // Задача не просрочена - используем текущую дату
+            completedDate = DateTime.UtcNow;
+        }
+
+        // Обновляем статус и дату завершения
         UpdatePartial(taskId, task =>
         {
             task.Status = TaskStatus.Irrelevant;
+            task.CompletedDate = completedDate;
         });
+
+        // Для повторяющихся задач создаём следующий экземпляр (используя установленную completedDate)
+        if (task.IsRecurring && task.RecurrenceType != RecurrenceType.None)
+        {
+            task.CompletedDate = completedDate;
+            CreateNextRecurrence(task);
+        }
     }
 
     public void RestoreFromIrrelevant(int taskId)

@@ -218,8 +218,12 @@
 
     private void OnTasksChanged()
     {
-        RefreshTasks();
-        InvokeAsync(StateHasChanged);
+        // Всегда переход на контекст диспетчера при обработке события, т.к. вызов может прийти из фонового потока
+        _ = InvokeAsync(() =>
+        {
+            RefreshTasks();
+            StateHasChanged();
+        });
     }
 
     private void RefreshTasks()
@@ -245,7 +249,7 @@
         // Сбрасываем страницу пагинации при обновлении
         _currentPage = 1;
 
-        StateHasChanged();
+        // Не вызываем StateHasChanged() напрямую здесь — вызывающий должен это сделать в UI-контексте
     }
 
     private async Task HandleTaskChanged()
