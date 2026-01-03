@@ -32,16 +32,23 @@
         </div>
     }
 
-    @if (CanAddEscalation)
-    {
-        <MudButton StartIcon="@Icons.Material.Filled.Add"
-                   Variant="Variant.Text"
-                   Color="Color.Primary"
-                   OnClick="@AddEscalation">
-            Добавить повышение приоритета
-        </MudButton>
-    }
+    <MudButton StartIcon="@Icons.Material.Filled.Add"
+               Variant="Variant.Text"
+               Color="Color.Primary"
+               OnClick="@AddEscalation"
+               Disabled="@(IsTaskRecurring || !CanAddEscalation)"
+               Class="@(IsTaskRecurring ? "disabled-like" : null)">
+        Добавить повышение приоритета
+    </MudButton>
 }
+
+<style>
+    /* Визуальный стиль для дизейбла, аналогичный fieldset disabled в TaskEditDialog */
+    .disabled-like {
+        opacity: 0.6;
+        filter: grayscale(30%);
+    }
+</style>
 
 @code {
     [Parameter] public List<EscalationDto> Escalations { get; set; } = [];
@@ -51,6 +58,8 @@
     [Parameter] public List<PriorityLevel> Priorities { get; set; } = [];
 
     [Parameter] public bool ShouldShow { get; set; }
+
+    [Parameter] public bool IsTaskRecurring { get; set; } = false;
 
     private bool CanAddEscalation => GetAvailablePrioritiesForEscalation().Any(p => Escalations.All(e => e.TargetPriorityId != p.Id));
 
@@ -66,6 +75,8 @@
 
     private void AddEscalation()
     {
+        if (IsTaskRecurring) return;
+
         var available = GetAvailablePrioritiesForEscalation().FirstOrDefault(p => Escalations.All(e => e.TargetPriorityId != p.Id));
         if (available == null) return;
         Escalations.Add(new() { TargetPriorityId = available.Id, EscalationDate = DateTime.Today.AddDays(7) });

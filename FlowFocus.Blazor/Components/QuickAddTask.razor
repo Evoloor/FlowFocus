@@ -8,7 +8,7 @@
 <MudPaper Class="quick-add-panel" Elevation="2">
     <div class="quick-add-content">
         <MudTextField T="string" @bind-Value="_taskTitle"
-                      @key="_fieldKey"
+                      @ref="_inputRef"
                       Placeholder="Введите название задачи..."
                       Variant="Variant.Outlined"
                       Margin="Margin.Dense"
@@ -21,7 +21,9 @@
                            Color="Color.Success"
                            Size="Size.Medium"
                            OnClick="@QuickAdd"
-                           Disabled="@(!IsValid)" />
+                           Disabled="@(!IsValid)"
+                           TabIndex="-1"
+                           @onmousedown:preventDefault="true" />
         </MudTooltip>
 
         <MudTooltip Text="Добавить с настройками">
@@ -29,7 +31,9 @@
                            Color="Color.Primary"
                            Size="Size.Medium"
                            OnClick="@OpenEditDialog"
-                           Disabled="@(!IsValid)" />
+                           Disabled="@(!IsValid)"
+                           TabIndex="-1"
+                           @onmousedown:preventDefault="true" />
         </MudTooltip>
     </div>
 </MudPaper>
@@ -37,7 +41,7 @@
 <style>
     .quick-add-panel {
         padding: 12px 16px;
-        background: var(--mud-palette-surface);
+        background-color: transparent;
         border-radius: 8px;
     }
 
@@ -54,9 +58,9 @@
 
 @code {
     private string _taskTitle = string.Empty;
-    private int _fieldKey = 0;
+    private MudTextField<string>? _inputRef;
 
-    private bool IsValid => !string.IsNullOrWhiteSpace(_taskTitle?.Trim());
+    private bool IsValid => !string.IsNullOrWhiteSpace(_taskTitle.Trim());
 
     private async Task OnKeyDown(KeyboardEventArgs e)
     {
@@ -67,8 +71,10 @@
         else if (e.Key == "Escape")
         {
             _taskTitle = string.Empty;
-            _fieldKey++; // Принудительно пересоздаём компонент для очистки поля
+            // Очищаем поле и возвращаем фокус
             await InvokeAsync(StateHasChanged);
+            await Task.Yield();
+            if (_inputRef != null) await _inputRef.FocusAsync();
         }
     }
 
@@ -87,8 +93,10 @@
         Snackbar.Add("Задача добавлена в ненастроенные", Severity.Success);
 
         _taskTitle = string.Empty;
-        _fieldKey++; // Принудительно пересоздаём компонент для очистки поля
+        // Очищаем поле и возвращаем фокус, без пересоздания компонента
         await InvokeAsync(StateHasChanged);
+        await Task.Yield();
+        if (_inputRef != null) await _inputRef.FocusAsync();
 
         // Проверяем авто-распределение
         var settings = SettingsRepo.GetUserSettings();
@@ -123,11 +131,11 @@
         if (result is { Canceled: false })
         {
             _taskTitle = string.Empty;
-            _fieldKey++; // Принудительно пересоздаём компонент для очистки поля
             await InvokeAsync(StateHasChanged);
+            await Task.Yield();
+            if (_inputRef != null) await _inputRef.FocusAsync();
             Snackbar.Add("Задача создана", Severity.Success);
             NotificationService.NotifyTasksChanged();
         }
     }
 }
-

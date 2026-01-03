@@ -145,7 +145,7 @@
 
                                 @* Повышение приоритета (перенесено сюда) *@
                                 <EscalationsEditor Escalations="_escalations" Task="_task" Priorities="_priorities"
-                                                   ShouldShow="ShouldShowEscalationTable"/>
+                                                   ShouldShow="ShouldShowEscalationTable" IsTaskRecurring="_task.IsRecurring"/>
 
                                 @* Для повторяющихся задач редактирование связей запрещено: блок рендерится всегда, но дизейблится через fieldset *@
                                 <MudItem xs="12">
@@ -312,7 +312,8 @@
 
         // Преобразуем входящие (InverseRelations) в представление для текущей задачи:
         // если другая задача блокирует текущую (inverse.Type == Blocks, SourceTask == other),
-        // то с точки зрения текущей задачи это BlockedBy с Target = other.
+        // то с точки зрения текущей задачи входящие блокировки показываем как BlockedBy (т.е. "Заблокирована"),
+        // остальные типы передаём как есть.
         var incoming = (source?.InverseRelations ?? []).Select(r => new RelationDto
         {
             Id = r.Id,

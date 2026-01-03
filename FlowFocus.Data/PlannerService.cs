@@ -10,7 +10,6 @@ namespace FlowFocus.Data;
 /// </summary>
 public class PlannerService(
     ITaskRepository taskRepository,
-    IPriorityRepository priorityRepository,
     StorageContext context) : IPlannerService
 {
     /// <summary>
@@ -26,6 +25,10 @@ public class PlannerService(
             if (task.Status is TaskStatus.Completed or TaskStatus.Irrelevant)
                 continue;
 
+            // Не повышаем приоритеты для повторяющихся задач (это может приводить к постоянному изменению EffectivePriority у копий)
+            if (task.IsRecurring)
+                continue;
+            
             var escalations = task.PriorityEscalations
                 .Where(e => !e.IsApplied && e.EscalationDate.Date <= logicalToday)
                 .OrderBy(e => e.TargetPriority?.Order ?? 99)
@@ -210,4 +213,3 @@ public class PlannerService(
         public int TaskCount { get; set; }
     }
 }
-

@@ -124,11 +124,11 @@ public class StorageContext : DbContext
 
         // Seed default priorities
         modelBuilder.Entity<PriorityLevel>().HasData(
-            new PriorityLevel { Id = 1, Order = 1, Name = "Критический", Color = "#FF4444", IsSystem = true },
-            new PriorityLevel { Id = 2, Order = 2, Name = "Высокий", Color = "#FF8C00", IsSystem = true },
-            new PriorityLevel { Id = 3, Order = 3, Name = "Средний", Color = "#FFD700", IsSystem = true },
-            new PriorityLevel { Id = 4, Order = 4, Name = "Низкий", Color = "#4CAF50", IsSystem = true },
-            new PriorityLevel { Id = 5, Order = 5, Name = "Фоновый", Color = "#2196F3", IsSystem = true }
+            new PriorityLevel { Id = 1, Order = 1, Name = "Критический", Color = "#FF4444" },
+            new PriorityLevel { Id = 2, Order = 2, Name = "Высокий", Color = "#FF8C00" },
+            new PriorityLevel { Id = 3, Order = 3, Name = "Средний", Color = "#FFD700" },
+            new PriorityLevel { Id = 4, Order = 4, Name = "Низкий", Color = "#4CAF50" },
+            new PriorityLevel { Id = 5, Order = 5, Name = "Фоновый", Color = "#2196F3" }
         );
 
         // Seed default settings

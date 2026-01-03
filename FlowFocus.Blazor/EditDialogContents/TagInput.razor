@@ -17,8 +17,8 @@
     <div class="d-flex gap-2 align-end mb-3">
         <MudTextField T="string" @bind-Value="NewTagInput" @bind-Value:after="OnTagInputChanged"
                      Label="Название тега или поиск" Variant="Variant.Outlined" Margin="Margin.Dense"
-                     OnKeyDown="OnTagKeyDown" Immediate="true" Clearable="true" Class="flex-grow-1" />
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddNewTag" Disabled="@IsAddTagButtonDisabled">
+                     OnKeyDown="OnTagKeyDown" Immediate="true" Clearable="true" Class="flex-grow-1" @ref="_tagInputRef" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddNewTag" Disabled="@IsAddTagButtonDisabled" TabIndex="-1" @onmousedown:preventDefault="true">
             Добавить
         </MudButton>
     </div>
@@ -71,6 +71,8 @@
     private string NewTagInput { get; set; } = string.Empty;
     private List<Tag> TagSearchResults { get; set; } = [];
 
+    private MudTextField<string>? _tagInputRef;
+
     private bool IsAddTagButtonDisabled => string.IsNullOrWhiteSpace(NewTagInput.Trim());
 
     private async Task OnTagInputChanged()
@@ -91,6 +93,13 @@
         if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(NewTagInput.Trim()))
         {
             await AddNewTag();
+        }
+        else if (e.Key == "Escape")
+        {
+            NewTagInput = string.Empty;
+            await InvokeAsync(StateHasChanged);
+            await Task.Yield();
+            if (_tagInputRef != null) await _tagInputRef.FocusAsync();
         }
     }
 
@@ -113,6 +122,8 @@
         NewTagInput = string.Empty;
         TagSearchResults = [];
         await InvokeAsync(StateHasChanged);
+        await Task.Yield();
+        if (_tagInputRef != null) await _tagInputRef.FocusAsync();
     }
 
     private async Task AddTag(Tag tag)
@@ -122,6 +133,9 @@
         SelectedTagIds.Add(tag.Id);
         TagSessionService.MarkTagUsed(tag);
         await OnTagAdded.InvokeAsync(tag);
+        // Обновляем фокус на поле после выбора чипа
+        await Task.Yield();
+        if (_tagInputRef != null) await _tagInputRef.FocusAsync();
     }
 
     private async Task SelectExistingTag(Tag tag)

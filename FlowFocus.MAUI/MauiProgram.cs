@@ -27,7 +27,7 @@ public static class MauiProgram
         // Настройка пути к БД для разных платформ
         var dbPath = GetDatabasePath();
         
-        // Настройка сервисов
+        // Настройка сервисов - используем централизованную регистрацию в FlowFocus.Data
         _ = builder.Services.AddDataLayer(dbPath);
         
         // Инициализация БД
@@ -57,38 +57,5 @@ public static class MauiProgram
 #endif
         
         return path;
-    }
-}
-
-internal static class ServiceExtensions
-{
-    public static IServiceCollection AddDataLayer(this IServiceCollection services, string dbPath)
-    {
-        services.AddDbContext<StorageContext>(options =>
-            options.UseSqlite($"Data Source={dbPath}"));
-
-        // Сервис уведомлений (singleton для broadcast между компонентами)
-        services.AddSingleton<INotificationService, NotificationService>();
-
-        // Репозитории
-        services.AddScoped<ITaskRepository, TaskRepository>();
-        services.AddScoped<ISettingsRepository, SettingsRepository>();
-        services.AddScoped<IPriorityRepository, PriorityRepository>();
-        services.AddScoped<ITagRepository, TagRepository>();
-
-        // Сервисы
-        services.AddScoped<IPlannerService, PlannerService>();
-        services.AddScoped<ITagSessionService, TagSessionService>();
-
-        return services;
-    }
-
-    public static void InitializeDatabase(this IServiceProvider serviceProvider)
-    {
-        using var scope = serviceProvider.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<StorageContext>();
-
-        // Автоматическое создание БД и применение миграций
-        context.Database.Migrate();
     }
 }

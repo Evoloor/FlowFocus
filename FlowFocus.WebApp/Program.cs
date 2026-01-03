@@ -1,6 +1,4 @@
 using FlowFocus.Blazor.Layout;
-using FlowFocus.Core;
-using FlowFocus.Core.Services;
 using FlowFocus.Data;
 using FlowFocus.WebApp;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +11,7 @@ _ = builder.Services.AddMudServices()
     .AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Кастомный импорт сервисов
+// Кастомный импорт сервисов - теперь централизован в FlowFocus.Data
 _ = builder.Services.AddDataLayer();
 
 var app = builder.Build();
@@ -36,39 +34,3 @@ app.MapRazorComponents<App>()
 app.Services.InitializeDatabase();
 
 app.Run();
-
-
-namespace FlowFocus.WebApp
-{
-    internal static class ServiceExtensions
-    {
-        public static IServiceCollection AddDataLayer(this IServiceCollection services)
-        {
-            services.AddDbContext<StorageContext>();
-
-            // Сервис уведомлений (singleton для broadcast между компонентами)
-            services.AddSingleton<INotificationService, NotificationService>();
-
-            // Репозитории
-            services.AddScoped<ITaskRepository, TaskRepository>();
-            services.AddScoped<ISettingsRepository, SettingsRepository>();
-            services.AddScoped<IPriorityRepository, PriorityRepository>();
-            services.AddScoped<ITagRepository, TagRepository>();
-
-            // Сервисы
-            services.AddScoped<IPlannerService, PlannerService>();
-            services.AddScoped<ITagSessionService, TagSessionService>();
-
-            return services;
-        }
-
-        public static void InitializeDatabase(this IServiceProvider serviceProvider)
-        {
-            using var scope = serviceProvider.CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<StorageContext>();
-
-            // Автоматическое создание БД и применение миграций
-            context.Database.Migrate();
-        }
-    }
-}

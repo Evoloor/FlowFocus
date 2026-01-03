@@ -201,9 +201,6 @@ public class PriorityLevel : IAuditEntity
     /// <summary>Цвет в формате HEX</summary>
     [StringLength(9)]
     public string Color { get; init; } = "#808080";
-
-    /// <summary>Системный приоритет (нельзя удалить)</summary>
-    public bool IsSystem { get; init; }
 }
 
 /// <summary>

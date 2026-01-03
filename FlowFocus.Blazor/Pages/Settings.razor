@@ -184,13 +184,13 @@
         Сохранить настройки
     </MudButton>
     
-    <MudButton Variant="Variant.Outlined"
+    @*<MudButton Variant="Variant.Outlined"
                Color="Color.Default"
                Size="Size.Large"
                StartIcon="@Icons.Material.Filled.Restore"
                OnClick="@ResetToDefaults">
         Сбросить к умолчаниям
-    </MudButton>
+    </MudButton>*@
 </div>
 
 @code {
@@ -206,7 +206,7 @@
         "#FFEB3B", "#009688", "#3F51B5", "#CDDC39", "#FF9800"
     ];
 
-    private MudDropContainer<PriorityItem> _dropContainer;
+    private MudDropContainer<PriorityItem>? _dropContainer;
 
     protected override void OnInitialized()
     {
@@ -225,7 +225,6 @@
             Order = p.Order,
             Name = p.Name,
             Color = p.Color,
-            IsSystem = p.IsSystem
         }).ToList();
     }
 
@@ -270,7 +269,6 @@
             Name = "Новый приоритет",
             Color = unusedColor,
             Order = _priorityItems.Count + 1,
-            IsSystem = false
         });
         _dropContainer?.Refresh();
     }
@@ -345,7 +343,6 @@
                     Order = item.Order,
                     Name = item.Name,
                     Color = item.Color,
-                    IsSystem = item.IsSystem
                 };
 
                 if (item.Id > 0)
@@ -378,6 +375,5 @@
         public int Order { get; set; }
         public string Name { get; set; } = string.Empty;
         public string Color { get; set; } = "#808080";
-        public bool IsSystem { get; set; }
     }
 }
