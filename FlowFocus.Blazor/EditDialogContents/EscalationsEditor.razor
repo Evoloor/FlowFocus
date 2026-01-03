@@ -1,68 +1,59 @@
-@inject IPriorityRepository PriorityRepo
-
 @if (ShouldShow)
 {
-    <MudExpansionPanels>
-        <MudExpansionPanel Text="Повышение приоритета">
-            <MudText Typo="Typo.body2" Class="mb-2 text-muted">Настройки автоматического повышения приоритета по времени</MudText>
+    <MudText Typo="Typo.body2" Class="mb-2 text-muted">Настройки автоматического повышения приоритета по времени
+    </MudText>
 
-            @foreach (var escalation in Escalations)
-            {
-                var isEscalationDateDisabled = escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date < DateTime.Today;
-                <div class="escalation-row mb-2">
-                    <MudSelect T="int" @bind-Value="escalation.TargetPriorityId"
-                               Label="Приоритет"
+    @foreach (var escalation in Escalations)
+    {
+        var isEscalationDateDisabled = escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date < DateTime.Today;
+        <div class="escalation-row mb-2">
+            <MudSelect T="int" @bind-Value="escalation.TargetPriorityId"
+                       Label="Приоритет"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Dense="true"
+                       Disabled="@IsEscalationPriorityDisabled(escalation)">
+                @foreach (var p in GetAvailablePrioritiesForEscalation())
+                {
+                    <MudSelectItem Value="p.Id">@p.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTooltip Text="@(isEscalationDateDisabled ? "Дата уже прошла и изменить её нельзя" : "")">
+                <MudDatePicker T="DateTime?" @bind-Date="escalation.EscalationDate"
+                               Label="Дата"
                                Variant="Variant.Outlined"
                                Margin="Margin.Dense"
-                               Dense="true"
-                               Disabled="@IsEscalationPriorityDisabled(escalation)">
-                        @foreach (var p in GetAvailablePrioritiesForEscalation())
-                        {
-                            <MudSelectItem Value="p.Id">@p.Name</MudSelectItem>
-                        }
-                    </MudSelect>
-                    <MudTooltip Text="@(isEscalationDateDisabled ? "Дата уже прошла и изменить её нельзя" : "")">
-                        <MudDatePicker T="DateTime?" @bind-Date="escalation.EscalationDate"
-                                       Label="Дата"
-                                       Variant="Variant.Outlined"
-                                       Margin="Margin.Dense"
-                                       MinDate="@DateTime.Today"
-                                       Disabled="@isEscalationDateDisabled" />
-                    </MudTooltip>
-                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                   Size="Size.Small"
-                                   Color="Color.Error"
-                                   OnClick="@(() => RemoveEscalation(escalation))" />
-                </div>
-            }
+                               MinDate="@DateTime.Today"
+                               Disabled="@isEscalationDateDisabled"/>
+            </MudTooltip>
+            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                           Size="Size.Small"
+                           Color="Color.Error"
+                           OnClick="@(() => RemoveEscalation(escalation))"/>
+        </div>
+    }
 
-            @if (CanAddEscalation)
-            {
-                <MudButton StartIcon="@Icons.Material.Filled.Add"
-                           Variant="Variant.Text"
-                           Color="Color.Primary"
-                           OnClick="@AddEscalation">
-                    Добавить повышение приоритета
-                </MudButton>
-            }
-        </MudExpansionPanel>
-    </MudExpansionPanels>
+    @if (CanAddEscalation)
+    {
+        <MudButton StartIcon="@Icons.Material.Filled.Add"
+                   Variant="Variant.Text"
+                   Color="Color.Primary"
+                   OnClick="@AddEscalation">
+            Добавить повышение приоритета
+        </MudButton>
+    }
 }
 
 @code {
-    [Parameter]
-    public List<EscalationDto> Escalations { get; set; } = [];
+    [Parameter] public List<EscalationDto> Escalations { get; set; } = [];
 
-    [Parameter]
-    public TaskItem Task { get; set; } = null!;
+    [Parameter] public TaskItem Task { get; set; } = null!;
 
-    [Parameter]
-    public List<PriorityLevel> Priorities { get; set; } = [];
+    [Parameter] public List<PriorityLevel> Priorities { get; set; } = [];
 
-    [Parameter]
-    public bool ShouldShow { get; set; }
+    [Parameter] public bool ShouldShow { get; set; }
 
-    private bool CanAddEscalation => GetAvailablePrioritiesForEscalation().Any(p => !Escalations.Any(e => e.TargetPriorityId == p.Id));
+    private bool CanAddEscalation => GetAvailablePrioritiesForEscalation().Any(p => Escalations.All(e => e.TargetPriorityId != p.Id));
 
     private List<PriorityLevel> GetAvailablePrioritiesForEscalation()
     {
@@ -76,7 +67,7 @@
 
     private void AddEscalation()
     {
-        var available = GetAvailablePrioritiesForEscalation().Where(p => Escalations.All(e => e.TargetPriorityId != p.Id)).FirstOrDefault();
+        var available = GetAvailablePrioritiesForEscalation().FirstOrDefault(p => Escalations.All(e => e.TargetPriorityId != p.Id));
         if (available == null) return;
         Escalations.Add(new() { TargetPriorityId = available.Id, EscalationDate = DateTime.Today.AddDays(7) });
     }
@@ -92,4 +83,5 @@
         var escalationPriority = Priorities.FirstOrDefault(p => p.Id == escalation.TargetPriorityId);
         return escalationPriority != null && escalationPriority.Order >= currentPriorityOrder;
     }
+
 }
