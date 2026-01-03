@@ -1,3 +1,4 @@
+@using FlowFocus.Blazor.EditDialogContents
 @inject IDialogService DialogService
 
 <div>
@@ -55,8 +56,9 @@
     [Parameter]
     public List<TaskItem> AvailableTasks { get; set; } = [];
 
+    // Передаём сам объект RelationDto, чтобы можно было удалить конкретную строку даже если Id == null
     [Parameter]
-    public EventCallback<int?> OnRemoveRequested { get; set; }
+    public EventCallback<RelationDto?> OnRemoveRequested { get; set; }
 
     private void AddRelation()
     {
@@ -71,7 +73,7 @@
     {
         if (OnRemoveRequested.HasDelegate)
         {
-            await OnRemoveRequested.InvokeAsync(relation.Id);
+            await OnRemoveRequested.InvokeAsync(relation);
             return;
         }
 

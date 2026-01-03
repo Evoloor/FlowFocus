@@ -611,26 +611,31 @@
         MudDialog.Cancel();
     }
 
-    private async Task RemoveRelationById(int? relationId)
+    private async Task RemoveRelationById(RelationDto? relation)
     {
-        if (relationId is null or <= 0)
+        if (relation is null)
         {
-            // If relation has no id (not persisted) remove from local DTO list
-            _relations.RemoveAll(r => r.Id == relationId);
+            return;
+        }
+
+        // Если связь ещё не сохранена (Id == null или <= 0) — удаляем конкретный DTO-экземпляр из локального списка
+        if (relation.Id is null or <= 0)
+        {
+            _relations.Remove(relation);
             await InvokeAsync(StateHasChanged);
             return;
         }
 
         try
         {
-            TaskRepo.DeleteRelation(relationId.Value);
+            TaskRepo.DeleteRelation(relation.Id.Value);
             // Update blocked statuses because relation deletion may change statuses
             PlannerService.UpdateBlockedStatuses();
             NotificationService.NotifyTasksChanged();
 
-            // Remove from local lists
-            _relations.RemoveAll(r => r.Id == relationId);
-            _inverseRelations.RemoveAll(r => r.Id == relationId);
+            // Remove from local lists by id
+            _relations.RemoveAll(r => r.Id == relation.Id);
+            _inverseRelations.RemoveAll(r => r.Id == relation.Id);
 
             await InvokeAsync(StateHasChanged);
         }
