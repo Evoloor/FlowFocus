@@ -108,53 +108,9 @@ public static class TaskEditValidator
     private static bool HasCircularReference(RelationDto newRelation, TaskItem task)
     {
         if (newRelation.TargetTask == null) return false;
-        if (newRelation.TargetTask.Id == task.Id) return true; // self-loop
+        if (newRelation.TargetTask.Id == task.Id) return true;
 
-        // Выполним обход в ширину от целевой задачи по исходящим связям (тип Blocks).
-        // Считаем циклом только путь длины >= 2. Это позволит игнорировать прямые зеркальные
-        // отношения между двумя задачами (когда одна задача явно блокирует другую и в ответ
-        // есть зеркальная связь) — такие пары не должны считаться циклом здесь.
-
-        var visited = new HashSet<int>();
-        var queue = new Queue<(TaskItem node, int depth)>();
-
-        visited.Add(newRelation.TargetTask.Id);
-
-        // Начальные соседи — задачи, которые целевая задача блокирует (outgoing edges)
-        var initialNeighbors = newRelation.TargetTask.Relations?.Where(r => r.Type == Core.Enums.RelationType.Blocks)
-            .Select(r => r.TargetTask)
-            .Where(t => t != null)
-            .Cast<TaskItem>()
-            .ToList() ?? [];
-
-        foreach (var n in initialNeighbors.Where(n => n.Id != task.Id))
-        {
-            visited.Add(n.Id);
-            queue.Enqueue((n, 1));
-        }
-
-        while (queue.Count > 0)
-        {
-            var (node, depth) = queue.Dequeue();
-
-            var neighbors = node.Relations?.Where(r => r.Type == Core.Enums.RelationType.Blocks)
-                .Select(r => r.TargetTask)
-                .Where(t => t != null)
-                .Cast<TaskItem>() ?? [];
-
-            foreach (var nbr in neighbors)
-            {
-                if (nbr.Id == task.Id)
-                {
-                    // нашли путь от target -> ... -> task длины >= 2
-                    return true;
-                }
-
-                if (!visited.Add(nbr.Id)) continue;
-                queue.Enqueue((nbr, depth + 1));
-            }
-        }
-
-        return false;
+        var targetRelations = newRelation.TargetTask.Relations ?? [];
+        return targetRelations.Any(r => r.TargetTaskId == task.Id && ((r.Type == Core.Enums.RelationType.Blocks && newRelation.Type == Core.Enums.RelationType.BlockedBy) || (r.Type == Core.Enums.RelationType.BlockedBy && newRelation.Type == Core.Enums.RelationType.Blocks)));
     }
 }
