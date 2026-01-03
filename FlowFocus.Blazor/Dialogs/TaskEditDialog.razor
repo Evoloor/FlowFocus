@@ -200,6 +200,9 @@
 
     private List<TaskRelation> _inverseRelations = [];
 
+    // Список id связей, помеченных для удаления при сохранении
+    private List<int> _relationsToRemove = [];
+
     protected override void OnInitialized()
     {
         _settings = SettingsRepo.GetUserSettings();
@@ -419,6 +422,25 @@
             var existingTracked = ExistingTask != null && ExistingTask.Id > 0 ? TaskRepo.GetById(ExistingTask.Id) : null;
             _task.Relations = RelationModule.SyncRelationsToTask(_relations, _task, existingTracked);
 
+            // Применяем отложенные удаления сохранённых связей, отмеченных пользователем в UI
+            if (_relationsToRemove.Count > 0)
+            {
+                foreach (var relId in _relationsToRemove.ToList())
+                {
+                    try
+                    {
+                        TaskRepo.DeleteRelation(relId);
+                        // Пометив для удаления, можно дальше удалить из списка, ошибки логируем ниже
+                    }
+                    catch (Exception ex)
+                    {
+                        Snackbar.Add($"Не удалось удалить связь (id={relId}): {ex.Message}", Severity.Error);
+                    }
+                }
+                // Очищаем список после попытки удаления
+                _relationsToRemove.Clear();
+            }
+
             // Синхронизируем повышения приоритета из DTO в модель задачи
             _task.PriorityEscalations = EscalationModule.SyncEscalationsToTask(_escalations, _task, ExistingTask, _priorities);
 
@@ -626,23 +648,18 @@
             return;
         }
 
-        try
+        // Для уже сохранённых связей мы не выполняем удаление сразу в репозитории.
+        // Вместо этого помечаем их для удаления при сохранении и удаляем из локального списка,
+        // чтобы изменение применялось только после нажатия "Сохранить".
+        if (!_relationsToRemove.Contains(relation.Id.Value))
         {
-            TaskRepo.DeleteRelation(relation.Id.Value);
-            // Update blocked statuses because relation deletion may change statuses
-            PlannerService.UpdateBlockedStatuses();
-            NotificationService.NotifyTasksChanged();
-
-            // Remove from local lists by id
-            _relations.RemoveAll(r => r.Id == relation.Id);
-            _inverseRelations.RemoveAll(r => r.Id == relation.Id);
-
-            await InvokeAsync(StateHasChanged);
+            _relationsToRemove.Add(relation.Id.Value);
         }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Не удалось удалить связь: {ex.Message}", Severity.Error);
-        }
+
+        _relations.RemoveAll(r => r.Id == relation.Id);
+        _inverseRelations.RemoveAll(r => r.Id == relation.Id);
+
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task OnSubtasksChanged(List<SubtaskDto>? updated)
