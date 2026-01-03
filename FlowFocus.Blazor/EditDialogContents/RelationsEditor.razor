@@ -1,48 +1,56 @@
 <div>
-    <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Связи с задачами</MudText>
+    @if (HasAnyActiveOtherTasks)
+    {
+        <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Связи с задачами</MudText>
 
-    @foreach (var relation in Relations)
-    {
-        <div class="relation-row mb-2">
-            <MudSelect T="RelationType" @bind-Value="relation.Type"
-                       Label="Тип"
-                       Variant="Variant.Outlined"
-                       Margin="Margin.Dense"
-                       Dense="true"
-                       Style="width: 150px">
-                <MudSelectItem Value="RelationType.RelatedTo">Связана с</MudSelectItem>
-                <MudSelectItem Value="RelationType.Blocks">Блокирует</MudSelectItem>
-                <MudSelectItem Value="RelationType.BlockedBy">Заблокирована</MudSelectItem>
-            </MudSelect>
-            <MudAutocomplete T="TaskItem" @bind-Value="relation.TargetTask"
-                             Label="Задача"
-                             SearchFunc="@SearchTasks"
-                             ToStringFunc="@(t => t?.Title ?? string.Empty)"
-                             Variant="Variant.Outlined"
-                             Margin="Margin.Dense"
-                             Dense="true"
-                             Class="flex-grow-1" />
-            <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                           Size="Size.Small"
-                           Color="Color.Error"
-                           OnClick="@(() => OnDeleteClicked(relation))" />
-        </div>
-    }
+        @foreach (var relation in Relations)
+        {
+            <div class="relation-row mb-2">
+                <MudSelect T="RelationType" @bind-Value="relation.Type"
+                           Label="Тип"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
+                           Dense="true"
+                           Style="width: 150px">
+                    <MudSelectItem Value="RelationType.RelatedTo">Связана с</MudSelectItem>
+                    <MudSelectItem Value="RelationType.Blocks">Блокирует</MudSelectItem>
+                    <MudSelectItem Value="RelationType.BlockedBy">Заблокирована</MudSelectItem>
+                </MudSelect>
+                <MudAutocomplete T="TaskItem" @bind-Value="relation.TargetTask"
+                                 Label="Задача"
+                                 SearchFunc="@((string v, CancellationToken ct) => SearchTasks(v, ct, relation))"
+                                 ToStringFunc="@(t => t?.Title ?? string.Empty)"
+                                 Variant="Variant.Outlined"
+                                 Margin="Margin.Dense"
+                                 Dense="true"
+                                 Class="flex-grow-1" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                               Size="Size.Small"
+                               Color="Color.Error"
+                               OnClick="@(() => OnDeleteClicked(relation))" />
+            </div>
+        }
 
-    @if (Relations.Count < AppConfig.MaxTaskRelations)
-    {
-        <MudButton StartIcon="@Icons.Material.Filled.Add"
-                   Variant="Variant.Text"
-                   Size="Size.Small"
-                   OnClick="@AddRelation">
-            Добавить связь (@(Relations.Count)/@AppConfig.MaxTaskRelations)
-        </MudButton>
-    }
-    else
-    {
-        <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
-            Достигнут лимит связей (@AppConfig.MaxTaskRelations). Удалите существующие связи для добавления новых.
-        </MudAlert>
+        @* Показываем кнопку добавления только если есть ещё незанятые кандидаты и не достигнут лимит *@
+        @if (Relations.Count >= AppConfig.MaxTaskRelations)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                Достигнут лимит связей (@AppConfig.MaxTaskRelations). Удалите существующие связи для добавления новых.
+            </MudAlert>
+        }
+        else if (RemainingUnlinkedCandidates.Any())
+        {
+            <MudButton StartIcon="@Icons.Material.Filled.Add"
+                       Variant="Variant.Text"
+                       Size="Size.Small"
+                       OnClick="@AddRelation">
+                Добавить связь (@(Relations.Count)/@AppConfig.MaxTaskRelations)
+            </MudButton>
+        }
+        else
+        {
+            @* Нет доступных для связи задач — молча не показываем кнопку и не отображаем ошибку *@
+        }
     }
 </div>
 
@@ -53,12 +61,40 @@
     [Parameter]
     public List<TaskItem> AvailableTasks { get; set; } = [];
 
+    // Текущая редактируемая задача — понадобится, чтобы исключить её из списка предложений
+    [Parameter]
+    public TaskItem? EditingTask { get; set; }
+
     // Передаём сам объект RelationDto, чтобы можно было удалить конкретную строку даже если Id == null
     [Parameter]
     public EventCallback<RelationDto?> OnRemoveRequested { get; set; }
 
+    // Возвращает задачи, которые считаются актуальными и не являются самой редактируемой задачей
+    private IEnumerable<TaskItem> CandidateTasks => AvailableTasks
+        .Where(t => t.Id != (EditingTask?.Id ?? 0)
+                    && t.Id != 0
+                    && t.Status != TaskStatus.Completed
+                    && t.Status != TaskStatus.Irrelevant);
+
+    // Id целевых задач, которые уже используются в текущих связях (для проверки оставшихся кандидатов)
+    private HashSet<int> RelationTargetIds => Relations
+        .Select(r => r.TargetTask?.Id ?? 0)
+        .Where(id => id != 0)
+        .ToHashSet();
+
+    // Кандидаты, с которыми ещё не выбрана связь
+    private IEnumerable<TaskItem> RemainingUnlinkedCandidates => CandidateTasks
+        .Where(t => !RelationTargetIds.Contains(t.Id));
+
+    // Условие отображения всего раздела: есть хотя бы одна актуальная задача, кроме редактируемой
+    private bool HasAnyActiveOtherTasks => CandidateTasks.Any();
+
     private void AddRelation()
     {
+        if (!RemainingUnlinkedCandidates.Any())
+        {
+            return;
+        }
         if (Relations.Count >= AppConfig.MaxTaskRelations)
         {
             return;
@@ -77,14 +113,34 @@
         Relations.Remove(relation);
     }
 
-    private Task<IEnumerable<TaskItem>> SearchTasks(string value, CancellationToken cancellationToken)
+    // Поддерживает контекст текущей строки relation: исключаем уже связанные задачи, за исключением текущей выбранной цели
+    private Task<IEnumerable<TaskItem>> SearchTasks(string value, CancellationToken cancellationToken, RelationDto? currentRelation = null)
     {
-        if (string.IsNullOrWhiteSpace(value))
-            return Task.FromResult(AvailableTasks.Take(10));
+        var baseCandidates = CandidateTasks.ToList();
 
-        return Task.FromResult(AvailableTasks
-            .Where(t => t.Title.Contains(value, StringComparison.OrdinalIgnoreCase))
-            .Where(t => t.Id != 0)
-            .Take(10));
+        // Сбор уже используемых целей (Id)
+        var usedIds = Relations
+            .Select(r => r.TargetTask?.Id ?? 0)
+            .Where(id => id != 0)
+            .ToHashSet();
+
+        // Если текущая строка имеет выбранную цель, позволяем её оставить (убираем из usedIds)
+        if (currentRelation?.TargetTask?.Id is int curId && curId != 0)
+        {
+            usedIds.Remove(curId);
+        }
+
+        // Оставляем только кандидатов, которые не используются в других связях
+        var allowed = baseCandidates.Where(t => !usedIds.Contains(t.Id));
+
+        IEnumerable<TaskItem> result;
+        if (string.IsNullOrWhiteSpace(value))
+            result = allowed.Take(10);
+        else
+            result = allowed
+                .Where(t => t.Title.Contains(value, StringComparison.OrdinalIgnoreCase))
+                .Take(10);
+
+        return Task.FromResult(result);
     }
 }
