@@ -36,10 +36,10 @@
 
 @code {
     [Parameter]
-    public List<EditDialogContents.SubtaskDto> Subtasks { get; set; } = [];
+    public List<SubtaskDto> Subtasks { get; set; } = [];
 
     [Parameter]
-    public EventCallback<List<EditDialogContents.SubtaskDto>> SubtasksChanged { get; set; }
+    public EventCallback<List<SubtaskDto>> SubtasksChanged { get; set; }
 
     private string NewSubtaskTitle { get; set; } = string.Empty;
 
@@ -51,7 +51,7 @@
         _ = SubtasksChanged.InvokeAsync(Subtasks);
     }
 
-    private void RemoveSubtask(EditDialogContents.SubtaskDto dto)
+    private void RemoveSubtask(SubtaskDto dto)
     {
         if (dto.Id is > 0)
         {
@@ -64,7 +64,7 @@
         _ = SubtasksChanged.InvokeAsync(Subtasks);
     }
 
-    private async Task EditSubtask(EditDialogContents.SubtaskDto subtask)
+    private async Task EditSubtask(SubtaskDto subtask)
     {
         var parameters = new DialogParameters<SubtaskEditDialog>
         {
@@ -75,7 +75,7 @@
         var dialog = await DialogService.ShowAsync<SubtaskEditDialog>("Редактировать подзадачу", parameters, options);
         var result = await dialog.Result;
 
-        if (result is { Canceled: false, Data: EditDialogContents.SubtaskDto updatedSubtask })
+        if (result is { Canceled: false, Data: SubtaskDto updatedSubtask })
         {
             var index = Subtasks.IndexOf(subtask);
             if (index >= 0)

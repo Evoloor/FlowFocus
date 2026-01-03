@@ -1,5 +1,4 @@
 @using FlowFocus.Blazor.EditDialogContents
-@using FlowFocus.Blazor.EditDialogContents.Validators
 @using SubtaskDto = FlowFocus.Blazor.EditDialogContents.SubtaskDto
 @inject ITaskRepository TaskRepo
 @inject ISettingsRepository SettingsRepo
@@ -148,8 +147,19 @@
                                 <EscalationsEditor Escalations="_escalations" Task="_task" Priorities="_priorities"
                                                    ShouldShow="ShouldShowEscalationTable"/>
 
-                                <RelationsEditor Relations="_relations" AvailableTasks="_availableTasks" EditingTask="_task"
-                                                 OnRemoveRequested="@OnRelationRemoveRequested"/>
+                                @* Для повторяющихся задач редактирование связей запрещено: блок рендерится всегда, но дизейблится через fieldset *@
+                                <MudItem xs="12">
+                                    <fieldset disabled="@_task.IsRecurring" style="border:none;padding:0">
+                                        <RelationsEditor Relations="_relations" AvailableTasks="_availableTasks" EditingTask="_task"
+                                                         OnRemoveRequested="@OnRelationRemoveRequested"/>
+                                        @if (_task.IsRecurring)
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                Связи недоступны для повторяющихся задач — они будут удалены при сохранении.
+                                            </MudText>
+                                        }
+                                    </fieldset>
+                                </MudItem>
 
                                 @* Повторение *@
                                 <RecurrenceEditor Task="_task"/>
@@ -203,6 +213,9 @@
     // Список id связей, помеченных для удаления при сохранении
     private List<int> _relationsToRemove = [];
 
+    // Отслеживаем переход в состояние повторяющейся задачи
+    private bool _wasRecurring;
+
     protected override void OnInitialized()
     {
         _settings = SettingsRepo.GetUserSettings();
@@ -250,6 +263,9 @@
                 _timeFormat = TimeFormat.Minutes;
             }
         }
+
+        // Инициализируем флаг отслеживания повторяемости
+        _wasRecurring = _task.IsRecurring;
     }
 
     private void LoadExistingTaskData()
@@ -257,7 +273,7 @@
         // Если у нас есть существующая задача, пытаемся получить полную (tracked) версию из репозитория,
         // чтобы иметь навигационные свойства (Tags, Subtasks, Relations, InverseRelations).
         var source = ExistingTask;
-        if (ExistingTask != null && ExistingTask.Id > 0)
+        if (ExistingTask is { Id: > 0 })
         {
             var repoVersion = TaskRepo.GetById(ExistingTask.Id);
             if (repoVersion != null) source = repoVersion;
@@ -360,7 +376,7 @@
         if (relation == null)
             return;
 
-        if (relation.Id.HasValue && relation.Id.Value > 0)
+        if (relation.Id is > 0)
         {
             await RemoveRelationById(relation.Id);
         }
@@ -403,6 +419,30 @@
         // Автоматически удаляем рудиментные повышения при изменении приоритета
         CleanupRedundantEscalations();
         StateHasChanged();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        // Если переключили в состояние повторяющейся задачи — пометим все существующие сохранённые связи на удаление
+        if (_wasRecurring != _task.IsRecurring)
+        {
+            _wasRecurring = _task.IsRecurring;
+            if (_wasRecurring)
+            {
+                // Помечаем существующие сохранённые связи на удаление и очищаем локальные DTO
+                foreach (var r in _relations.Where(r => r.Id is > 0).ToList())
+                {
+                    if (!_relationsToRemove.Contains(r.Id.Value)) _relationsToRemove.Add(r.Id.Value);
+                }
+                _relations.Clear();
+
+                // Сообщаем пользователю
+                Snackbar.Add("Связи удалены для повторяющейся задачи", Severity.Info);
+                InvokeAsync(StateHasChanged);
+            }
+        }
+
+        base.OnAfterRender(firstRender);
     }
 
     private async Task SaveTask()
@@ -450,8 +490,38 @@
             // Синхронизируем подзадачи из DTO в модель задачи
             SyncSubtasksToTask();
 
+            // Если задача стала повторяющейся, гарантированно удаляем все существующие связи
+            if (_task.IsRecurring)
+            {
+                if (ExistingTask is { Id: > 0 })
+                {
+                    var existing = TaskRepo.GetById(ExistingTask.Id);
+                    if (existing?.Relations != null)
+                    {
+                        foreach (var rel in existing.Relations)
+                        {
+                            if (!_relationsToRemove.Contains(rel.Id)) _relationsToRemove.Add(rel.Id);
+                        }
+                    }
+                }
+                // очищаем локальный список, чтобы ничего не синхронизировалось
+                _relations.Clear();
+            }
+
             // Синхронизируем связи из DTO в модель задачи
-            var existingTracked = ExistingTask != null && ExistingTask.Id > 0 ? TaskRepo.GetById(ExistingTask.Id) : null;
+            // Перед синхронизацией отфильтруем связи, указывающие на повторяющиеся задачи и сообщим пользователю.
+            var relationsToRecurringTargets = _relations.Where(r => r.TargetTask is { IsRecurring: true }).ToList();
+            if (relationsToRecurringTargets.Any())
+            {
+                // Соберём короткий список заголовков для показа в Snackbar (ограничим длину)
+                var titles = relationsToRecurringTargets.Select(r => r.TargetTask!.Title).Where(t => !string.IsNullOrWhiteSpace(t)).Take(5).ToList();
+                var message = titles.Any() ? $"Связи с повторяющимися задачами удалены: {string.Join(", ", titles)}" : "Некоторые связи с повторяющимися задачами удалены";
+                Snackbar.Add(message, Severity.Warning);
+                // Удаляем такие DTO локально, чтобы не мешали дальнейшей логике и проверкам количества
+                _relations.RemoveAll(r => r.TargetTask is { IsRecurring: true });
+            }
+
+            var existingTracked = ExistingTask is { Id: > 0 } ? TaskRepo.GetById(ExistingTask.Id) : null;
             _task.Relations = RelationModule.SyncRelationsToTask(_relations, _task, existingTracked);
 
             // Применяем отложенные удаления сохранённых связей, отмеченных пользователем в UI

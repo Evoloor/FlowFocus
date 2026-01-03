@@ -7,7 +7,8 @@ public static class RelationModule
 {
     public static List<TaskRelation> SyncRelationsToTask(List<RelationDto> dtos, TaskItem task, TaskItem? existingTask)
     {
-        var validRelations = dtos.Where(r => r.TargetTask != null).ToList();
+        // Отбрасываем невалидные записи: нет цели или цель является повторяющейся задачей (нельзя ссылаться на recurring)
+        var validRelations = dtos.Where(r => r.TargetTask is not null && !r.TargetTask.IsRecurring).ToList();
         var existingRelationsSource = existingTask?.Relations ?? [];
         var existingRelationsInverse = existingTask?.InverseRelations ?? [];
         var resultRelations = new List<TaskRelation>();
@@ -25,25 +26,27 @@ public static class RelationModule
             int dbSourceId;
             int dbTargetId;
 
-            if (dto.Type == Core.Enums.RelationType.BlockedBy)
+            switch (dto.Type)
             {
-                // DTO означает: текущая задача блокируется указанной TargetTask
-                dbType = Core.Enums.RelationType.Blocks;
-                dbSourceId = dto.TargetTask!.Id; // Другой таск является source
-                dbTargetId = task.Id > 0 ? task.Id : 0; // Текущий таск является целью
-            }
-            else if (dto.Type == Core.Enums.RelationType.Blocks)
-            {
-                dbType = Core.Enums.RelationType.Blocks;
-                dbSourceId = task.Id > 0 ? task.Id : 0;
-                dbTargetId = dto.TargetTask!.Id;
-            }
-            else
-            {
-                // Обычные типы сохраняем напрямую (Source = текущая задача)
-                dbType = dto.Type;
-                dbSourceId = task.Id > 0 ? task.Id : 0;
-                dbTargetId = dto.TargetTask!.Id;
+                case RelationType.BlockedBy:
+                    // DTO означает: текущая задача блокируется указанной TargetTask
+                    dbType = RelationType.Blocks;
+                    dbSourceId = dto.TargetTask!.Id; // Другой таск является source
+                    dbTargetId = task.Id > 0 ? task.Id : 0; // Текущий таск является целью
+                    break;
+                case RelationType.Blocks:
+                    dbType = RelationType.Blocks;
+                    dbSourceId = task.Id > 0 ? task.Id : 0;
+                    dbTargetId = dto.TargetTask!.Id;
+                    break;
+                case RelationType.RelatedTo:
+                case RelationType.Subtask:
+                default:
+                    // Обычные типы сохраняем напрямую (Source = текущая задача)
+                    dbType = dto.Type;
+                    dbSourceId = task.Id > 0 ? task.Id : 0;
+                    dbTargetId = dto.TargetTask!.Id;
+                    break;
             }
 
             if (dto.Id is > 0)

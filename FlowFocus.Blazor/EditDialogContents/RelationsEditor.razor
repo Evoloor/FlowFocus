@@ -74,7 +74,8 @@
         .Where(t => t.Id != (EditingTask?.Id ?? 0)
                     && t.Id != 0
                     && t.Status != TaskStatus.Completed
-                    && t.Status != TaskStatus.Irrelevant);
+                    && t.Status != TaskStatus.Irrelevant
+                    && !t.IsRecurring); // Исключаем повторяющиеся задачи из кандидатов
 
     // Id целевых задач, которые уже используются в текущих связях (для проверки оставшихся кандидатов)
     private HashSet<int> RelationTargetIds => Relations
@@ -86,7 +87,7 @@
     private IEnumerable<TaskItem> RemainingUnlinkedCandidates => CandidateTasks
         .Where(t => !RelationTargetIds.Contains(t.Id));
 
-    // Условие отображения всего раздела: есть хотя бы одна актуальная задача, кроме редактируемой
+    // Условие отображения всего раздела: есть ли хотя бы одна актуальная задача (не включая повторяющиеся и редактируемую)
     private bool HasAnyActiveOtherTasks => CandidateTasks.Any();
 
     private void AddRelation()
