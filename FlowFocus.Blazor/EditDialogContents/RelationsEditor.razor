@@ -91,15 +91,23 @@
 
     private void AddRelation()
     {
-        if (!RemainingUnlinkedCandidates.Any())
-        {
+        var candidates = RemainingUnlinkedCandidates.ToList();
+        if (!candidates.Any())
             return;
-        }
+
         if (Relations.Count >= AppConfig.MaxTaskRelations)
-        {
             return;
+
+        var newRel = new RelationDto { Type = RelationType.RelatedTo };
+        if (candidates.Count == 1)
+        {
+            // Если доступен ровно один кандидат, предвыбираем его
+            newRel.TargetTask = candidates[0];
         }
-        Relations.Add(new() { Type = RelationType.RelatedTo });
+
+        Relations.Add(newRel);
+        // Обновляем UI, чтобы предвыбранная цель сразу отобразилась в автокомплите
+        InvokeAsync(StateHasChanged);
     }
 
     private async Task OnDeleteClicked(RelationDto relation)
@@ -116,6 +124,9 @@
     // Поддерживает контекст текущей строки relation: исключаем уже связанные задачи, за исключением текущей выбранной цели
     private Task<IEnumerable<TaskItem>> SearchTasks(string value, CancellationToken cancellationToken, RelationDto? currentRelation = null)
     {
+        if (cancellationToken.IsCancellationRequested)
+            return Task.FromResult(Enumerable.Empty<TaskItem>());
+
         var baseCandidates = CandidateTasks.ToList();
 
         // Сбор уже используемых целей (Id)
@@ -125,9 +136,9 @@
             .ToHashSet();
 
         // Если текущая строка имеет выбранную цель, позволяем её оставить (убираем из usedIds)
-        if (currentRelation?.TargetTask?.Id is int curId && curId != 0)
+        if (currentRelation?.TargetTask != null && currentRelation.TargetTask.Id != 0)
         {
-            usedIds.Remove(curId);
+            usedIds.Remove(currentRelation.TargetTask.Id);
         }
 
         // Оставляем только кандидатов, которые не используются в других связях
