@@ -1,8 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
-using FlowFocus.Core;
-using FlowFocus.Core.Services;
 using FlowFocus.Data;
-using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
 
 namespace FlowFocus.MAUI;

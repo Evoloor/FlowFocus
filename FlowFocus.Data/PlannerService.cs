@@ -75,7 +75,7 @@ public class PlannerService(
 
         // Сортировка по релевантности
         var sortedTasks = tasks
-            .OrderBy(t => GetEffectivePriorityOrder(t))
+            .OrderBy(GetEffectivePriorityOrder)
             .ThenBy(t => t.TotalEstimatedMinutes <= AppConfig.ShortTaskThreshold ? 0 : 1) // Короткие первые
             .ThenByDescending(t => t.Interest ?? 0)
             .ToList();
@@ -118,11 +118,9 @@ public class PlannerService(
         foreach (var task in fixedDateTasks)
         {
             var trackedTask = context.Tasks.Find(task.Id);
-            if (trackedTask != null)
-            {
-                trackedTask.ActualAssignedDate = task.UserAssignedDate;
-                trackedTask.LastChangesOn = DateTime.UtcNow;
-            }
+            if (trackedTask == null) continue;
+            trackedTask.ActualAssignedDate = task.UserAssignedDate;
+            trackedTask.LastChangesOn = DateTime.UtcNow;
         }
 
         context.SaveChanges();

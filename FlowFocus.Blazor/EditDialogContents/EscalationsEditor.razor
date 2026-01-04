@@ -59,7 +59,7 @@
 
     [Parameter] public bool ShouldShow { get; set; }
 
-    [Parameter] public bool IsTaskRecurring { get; set; } = false;
+    [Parameter] public bool IsTaskRecurring { get; set; }
 
     private bool CanAddEscalation => GetAvailablePrioritiesForEscalation().Any(p => Escalations.All(e => e.TargetPriorityId != p.Id));
 

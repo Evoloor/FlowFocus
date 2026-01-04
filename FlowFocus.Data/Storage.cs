@@ -151,8 +151,8 @@ public class StorageContext : DbContext
 public abstract class CachedRepository<T>(StorageContext context) : IRepository<T>
     where T : class, IAuditEntity
 {
-    protected List<T>? Cache;
-    protected bool IsDirty = true;
+    private List<T>? _cache;
+    private bool _isDirty = true;
     protected readonly object CacheLock = new();
     protected readonly StorageContext Context = context;
 
@@ -168,13 +168,13 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
     {
         lock (CacheLock)
         {
-            if (IsDirty || Cache is null)
+            if (_isDirty || _cache is null)
             {
-                Cache = GetBaseQuery().ToList();
-                IsDirty = false;
+                _cache = GetBaseQuery().ToList();
+                _isDirty = false;
             }
 
-            return Cache.ToList();
+            return _cache.ToList();
         }
     }
 
@@ -183,7 +183,7 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
         return GetAll().FirstOrDefault(e => e.Id == id);
     }
 
-    protected T? GetTrackedById(int id)
+    private T? GetTrackedById(int id)
     {
         if (id > 0) return GetTrackedQuery().FirstOrDefault(e => e.Id == id);
         Console.WriteLine($"Warning: Attempting to get entity with invalid ID: {id}");
@@ -281,14 +281,14 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
         MarkDirty();
     }
 
-    protected void MarkDirty() => IsDirty = true;
+    protected void MarkDirty() => _isDirty = true;
 
     protected void RefreshCache()
     {
         lock (CacheLock)
         {
-            IsDirty = true;
-            Cache = null;
+            _isDirty = true;
+            _cache = null;
         }
     }
 }

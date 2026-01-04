@@ -60,7 +60,6 @@
                 {
                     <MudItem xs="12" sm="6">
                         <MudSelect T="int?" @bind-Value="_task.PriorityId"
-                                   @bind-Value:after="@OnAfterPriorityChanged"
                                    Label="Приоритет"
                                    Variant="Variant.Outlined"
                                    Clearable="true"
@@ -208,10 +207,8 @@
 
     private bool IsEdit => ExistingTask != null;
 
-    private List<TaskRelation> _inverseRelations = [];
-
     // Список id связей, помеченных для удаления при сохранении
-    private List<int> _relationsToRemove = [];
+    private readonly List<int> _relationsToRemove = [];
 
     // Отслеживаем переход в состояние повторяющейся задачи
     private bool _wasRecurring;
@@ -327,12 +324,11 @@
         // Объединяем исходящие и входящие, убираем дубликаты по (TargetTaskId, Type)
         _relations = outgoing.Concat(incoming)
             .Where(r => r.TargetTask != null)
-            .GroupBy(r => new { Id = r.TargetTask!.Id, Type = r.Type })
+            .GroupBy(r => new { r.TargetTask!.Id, r.Type })
             .Select(g => g.First())
             .ToList();
 
         // Сохраняем оригинальные inverse relations отдельно, если понадобятся как readonly
-        _inverseRelations = source?.InverseRelations ?? [];
     }
 
     private bool ShouldShowEscalationTable
@@ -368,7 +364,7 @@
 
     private async Task OnSubtasksChanged(List<SubtaskDto> newSubtasks)
     {
-        _subtasks = newSubtasks ?? new List<SubtaskDto>();
+        _subtasks = newSubtasks ?? [];
         await InvokeAsync(StateHasChanged);
     }
 
@@ -413,13 +409,6 @@
         }
 
         await InvokeAsync(StateHasChanged);
-    }
-
-    private void OnAfterPriorityChanged()
-    {
-        // Автоматически удаляем рудиментные повышения при изменении приоритета
-        CleanupRedundantEscalations();
-        StateHasChanged();
     }
 
     protected override void OnAfterRender(bool firstRender)
@@ -488,9 +477,6 @@
                 Tag = tag
             }).ToList();
 
-            // Синхронизируем подзадачи из DTO в модель задачи
-            SyncSubtasksToTask();
-
             // Если задача стала повторяющейся, гарантированно удаляем все существующие связи
             if (_task.IsRecurring)
             {
@@ -499,9 +485,9 @@
                     var existing = TaskRepo.GetById(ExistingTask.Id);
                     if (existing?.Relations != null)
                     {
-                        foreach (var rel in existing.Relations)
+                        foreach (var rel in existing.Relations.Where(rel => !_relationsToRemove.Contains(rel.Id)))
                         {
-                            if (!_relationsToRemove.Contains(rel.Id)) _relationsToRemove.Add(rel.Id);
+                            _relationsToRemove.Add(rel.Id);
                         }
                     }
                 }
@@ -587,7 +573,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add((string)ex.Message, Severity.Error);
+            Snackbar.Add(ex.Message, Severity.Error);
         }
     }
 
@@ -597,22 +583,11 @@
         MudDialog.Cancel();
     }
 
-    private void CleanupRedundantEscalations()
-    {
-        // Минимальная реализация: ничего не делаем здесь.
-    }
-
     private List<string> ValidateTask()
     {
         var errors = new List<string>();
         if (string.IsNullOrWhiteSpace(_task.Title)) errors.Add("Название обязательно");
-        // Дополнительные проверки можно добавить при необходимости
         return errors;
-    }
-
-    private void SyncSubtasksToTask()
-    {
-        // Заглушка: если нужна синхронизация DTO->модель, реализуйте здесь.
     }
 
     private bool ShouldRecalculate()

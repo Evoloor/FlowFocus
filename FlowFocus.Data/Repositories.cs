@@ -192,11 +192,11 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
     {
         // Синхронизируем связи в БД с желаемым набором из source.Relations.
         // Желанные связи (canonical) могут содержать записи, где tracked является и Source, и Target.
-        var desired = source.Relations ?? new List<TaskRelation>();
+        var desired = source.Relations ?? [];
         
         // Собираем все существующие записи, где tracked является Source или Target
-        var trackedOutgoing = tracked.Relations ?? new List<TaskRelation>();
-        var trackedIncoming = tracked.InverseRelations ?? new List<TaskRelation>();
+        var trackedOutgoing = tracked.Relations ?? [];
+        var trackedIncoming = tracked.InverseRelations ?? [];
         var trackedAll = trackedOutgoing.Concat(trackedIncoming).ToList();
         
         // Удаляем те существующие записи (outgoing или incoming), которых нет в desired
