@@ -9,12 +9,15 @@
     <div class="quick-add-content">
         <MudTextField T="string" @bind-Value="_taskTitle"
                       @ref="_inputRef"
+                      @key="_inputResetKey"
+                      Id="quick-add-input-field"
                       Placeholder="Введите название задачи..."
                       Variant="Variant.Outlined"
                       Margin="Margin.Dense"
                       Immediate="true"
                       Class="quick-add-input"
-                      OnKeyDown="@OnKeyDown" />
+                      OnKeyDown="@OnKeyDown"
+                      OnKeyUp="@OnKeyUp" />
 
         <MudTooltip Text="Быстрое добавление (Enter)">
             <MudIconButton Icon="@Icons.Material.Filled.Check"
@@ -59,22 +62,33 @@
 @code {
     private string _taskTitle = string.Empty;
     private MudTextField<string>? _inputRef;
+    private int _inputResetKey;
 
-    private bool IsValid => !string.IsNullOrWhiteSpace(_taskTitle.Trim());
+    private bool IsValid => !string.IsNullOrWhiteSpace(_taskTitle);
 
     private async Task OnKeyDown(KeyboardEventArgs e)
     {
+        // Обрабатываем только Escape здесь — очистка должна происходить немедленно
+        if (e.Key == "Escape")
+        {
+            _taskTitle = string.Empty;
+            // Инкрементируем ключ, чтобы принудительно пересоздать компонент поля и сбросить внутреннее состояние
+            _inputResetKey++;
+            await InvokeAsync(StateHasChanged);
+            // Даем шанс компонентам обновиться
+            await Task.Yield();
+            await Task.Delay(30);
+            // Фокусируем новое поле
+            if (_inputRef != null) await _inputRef.FocusAsync();
+        }
+    }
+
+    private async Task OnKeyUp(KeyboardEventArgs e)
+    {
+        // Для Enter используем OnKeyUp, чтобы двусторонняя привязка успела обновить _taskTitle
         if (e.Key == "Enter" && IsValid)
         {
             await QuickAdd();
-        }
-        else if (e.Key == "Escape")
-        {
-            _taskTitle = string.Empty;
-            // Очищаем поле и возвращаем фокус
-            await InvokeAsync(StateHasChanged);
-            await Task.Yield();
-            if (_inputRef != null) await _inputRef.FocusAsync();
         }
     }
 
@@ -92,12 +106,6 @@
         TaskRepo.Add(task);
         Snackbar.Add("Задача добавлена в ненастроенные", Severity.Success);
 
-        _taskTitle = string.Empty;
-        // Очищаем поле и возвращаем фокус, без пересоздания компонента
-        await InvokeAsync(StateHasChanged);
-        await Task.Yield();
-        if (_inputRef != null) await _inputRef.FocusAsync();
-
         // Проверяем авто-распределение
         var settings = SettingsRepo.GetUserSettings();
         if (settings.AutoDistributeEnabled)
@@ -106,6 +114,16 @@
         }
 
         NotificationService.NotifyTasksChanged();
+
+        // Очищаем поле и возвращаем фокус после уведомления, чтобы избежать потери фокуса
+        _taskTitle = string.Empty;
+        // Инкрементируем ключ, чтобы гарантированно сбросить внутреннее состояние MudTextField
+        _inputResetKey++;
+        await InvokeAsync(StateHasChanged);
+        // Даем шанс компонентам обновиться
+        await Task.Yield();
+        await Task.Delay(30);
+        if (_inputRef != null) await _inputRef.FocusAsync();
     }
 
     private async Task OpenEditDialog()
@@ -131,6 +149,7 @@
         if (result is { Canceled: false })
         {
             _taskTitle = string.Empty;
+            _inputResetKey++;
             await InvokeAsync(StateHasChanged);
             await Task.Yield();
             if (_inputRef != null) await _inputRef.FocusAsync();

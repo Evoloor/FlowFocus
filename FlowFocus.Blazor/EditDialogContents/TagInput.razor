@@ -17,7 +17,7 @@
     <div class="d-flex gap-2 align-end mb-3">
         <MudTextField T="string" @bind-Value="NewTagInput" @bind-Value:after="OnTagInputChanged"
                      Label="Название тега или поиск" Variant="Variant.Outlined" Margin="Margin.Dense"
-                     OnKeyDown="OnTagKeyDown" Immediate="true" Clearable="true" Class="flex-grow-1" @ref="_tagInputRef" />
+                     OnKeyDown="OnTagKeyDown" Immediate="true" Clearable="true" Class="flex-grow-1" @ref="_tagInputRef" @key="_inputResetKey" />
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddNewTag" Disabled="@IsAddTagButtonDisabled" TabIndex="-1" @onmousedown:preventDefault="true">
             Добавить
         </MudButton>
@@ -72,8 +72,10 @@
     private List<Tag> TagSearchResults { get; set; } = [];
 
     private MudTextField<string>? _tagInputRef;
+    private int _inputResetKey;
 
-    private bool IsAddTagButtonDisabled => string.IsNullOrWhiteSpace(NewTagInput.Trim());
+    // Use safe null-aware checks to avoid NullReferenceException when NewTagInput is null
+    private bool IsAddTagButtonDisabled => string.IsNullOrWhiteSpace(NewTagInput);
 
     private async Task OnTagInputChanged()
     {
@@ -90,16 +92,28 @@
 
     private async Task OnTagKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(NewTagInput.Trim()))
+        // Avoid calling Trim() on possibly-null NewTagInput
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(NewTagInput))
         {
             await AddNewTag();
         }
         else if (e.Key == "Escape")
         {
+            // Сбрасываем значение и очистим внутреннее состояние текстового поля
             NewTagInput = string.Empty;
+            TagSearchResults = [];
             await InvokeAsync(StateHasChanged);
             await Task.Yield();
-            if (_tagInputRef != null) await _tagInputRef.FocusAsync();
+            // Пересоздадим компонент поля, чтобы гарантированно сбросить его внутреннее значение
+            _inputResetKey++;
+            // Убедимся, что компонент пересоздан и _tagInputRef привязан к новому экземпляру
+            await InvokeAsync(StateHasChanged);
+            await Task.Yield();
+            await Task.Delay(30);
+            if (_tagInputRef != null)
+            {
+                await _tagInputRef.FocusAsync();
+            }
         }
     }
 
@@ -119,11 +133,20 @@
             await AddTag(created);
         }
 
+        // Очистим поле ввода и результаты поиска, обновим UI и вернём фокус
         NewTagInput = string.Empty;
         TagSearchResults = [];
         await InvokeAsync(StateHasChanged);
         await Task.Yield();
-        if (_tagInputRef != null) await _tagInputRef.FocusAsync();
+        // Пересоздадим компонент поля, чтобы убедиться, что внутреннее состояние сброшено
+        _inputResetKey++;
+        await InvokeAsync(StateHasChanged);
+        await Task.Yield();
+        await Task.Delay(30);
+        if (_tagInputRef != null)
+        {
+            await _tagInputRef.FocusAsync();
+        }
     }
 
     private async Task AddTag(Tag tag)
@@ -133,9 +156,20 @@
         SelectedTagIds.Add(tag.Id);
         TagSessionService.MarkTagUsed(tag);
         await OnTagAdded.InvokeAsync(tag);
-        // Обновляем фокус на поле после выбора чипа
+
+        // Очистим поле ввода после выбора тега и вернём фокус
+        NewTagInput = string.Empty;
+        TagSearchResults = [];
+        await InvokeAsync(StateHasChanged);
         await Task.Yield();
-        if (_tagInputRef != null) await _tagInputRef.FocusAsync();
+        _inputResetKey++;
+        await InvokeAsync(StateHasChanged);
+        await Task.Yield();
+        await Task.Delay(30);
+        if (_tagInputRef != null)
+        {
+            await _tagInputRef.FocusAsync();
+        }
     }
 
     private async Task SelectExistingTag(Tag tag)
