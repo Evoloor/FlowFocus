@@ -140,23 +140,40 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
         }
         
         // Добавляем новые теги, которых нет в tracked
-        foreach (var sourceTag in source.Tags)
+        foreach (var sourceTag in source.Tags.Where(sourceTag => !trackedTagIds.Contains(sourceTag.TagId)))
         {
-            if (!trackedTagIds.Contains(sourceTag.TagId))
+            Context.TaskTags.Add(new()
             {
-                Context.TaskTags.Add(new()
-                {
-                    TaskId = tracked.Id,
-                    TagId = sourceTag.TagId
-                });
-            }
+                TaskId = tracked.Id,
+                TagId = sourceTag.TagId
+            });
         }
         
-        // Проверяем и удаляем неиспользуемые теги
+        // Проверяем и обновляем usageCount для удалённых тегов
         if (removedTagIds.Count != 0)
         {
             var tagRepo = new TagRepository(Context);
-            tagRepo.CleanupUnusedTags(removedTagIds);
+            // Для каждого удалённого тега уменьшаем usageCount и при необходимости удаляем сам тег
+            foreach (var id in removedTagIds)
+            {
+                try
+                {
+                    tagRepo.DecrementUsage(id);
+                }
+                catch
+                {
+                    // Не фатально — продолжим
+                }
+            }
+            try
+            {
+                // Дополнительная защита: удаляем теги без ссылок, если они остались
+                tagRepo.CleanupUnusedTags(removedTagIds);
+            }
+            catch
+            {
+                // Не фатально
+            }
         }
     }
     
@@ -204,7 +221,7 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
             // Если у записи есть Id, ищем по Id в desired
             (r.Id > 0 && !desired.Any(d => d.Id > 0 && d.Id == r.Id))
             // Или, если нет Id, пытаемся сверить по Source/Target/Type
-            || (!desired.Any(d => d.SourceTaskId == r.SourceTaskId && d.TargetTaskId == r.TargetTaskId && d.Type == r.Type))
+            || !desired.Any(d => d.SourceTaskId == r.SourceTaskId && d.TargetTaskId == r.TargetTaskId && d.Type == r.Type)
         ).ToList();
         
         foreach (var rel in toRemove)
@@ -413,7 +430,7 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
             CreateNextRecurrence(task);
         }
     }
-
+    
     /// <summary>
     /// Создать следующую копию повторяющейся задачи
     /// </summary>
@@ -489,13 +506,13 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
     {
         var currentDay = (int)baseDate.DayOfWeek;
         // Конвертируем DayOfWeek (0=Sunday) в нашу маску (1=Monday)
-        var maskDay = currentDay == 0 ? 64 : (1 << (currentDay - 1));
+        var maskDay = currentDay == 0 ? 64 : 1 << (currentDay - 1);
 
         // Ищем следующий день недели из маски
         for (var i = 1; i <= 7; i++)
         {
             var nextDay = (currentDay + i) % 7;
-            var nextMaskDay = nextDay == 0 ? 64 : (1 << (nextDay - 1));
+            var nextMaskDay = nextDay == 0 ? 64 : 1 << (nextDay - 1);
             
             if ((weekDaysMask & nextMaskDay) != 0)
             {
@@ -602,11 +619,32 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
             GetDbSet().Remove(task);
             Context.SaveChanges();
             
-            // Проверяем и удаляем неиспользуемые теги
+            // Уменьшаем usageCount для тегов, которые были связаны с удалённой задачей
             if (tagIds.Count != 0)
             {
                 var tagRepo = new TagRepository(Context);
-                tagRepo.CleanupUnusedTags(tagIds);
+                foreach (var tagId in tagIds)
+                {
+                    try
+                    {
+                        tagRepo.DecrementUsage(tagId);
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
+                }
+
+                try
+                {
+                    // Попробуем удалить физически неиспользуемые теги
+                    var tagRepoCleanup = new TagRepository(Context);
+                    tagRepoCleanup.CleanupUnusedTags(tagIds);
+                }
+                catch
+                {
+                    // ignore
+                }
             }
             
             MarkDirty();
@@ -758,20 +796,12 @@ public class TagRepository(StorageContext context) : CachedRepository<Tag>(conte
         
         lock (CacheLock)
         {
-            foreach (var tagId in tagIds)
+            foreach (var tag in tagIds
+                         .Select(tagId => new { tagId, hasReferences = Context.TaskTags.Any(tt => tt.TagId == tagId) })
+                         .Where(t => !t.hasReferences)
+                         .Select(t => Context.Tags.Find(t.tagId)).OfType<Tag>())
             {
-                // Проверяем, есть ли еще ссылки на этот тег
-                var hasReferences = Context.TaskTags.Any(tt => tt.TagId == tagId);
-                
-                if (!hasReferences)
-                {
-                    // Тег больше не используется, удаляем его
-                    var tag = Context.Tags.Find(tagId);
-                    if (tag != null)
-                    {
-                        Context.Tags.Remove(tag);
-                    }
-                }
+                Context.Tags.Remove(tag);
             }
             
             Context.SaveChanges();
@@ -779,6 +809,30 @@ public class TagRepository(StorageContext context) : CachedRepository<Tag>(conte
         }
     }
 
+    public void DecrementUsage(int tagId)
+    {
+        // Атомарно уменьшаем UsageCount и удаляем тег, если он больше не используется
+        if (tagId <= 0) return;
+
+        lock (CacheLock)
+        {
+            var tag = Context.Tags.Find(tagId);
+            if (tag == null) return;
+
+            tag.UsageCount = Math.Max(0, tag.UsageCount - 1);
+
+            // Если usageCount уменьшился до 0, и нет ссылок в TaskTags — удалим тег из базы
+            var hasReferences = Context.TaskTags.Any(tt => tt.TagId == tagId);
+            if (tag.UsageCount == 0 && !hasReferences)
+            {
+                Context.Tags.Remove(tag);
+            }
+
+            Context.SaveChanges();
+            MarkDirty();
+        }
+    }
+    
     private static readonly string[] PastelColors =
     [
         "#FFB3BA", "#FFDFBA", "#FFFFBA", "#BAFFC9", "#BAE1FF",
@@ -797,13 +851,11 @@ public class TagRepository(StorageContext context) : CachedRepository<Tag>(conte
 /// </summary>
 public class TagSessionService(ITagRepository tagRepository) : ITagSessionService
 {
-    private Tag? _lastUsedTag;
-
-    public Tag? LastUsedTag => _lastUsedTag;
+    public Tag? LastUsedTag { get; private set; }
 
     public void MarkTagUsed(Tag tag)
     {
-        _lastUsedTag = tag;
+        LastUsedTag = tag;
         tagRepository.IncrementUsage(tag.Id);
     }
 
@@ -811,21 +863,35 @@ public class TagSessionService(ITagRepository tagRepository) : ITagSessionServic
     {
         var result = new List<Tag>();
 
-        // Сперва последний использованный тег из хипа (за сессию), если такой имеется
-        if (_lastUsedTag != null)
+        // Сперва последний использованный тег из хипа (за сессию), если такой имеется и он ещё валиден
+        if (LastUsedTag != null)
         {
-            result.Add(_lastUsedTag);
+            try
+            {
+                var existing = tagRepository.GetById(LastUsedTag.Id);
+                if (existing != null && existing.UsageCount > 0)
+                {
+                    result.Add(existing);
+                }
+                else
+                {
+                    // Если тег удалён или больше не актуален — сбросим ссылку
+                    LastUsedTag = null;
+                }
+            }
+            catch
+            {
+                LastUsedTag = null;
+            }
         }
 
         // Затем заполняем ещё 4 (или 5, если не было недавнего) по принципу самых используемых в созданных делах
         var remainingCount = count - result.Count;
-        if (remainingCount > 0)
+        if (remainingCount <= 0) return result;
+        var popular = tagRepository.GetPopularTags(remainingCount + 5); // Берем больше, чтобы исключить уже добавленные
+        foreach (var tag in popular.TakeWhile(tag => result.Count < count).Where(tag => result.All(t => t.Id != tag.Id)))
         {
-            var popular = tagRepository.GetPopularTags(remainingCount + 5); // Берем больше, чтобы исключить уже добавленные
-            foreach (var tag in popular.TakeWhile(tag => result.Count < count).Where(tag => !result.Any(t => t.Id == tag.Id)))
-            {
-                result.Add(tag);
-            }
+            result.Add(tag);
         }
 
         return result;

@@ -121,6 +121,8 @@
                                   OnTagRemoved="@(async (Tag t) =>
                                                 {
                                                     RemoveTag(t);
+                                                    // Обновляем список предложений после удаления
+                                                    await RefreshSuggestedTags();
                                                     await InvokeAsync(StateHasChanged);
                                                 })"/>
                     </MudItem>
@@ -196,6 +198,8 @@
     private List<Tag> _suggestedTags = [];
     private List<Tag> _selectedTags = [];
     private HashSet<int> _selectedTagIds = [];
+    // Исходные id тегов при открытии диалога — нужны для расчёта удалённых тегов при сохранении
+    private HashSet<int> _originalTagIds = new();
     private List<SubtaskDto> _subtasks = [];
     private List<RelationDto> _relations = [];
     private readonly List<EscalationDto> _escalations = [];
@@ -213,12 +217,12 @@
     // Отслеживаем переход в состояние повторяющейся задачи
     private bool _wasRecurring;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         _settings = SettingsRepo.GetUserSettings();
         _priorities = PriorityRepo.GetAllOrdered();
         // Получаем предлагаемые теги: последний использованный + популярные (до 5)
-        _suggestedTags = TagSessionService.GetSuggestedTags();
+        // Используем RefreshSuggestedTags чтобы исключить уже выбранные теги
         _availableTasks = TaskRepo.GetTasksForAutocomplete();
 
         if (ExistingTask != null)
@@ -263,6 +267,9 @@
 
         // Инициализируем флаг отслеживания повторяемости
         _wasRecurring = _task.IsRecurring;
+
+        // Обновим предлагаемые теги с учётом уже выбранных
+        await RefreshSuggestedTags();
     }
 
     private void LoadExistingTaskData()
@@ -281,11 +288,14 @@
         {
             _selectedTags = source.Tags.Select(tt => tt.Tag).Where(t => t != null).ToList();
             _selectedTagIds = _selectedTags.Select(t => t.Id).ToHashSet();
+            // Сохраняем исходный набор id тегов для последующей проверки удалённых
+            _originalTagIds = new HashSet<int>(_selectedTagIds);
         }
         else
         {
             _selectedTags = [];
             _selectedTagIds = [];
+            _originalTagIds = new();
         }
 
         // Загружаем подзадачи из оригинальной задачи (конструктор копирования не копирует навигационные свойства)
@@ -362,6 +372,8 @@
         _selectedTagIds.Remove(tag.Id);
     }
 
+    // Обработчик удаления тега из UI: обновляем предложения, но не меняем статистику в репозитории до сохранения
+    // (раньше здесь вызывался TagRepo.CleanupUnusedTags сразу — убираем чтобы корректно учитывать изменения при сохранении)
     private async Task OnSubtasksChanged(List<SubtaskDto> newSubtasks)
     {
         _subtasks = newSubtasks ?? [];
@@ -469,6 +481,9 @@
             {
                 _task.Status = TaskStatus.Planned;
             }
+
+            // Перед обновлением логики тегов — уменьшение счетчиков теперь выполняется в репозитории TaskRepository.Update/Delete.
+            // Ранее здесь выполнялись вызовы TagRepo.DecrementUsage/CleanupUnusedTags — они удалены, чтобы избежать двойного уменьшения.
 
             // Обновляем теги задачи
             _task.Tags = _selectedTags.Select(tag => new TaskTag

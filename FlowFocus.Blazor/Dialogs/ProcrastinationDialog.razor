@@ -88,8 +88,8 @@
         var todayTime = todayTasks.Sum(t => t.TotalEstimatedMinutes);
 
         var hasSpace = todayCount < _settings.DailyTaskLimit &&
-                       todayComplexity + (_currentTask.TotalComplexity) <= _settings.DailyComplexityLimit &&
-                       todayTime + (_currentTask.TotalEstimatedMinutes) <= _settings.DailyTimeLimit;
+                       todayComplexity + _currentTask.TotalComplexity <= _settings.DailyComplexityLimit &&
+                       todayTime + _currentTask.TotalEstimatedMinutes <= _settings.DailyTimeLimit;
 
         if (!hasSpace)
         {
