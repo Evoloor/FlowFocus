@@ -25,26 +25,20 @@
                     {
                         <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Color="Color.Warning" />
                     }
+                    else if (Task.Status == TaskStatus.Irrelevant)
+                    {
+                        <MudText Typo="Typo.caption" Class="vertical-text text-muted">Неактуально</MudText>
+                    }
                     else
-                        switch (Task.Status)
-                        {
-                            case TaskStatus.Irrelevant:
-                                <MudText Typo="Typo.caption" Class="vertical-text text-muted">Неактуально</MudText>
-                                break;
-                            case TaskStatus.Completed:
-                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" />
-                                break;
-                            case TaskStatus.NotConfigured:
-                            case TaskStatus.Planned:
-                            case TaskStatus.Blocked:
-                            default:
-                                <MudCheckBox T="bool" Value="@(Task.Status == TaskStatus.Completed)"
-                                             ValueChanged="@OnTaskCompleted"
-                                             Size="Size.Small"
-                                             Color="Color.Primary"
-                                             Disabled="@(Task.Status == TaskStatus.NotConfigured)" />
-                                break;
-                        }
+                    {
+                        // Render an interactive checkbox for all non-blocked/non-irrelevant statuses,
+                        // including Completed — so user can un-check (reopen) the task.
+                        <MudCheckBox T="bool" Value="@(Task.Status == TaskStatus.Completed)"
+                                     ValueChanged="@OnTaskCompleted"
+                                     Size="Size.Small"
+                                     Color="Color.Primary"
+                                     Disabled="@(Task.Status == TaskStatus.NotConfigured)" />
+                    }
                 </div>
 
                 @* Название *@
@@ -415,27 +409,38 @@
 
     private async Task OnTaskCompleted(bool completed)
     {
-        if (!completed) return;
-
-        // Проверяем разблокируемые задачи
-        var unblockedTasks = TaskRepo.GetTasksUnblockedBy(Task.Id);
-
-        TaskRepo.CompleteTask(Task.Id);
-
-        if (unblockedTasks.Any())
+        if (completed)
         {
-            // Показываем диалог с разблокированными задачами
-            var parameters = new DialogParameters<UnblockedTasksDialog>
+            // Проверяем разблокируемые задачи
+            var unblockedTasks = TaskRepo.GetTasksUnblockedBy(Task.Id);
+
+            TaskRepo.CompleteTask(Task.Id);
+
+            if (unblockedTasks.Any())
             {
-                { x => x.UnblockedTasks, unblockedTasks }
-            };
+                // Показываем диалог с разблокированными задачами
+                var parameters = new DialogParameters<UnblockedTasksDialog>
+                {
+                    { x => x.UnblockedTasks, unblockedTasks }
+                };
 
-            await DialogService.ShowAsync<UnblockedTasksDialog>("Задачи разблокированы", parameters);
+                await DialogService.ShowAsync<UnblockedTasksDialog>("Задачи разблокированы", parameters);
+            }
+
+            Snackbar.Add("Задача выполнена", Severity.Success);
+            NotificationService.NotifyTasksChanged();
+            await OnTaskChanged.InvokeAsync();
         }
-
-        Snackbar.Add("Задача выполнена", Severity.Success);
-        NotificationService.NotifyTasksChanged();
-        await OnTaskChanged.InvokeAsync();
+        else
+        {
+            // Снимаем пометку о выполнении
+            TaskRepo.ReopenTask(Task.Id);
+            // Обновляем статусы заблокированных задач на всякий случай
+            PlannerService.UpdateBlockedStatuses();
+            Snackbar.Add("Отменено завершение задачи", Severity.Info);
+            NotificationService.NotifyTasksChanged();
+            await OnTaskChanged.InvokeAsync();
+        }
     }
 
     private async Task ToggleFavorite()
@@ -517,6 +522,8 @@
         margin-bottom: 8px;
         overflow: hidden;
         transition: all 0.2s ease;
+        position: relative; /* Ограничиваем псевдоэлементы рамками карточки */
+        z-index: 0;
     }
 
     .task-card:hover {

@@ -700,6 +700,18 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
             MarkDirty();
         }
     }
+
+    public void ReopenTask(int taskId)
+    {
+        var task = GetById(taskId);
+        if (task == null) return;
+
+        UpdatePartial(taskId, t =>
+        {
+            t.Status = TaskStatus.Planned;
+            t.CompletedDate = null;
+        });
+    }
 }
 
 /// <summary>
@@ -935,6 +947,8 @@ public class TagSessionService(ITagRepository tagRepository) : ITagSessionServic
         return result;
     }
 }
+
+
 
 
 

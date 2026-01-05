@@ -44,6 +44,9 @@ public interface ITaskRepository : IRepository<TaskItem>
     /// <summary>Пометить задачу как выполненную</summary>
     void CompleteTask(int taskId);
 
+    /// <summary>Отменить пометку о выполнении (сделать незавершённой)</summary>
+    void ReopenTask(int taskId);
+
     /// <summary>Пометить задачу как неактуальную</summary>
     void MarkIrrelevant(int taskId);
 
