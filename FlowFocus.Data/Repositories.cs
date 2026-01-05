@@ -487,8 +487,16 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
     /// </summary>
     private DateTime? CalculateNextRecurrenceDate(TaskItem task)
     {
+        // completedDate — дата завершения, если установлена, иначе сейчас
         var completedDate = task.CompletedDate ?? DateTime.UtcNow;
-        var baseDate = completedDate.Date;
+
+        // Если задача имела дату назначения, и выполнение произошло раньше этой даты (т.е. досрочное выполнение),
+        // используем дату назначения как базовую для расчёта следующей повторки. Это покрывает случай "выполнил задачу, назначенную на завтра",
+        // когда базой для расчёта следующей даты должна быть исходная UserAssignedDate, а не дата выполнения.
+        var assignedDate = task.UserAssignedDate ?? completedDate;
+
+        // Базовая дата — максимум между датой выполнения и датой назначения (по дням)
+        var baseDate = completedDate.Date >= assignedDate.Date ? completedDate.Date : assignedDate.Date;
 
         return task.RecurrenceType switch
         {
@@ -927,4 +935,6 @@ public class TagSessionService(ITagRepository tagRepository) : ITagSessionServic
         return result;
     }
 }
+
+
 
