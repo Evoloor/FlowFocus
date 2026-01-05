@@ -1,7 +1,6 @@
 @page "/settings"
 @inject ISettingsRepository SettingsRepo
 @inject IPriorityRepository PriorityRepo
-@inject IPlannerService PlannerService
 @inject INotificationService NotificationService
 @inject ISnackbar Snackbar
 
@@ -42,22 +41,6 @@
                              Variant="Variant.Outlined" />
         </MudItem>
     </MudGrid>
-</MudPaper>
-
-<MudPaper Class="pa-4 mb-4" Elevation="1">
-    <MudText Typo="Typo.h6" Class="mb-3">Авто-распределение</MudText>
-
-    @*<MudSwitch T="bool" @bind-Value="_settings.AutoDistributeEnabled"
-               Label="Пересчитывать при создании/изменении задач"
-               Color="Color.Primary" />*@
-
-    <MudButton Variant="Variant.Filled"
-               Color="Color.Primary"
-               StartIcon="@Icons.Material.Filled.Refresh"
-               OnClick="@RecalculateAll"
-               Class="mt-3">
-        Пересчитать ВСЕ дела
-    </MudButton>
 </MudPaper>
 
 <MudPaper Class="pa-4 mb-4" Elevation="1">
@@ -301,13 +284,6 @@
         }
         
         _dropContainer?.Refresh();
-    }
-
-    private void RecalculateAll()
-    {
-        PlannerService.RecalculateAll(_settings);
-        NotificationService.NotifyTasksChanged();
-        Snackbar.Add("Все задачи пересчитаны", Severity.Success);
     }
 
     private void ResetToDefaults()

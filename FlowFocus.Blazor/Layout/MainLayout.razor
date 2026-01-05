@@ -1,6 +1,9 @@
 ﻿@inherits LayoutComponentBase
 @inject ISettingsRepository SettingsRepo
 @inject IDialogService DialogService
+@inject IPlannerService PlannerService
+@inject INotificationService NotificationService
+@inject ISnackbar Snackbar
 
 <MudThemeProvider Theme="@_theme" IsDarkMode="_isDarkMode"/>
 <MudPopoverProvider/>
@@ -16,10 +19,20 @@
         
         @* Кнопка прокрастинации *@
         <MudTooltip Text="Прокрастинация">
-            <MudIconButton Icon="@Icons.Material.Filled.Psychology"
+            <MudIconButton Icon="@Icons.Material.Filled.SelfImprovement"
                            Color="Color.Inherit"
                            OnClick="@OpenProcrastinationDialog"/>
         </MudTooltip>
+
+        @* Авто-распределение: переключатель и кнопка пересчёта *@
+        <div class="d-flex align-center mr-2">
+            @*<MudTooltip Text="Включить/выключить автоматическое распределение задач">
+                <MudSwitch T="bool" Checked="_autoDistributeEnabled" CheckedChanged="@OnAutoDistributeChanged" Class="mr-2" />
+            </MudTooltip>*@
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Disabled="@_isRecalculating" OnClick="@RecalculateAllAsync" StartIcon="@Icons.Material.Filled.Refresh" Size="Size.Small">
+                @(_isRecalculating ? "Пересчёт..." : "Пересчитать")
+            </MudButton>
+        </div>
         
         <MudIconButton Icon="@(DarkLightModeButtonIcon)" Color="Color.Inherit" OnClick="@DarkModeToggle"/>
     </MudAppBar>
@@ -69,7 +82,8 @@
         left: 0;
         right: 0;
         padding: 16px 0;
-        background: var(--mud-palette-background);
+        /* Добавляем fallback на случай, если переменная не определена во время анализа */
+        background: var(--mud-palette-background, transparent);
         z-index: 100;
         box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
     }
@@ -86,6 +100,9 @@
     private bool _isDarkMode = true;
     private MudTheme? _theme;
 
+    private bool _isRecalculating = false;
+    private bool _autoDistributeEnabled;
+
     protected override void OnInitialized()
     {
         base.OnInitialized();
@@ -93,6 +110,7 @@
         // Загружаем настройки темы
         var settings = SettingsRepo.GetUserSettings();
         _isDarkMode = settings.IsDarkMode;
+        _autoDistributeEnabled = settings.AutoDistributeEnabled;
 
         _theme = new()
         {
@@ -117,6 +135,39 @@
         SettingsRepo.UpdateSettings(settings);
     }
 
+    private async Task RecalculateAllAsync()
+    {
+        try
+        {
+            _isRecalculating = true;
+
+            var settings = SettingsRepo.GetUserSettings();
+            if (settings == null)
+            {
+                Snackbar.Add("Настройки не найдены", Severity.Warning);
+                return;
+            }
+
+            // Сохраняем текущее состояние авто-распределения
+            settings.AutoDistributeEnabled = _autoDistributeEnabled;
+            SettingsRepo.UpdateSettings(settings);
+
+            await Task.Run(() => PlannerService.RecalculateAll(settings));
+
+            NotificationService.NotifyTasksChanged();
+            Snackbar.Add("Все задачи пересчитаны", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка пересчёта: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isRecalculating = false;
+            StateHasChanged();
+        }
+    }
+
     private async Task OpenProcrastinationDialog()
     {
         var options = new DialogOptions
@@ -127,6 +178,23 @@
         };
 
         await DialogService.ShowAsync<ProcrastinationDialog>("Прокрастинация", options);
+    }
+
+    private void OnAutoDistributeChanged(bool value)
+    {
+        _autoDistributeEnabled = value;
+
+        try
+        {
+            var settings = SettingsRepo.GetUserSettings();
+            if (settings == null) return;
+            settings.AutoDistributeEnabled = value;
+            SettingsRepo.UpdateSettings(settings);
+        }
+        catch
+        {
+            // игнорируем ошибки сохранения настроек здесь; Snackbar не используем, чтобы не мешать UX
+        }
     }
 
     private readonly PaletteLight _lightPalette = new()
