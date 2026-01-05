@@ -29,7 +29,7 @@
             @*<MudTooltip Text="Включить/выключить автоматическое распределение задач">
                 <MudSwitch T="bool" Checked="_autoDistributeEnabled" CheckedChanged="@OnAutoDistributeChanged" Class="mr-2" />
             </MudTooltip>*@
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Disabled="@_isRecalculating" OnClick="@RecalculateAllAsync" StartIcon="@Icons.Material.Filled.Refresh" Size="Size.Small">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Disabled="@_isRecalculating" OnClick="@RecalculateAllAsync" StartIcon="@Icons.Material.Filled.Autorenew" Size="Size.Small">
                 @(_isRecalculating ? "Пересчёт..." : "Пересчитать")
             </MudButton>
         </div>
