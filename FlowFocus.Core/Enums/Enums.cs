@@ -57,7 +57,11 @@ public enum RecurrenceType
     /// <summary>Каждые N дней</summary>
     EveryNDays,
     /// <summary>По дням недели</summary>
-    WeekDays
+    WeekDays,
+    /// <summary>Ежемесячно</summary>
+    Monthly,
+    /// <summary>Ежегодно</summary>
+    Yearly
 }
 
 /// <summary>

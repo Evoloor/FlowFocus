@@ -495,8 +495,38 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
             RecurrenceType.Daily => baseDate.AddDays(1),
             RecurrenceType.EveryNDays => baseDate.AddDays(task.RecurrenceInterval ?? 1),
             RecurrenceType.WeekDays => CalculateNextWeekDayDate(baseDate, task.RecurrenceWeekDays ?? 0),
+            RecurrenceType.Monthly => CalculateNextMonthDate(baseDate, task.RecurrenceInterval ?? 1),
+            RecurrenceType.Yearly => CalculateNextYearDate(baseDate, task.RecurrenceInterval ?? 1),
             _ => null
         };
+    }
+
+    /// <summary>
+    /// Рассчитать следующую дату при ежемесячном повторении, с сохранением дня выполнения и fallback на последний день месяца
+    /// </summary>
+    private DateTime CalculateNextMonthDate(DateTime baseDate, int monthsInterval)
+    {
+        if (monthsInterval <= 0) monthsInterval = 1;
+        var target = baseDate.AddMonths(monthsInterval);
+        var day = baseDate.Day;
+        var daysInTarget = DateTime.DaysInMonth(target.Year, target.Month);
+        var chosenDay = day > daysInTarget ? daysInTarget : day;
+        return new DateTime(target.Year, target.Month, chosenDay);
+    }
+
+    /// <summary>
+    /// Рассчитать следующую дату при ежегодном повторении, с fallback для 29 февраля на 28 февраля в невисокосный год
+    /// </summary>
+    private DateTime CalculateNextYearDate(DateTime baseDate, int yearsInterval)
+    {
+        if (yearsInterval <= 0) yearsInterval = 1;
+        var targetYear = baseDate.Year + yearsInterval;
+        var month = baseDate.Month;
+        var day = baseDate.Day;
+
+        var daysInTarget = DateTime.DaysInMonth(targetYear, month);
+        var chosenDay = day > daysInTarget ? daysInTarget : day;
+        return new DateTime(targetYear, month, chosenDay);
     }
 
     /// <summary>
