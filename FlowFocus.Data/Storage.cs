@@ -1,6 +1,7 @@
 using FlowFocus.Core;
 using FlowFocus.Core.Models;
 using Microsoft.EntityFrameworkCore;
+using FlowFocus.Core.Services;
 
 namespace FlowFocus.Data;
 
@@ -148,13 +149,14 @@ public class StorageContext : DbContext
     }
 }
 
-public abstract class CachedRepository<T>(StorageContext context) : IRepository<T>
+public abstract class CachedRepository<T>(StorageContext context, INotificationService notificationService) : IRepository<T>
     where T : class, IAuditEntity
 {
     private List<T>? _cache;
     private bool _isDirty = true;
     protected readonly object CacheLock = new();
     protected readonly StorageContext Context = context;
+    protected readonly INotificationService NotificationService = notificationService;
 
     protected abstract DbSet<T> GetDbSet();
 
@@ -263,6 +265,22 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
         }
     }
 
+    protected void MarkDirty()
+    {
+        _isDirty = true;
+        NotificationService?.NotifyTasksChanged();
+    }
+
+    protected void RefreshCache()
+    {
+        lock (CacheLock)
+        {
+            _isDirty = true;
+            _cache = null;
+        }
+    }
+
+    // Реализации методов интерфейса IRepository, требуемые компилятором
     public virtual void Delete(int id)
     {
         lock (CacheLock)
@@ -279,16 +297,5 @@ public abstract class CachedRepository<T>(StorageContext context) : IRepository<
     {
         Context.SaveChanges();
         MarkDirty();
-    }
-
-    protected void MarkDirty() => _isDirty = true;
-
-    protected void RefreshCache()
-    {
-        lock (CacheLock)
-        {
-            _isDirty = true;
-            _cache = null;
-        }
     }
 }

@@ -1,6 +1,7 @@
 using FlowFocus.Core;
 using FlowFocus.Core.Enums;
 using FlowFocus.Core.Models;
+using FlowFocus.Core.Services;
 using Microsoft.EntityFrameworkCore;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
@@ -9,7 +10,7 @@ namespace FlowFocus.Data;
 /// <summary>
 /// Репозиторий задач
 /// </summary>
-public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>(context), ITaskRepository
+public class TaskRepository(StorageContext context, INotificationService notificationService) : CachedRepository<TaskItem>(context, notificationService), ITaskRepository
 {
     protected override DbSet<TaskItem> GetDbSet() => Context.Tasks;
     
@@ -29,10 +30,7 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
             {
                 foreach (var subtask in entity.Subtasks)
                 {
-                    if (subtask.ParentTaskId == null)
-                    {
-                        subtask.ParentTaskId = entity.Id;
-                    }
+                    subtask.ParentTaskId ??= entity.Id;
                     if (subtask.CreatedDate == default)
                     {
                         subtask.CreatedDate = DateTime.UtcNow;
@@ -152,7 +150,7 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
         // Проверяем и обновляем usageCount для удалённых тегов
         if (removedTagIds.Count != 0)
         {
-            var tagRepo = new TagRepository(Context);
+            var tagRepo = new TagRepository(Context, NotificationService);
             // Для каждого удалённого тега уменьшаем usageCount и при необходимости удаляем сам тег
             foreach (var id in removedTagIds)
             {
@@ -660,7 +658,7 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
             // Уменьшаем usageCount для тегов, которые были связаны с удалённой задачей
             if (tagIds.Count != 0)
             {
-                var tagRepo = new TagRepository(Context);
+                var tagRepo = new TagRepository(Context, NotificationService);
                 foreach (var tagId in tagIds)
                 {
                     try
@@ -676,7 +674,7 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
                 try
                 {
                     // Попробуем удалить физически неиспользуемые теги
-                    var tagRepoCleanup = new TagRepository(Context);
+                    var tagRepoCleanup = new TagRepository(Context, NotificationService);
                     tagRepoCleanup.CleanupUnusedTags(tagIds);
                 }
                 catch
@@ -717,7 +715,7 @@ public class TaskRepository(StorageContext context) : CachedRepository<TaskItem>
 /// <summary>
 /// Репозиторий настроек
 /// </summary>
-public class SettingsRepository(StorageContext context) : CachedRepository<UserSettings>(context), ISettingsRepository
+public class SettingsRepository(StorageContext context, INotificationService notificationService) : CachedRepository<UserSettings>(context, notificationService), ISettingsRepository
 {
     protected override DbSet<UserSettings> GetDbSet() => Context.Settings;
 
@@ -741,7 +739,7 @@ public class SettingsRepository(StorageContext context) : CachedRepository<UserS
 /// <summary>
 /// Репозиторий приоритетов
 /// </summary>
-public class PriorityRepository(StorageContext context) : CachedRepository<PriorityLevel>(context), IPriorityRepository
+public class PriorityRepository(StorageContext context, INotificationService notificationService) : CachedRepository<PriorityLevel>(context, notificationService), IPriorityRepository
 {
     protected override DbSet<PriorityLevel> GetDbSet() => Context.Priorities;
 
@@ -789,7 +787,7 @@ public class PriorityRepository(StorageContext context) : CachedRepository<Prior
 /// <summary>
 /// Репозиторий тегов
 /// </summary>
-public class TagRepository(StorageContext context) : CachedRepository<Tag>(context), ITagRepository
+public class TagRepository(StorageContext context, INotificationService notificationService) : CachedRepository<Tag>(context, notificationService), ITagRepository
 {
     protected override DbSet<Tag> GetDbSet() => Context.Tags;
 
@@ -947,6 +945,10 @@ public class TagSessionService(ITagRepository tagRepository) : ITagSessionServic
         return result;
     }
 }
+
+
+
+
 
 
 
