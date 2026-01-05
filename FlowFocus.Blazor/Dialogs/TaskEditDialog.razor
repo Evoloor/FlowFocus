@@ -163,7 +163,7 @@
                                 </MudItem>
 
                                 @* Повторение *@
-                                <RecurrenceEditor Task="_task"/>
+                                <RecurrenceEditor Task="_task" OnRecurringChanged="@(async (bool v) => { _task.IsRecurring = v; await InvokeAsync(StateHasChanged); })"/>
                             </MudExpansionPanel>
                         </MudExpansionPanels>
                     </MudItem>

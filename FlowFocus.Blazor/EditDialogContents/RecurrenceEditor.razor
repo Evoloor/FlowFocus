@@ -1,6 +1,6 @@
 <div class="recurrence-block">
     <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Повторение</MudText>
-    <MudCheckBox T="bool" @bind-Value="Task.IsRecurring" Label="Повторяющаяся задача" />
+    <MudCheckBox T="bool" Value="_isRecurringLocal" ValueChanged="OnIsRecurringChanged" Label="Повторяющаяся задача" />
 
     @if (Task.IsRecurring)
     {
@@ -57,12 +57,18 @@
     [Parameter, EditorRequired]
     public TaskItem Task { get; set; } = null!;
 
+    [Parameter]
+    public EventCallback<bool> OnRecurringChanged { get; set; }
+
     private enum RecurrenceChoice { Daily, Weekly, EveryN }
     private enum RecurrenceUnit { Days, Months, Years }
 
     private RecurrenceChoice _choice;
     private RecurrenceUnit _unit = RecurrenceUnit.Days;
     private int? _interval;
+
+    // Локальная переменная для привязки чекбокса. При изменении уведомляем родителя, чтобы он перерисовался.
+    private bool _isRecurringLocal;
 
     private static readonly (string Name, int Value)[] WeekDays =
     [
@@ -71,6 +77,9 @@
 
     protected override void OnParametersSet()
     {
+        // Синхронизируем локальную переменную с моделью
+        _isRecurringLocal = Task.IsRecurring;
+
         // Инициализируем локальное отображение на основе существующих полей модели
         switch (Task.RecurrenceType)
         {
@@ -102,6 +111,18 @@
                 _interval = null;
                 break;
         }
+    }
+
+    private async Task OnIsRecurringChanged(bool value)
+    {
+        // Устанавливаем в модель и уведомляем родителя
+        _isRecurringLocal = value;
+        Task.IsRecurring = value;
+        if (OnRecurringChanged.HasDelegate)
+        {
+            await OnRecurringChanged.InvokeAsync(value);
+        }
+        await InvokeAsync(StateHasChanged);
     }
 
     private void OnChoiceChanged(RecurrenceChoice newChoice)
