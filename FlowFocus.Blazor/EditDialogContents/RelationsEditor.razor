@@ -3,19 +3,22 @@
     {
         <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Связи с задачами</MudText>
 
-        @foreach (var relation in Relations)
+        @for (var i = 0; i < Relations.Count; i++)
         {
-            <div class="relation-row mb-2">
+            var relation = Relations[i];
+            object rowKey = relation.Id.HasValue ? $"id-{relation.Id.Value}" : $"new-{i}";
+            <div @key=rowKey class="relation-row mb-2">
                 <MudSelect T="RelationType" @bind-Value="relation.Type"
                            Label="Тип"
                            Variant="Variant.Outlined"
                            Margin="Margin.Dense"
                            Dense="true"
                            Style="width: 150px">
-                    <MudSelectItem Value="RelationType.RelatedTo">Связана с</MudSelectItem>
-                    <MudSelectItem Value="RelationType.Blocks">Блокирует</MudSelectItem>
-                    <MudSelectItem Value="RelationType.BlockedBy">Заблокирована</MudSelectItem>
+                    <MudSelectItem Value="@(RelationType.RelatedTo)">Связана с</MudSelectItem>
+                    <MudSelectItem Value="@(RelationType.Blocks)">Блокирует</MudSelectItem>
+                    <MudSelectItem Value="@(RelationType.BlockedBy)">Заблокирована</MudSelectItem>
                 </MudSelect>
+
                 <MudAutocomplete T="TaskItem" @bind-Value="relation.TargetTask"
                                  Label="Задача"
                                  SearchFunc="@((string v, CancellationToken ct) => SearchTasks(v, ct, relation))"
@@ -23,11 +26,11 @@
                                  Variant="Variant.Outlined"
                                  Margin="Margin.Dense"
                                  Dense="true"
-                                 Class="flex-grow-1" />
+                                 Class="flex-grow-1"/>
                 <MudIconButton Icon="@Icons.Material.Filled.Delete"
                                Size="Size.Small"
                                Color="Color.Error"
-                               OnClick="@(() => OnDeleteClicked(relation))" />
+                               OnClick="@(() => OnDeleteClicked(relation))"/>
             </div>
         }
 
@@ -55,19 +58,15 @@
 </div>
 
 @code {
-    [Parameter]
-    public List<RelationDto> Relations { get; set; } = [];
+    [Parameter] public List<RelationDto> Relations { get; set; } = [];
 
-    [Parameter]
-    public List<TaskItem> AvailableTasks { get; set; } = [];
+    [Parameter] public List<TaskItem> AvailableTasks { get; set; } = [];
 
     // Текущая редактируемая задача — понадобится, чтобы исключить её из списка предложений
-    [Parameter]
-    public TaskItem? EditingTask { get; set; }
+    [Parameter] public TaskItem? EditingTask { get; set; }
 
     // Передаём сам объект RelationDto, чтобы можно было удалить конкретную строку даже если Id == null
-    [Parameter]
-    public EventCallback<RelationDto?> OnRemoveRequested { get; set; }
+    [Parameter] public EventCallback<RelationDto?> OnRemoveRequested { get; set; }
 
     // Возвращает задачи, которые считаются актуальными и не являются самой редактируемой задачей
     private IEnumerable<TaskItem> CandidateTasks => AvailableTasks
@@ -155,4 +154,5 @@
 
         return Task.FromResult(result);
     }
+
 }

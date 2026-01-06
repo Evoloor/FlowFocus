@@ -215,11 +215,13 @@ public class TaskRepository(StorageContext context, INotificationService notific
         var trackedAll = trackedOutgoing.Concat(trackedIncoming).ToList();
         
         // Удаляем те существующие записи (outgoing или incoming), которых нет в desired
+        // Удаляем только те существующие записи, которые не представлены в desired ни по Id, ни по комбинации Source/Target/Type.
         var toRemove = trackedAll.Where(r =>
-            // Если у записи есть Id, ищем по Id в desired
-            (r.Id > 0 && !desired.Any(d => d.Id > 0 && d.Id == r.Id))
-            // Или, если нет Id, пытаемся сверить по Source/Target/Type
-            || !desired.Any(d => d.SourceTaskId == r.SourceTaskId && d.TargetTaskId == r.TargetTaskId && d.Type == r.Type)
+            // Удаляем, если нет ни одного desired с тем же Id (если Id > 0)
+            // И одновременно нет desired с тем же Source/Target/Type.
+            !( (r.Id > 0 && desired.Any(d => d.Id > 0 && d.Id == r.Id))
+               || desired.Any(d => d.SourceTaskId == r.SourceTaskId && d.TargetTaskId == r.TargetTaskId && d.Type == r.Type)
+            )
         ).ToList();
         
         foreach (var rel in toRemove)
@@ -945,6 +947,8 @@ public class TagSessionService(ITagRepository tagRepository) : ITagSessionServic
         return result;
     }
 }
+
+
 
 
 
