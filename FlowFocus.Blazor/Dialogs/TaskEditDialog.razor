@@ -339,6 +339,19 @@
             .ToList();
 
         // Сохраняем оригинальные inverse relations отдельно, если понадобятся как readonly
+
+        // --- Новое: загрузим повышения приоритета в DTO для редактора ---
+        _escalations.Clear();
+        if (source?.PriorityEscalations == null) return;
+        foreach (var pe in source.PriorityEscalations)
+        {
+            _escalations.Add(new EscalationDto
+            {
+                Id = pe.Id,
+                TargetPriorityId = pe.TargetPriorityId,
+                EscalationDate = pe.EscalationDate
+            });
+        }
     }
 
     private bool ShouldShowEscalationTable
@@ -432,9 +445,9 @@
             if (_wasRecurring)
             {
                 // Помечаем существующие сохранённые связи на удаление и очищаем локальные DTO
-                foreach (var r in _relations.Where(r => r.Id is > 0).ToList())
+                foreach (var r in _relations.Where(r => r.Id is > 0).ToList().Where(r => !_relationsToRemove.Contains(r.Id.Value)))
                 {
-                    if (!_relationsToRemove.Contains(r.Id.Value)) _relationsToRemove.Add(r.Id.Value);
+                    _relationsToRemove.Add(r.Id.Value);
                 }
                 _relations.Clear();
 
@@ -492,6 +505,44 @@
                 Tag = tag
             }).ToList();
 
+            // --- Новое: синхронизируем подзадачи из DTO в модель задачи ---
+            // При сохранении репозиторий ожидает TaskItem.Subtasks с существующими (Id>0) и новыми (Id==0) TaskItem объектами.
+            var existingTracked = ExistingTask is { Id: > 0 } ? TaskRepo.GetById(ExistingTask.Id) : null;
+
+            _task.Subtasks = _subtasks
+                .Where(s => !s.IsDeleted)
+                .Select(dto =>
+                {
+                    var ti = new TaskItem();
+                    // Для существующих подзадач устанавливаем Id, и пробуем сохранить CreatedDate если он есть в tracked
+                    if (dto.Id is > 0)
+                    {
+                        ti.Id = dto.Id.Value;
+                        var trackedSub = existingTracked?.Subtasks?.FirstOrDefault(st => st.Id == dto.Id.Value);
+                        if (trackedSub != null)
+                        {
+                            ti.CreatedDate = trackedSub.CreatedDate;
+                            ti.ParentTaskId = trackedSub.ParentTaskId;
+                            // Сохраняем статус если было
+                            ti.Status = trackedSub.Status;
+                        }
+                    }
+                    else
+                    {
+                        // Для новых подзадач оставляем Id == 0, CreatedDate по умолчанию
+                    }
+
+                    ti.Title = dto.Title;
+                    ti.IsFavorite = dto.IsFavorite;
+                    ti.Interest = dto.Interest;
+                    ti.Complexity = dto.Complexity;
+                    ti.EstimatedMinutes = dto.EstimatedMinutes;
+                    // Обеспечим, что у подзадачи будет статус Planned
+                    ti.Status = ti.Status == 0 ? TaskStatus.Planned : ti.Status;
+
+                    return ti;
+                }).ToList();
+
             // Если задача стала повторяющейся, гарантированно удаляем все существующие связи
             if (_task.IsRecurring)
             {
@@ -523,7 +574,6 @@
                 _relations.RemoveAll(r => r.TargetTask is { IsRecurring: true });
             }
 
-            var existingTracked = ExistingTask is { Id: > 0 } ? TaskRepo.GetById(ExistingTask.Id) : null;
             _task.Relations = RelationModule.SyncRelationsToTask(_relations, _task, existingTracked);
 
             // Применяем отложенные удаления сохранённых связей, отмеченных пользователем в UI
