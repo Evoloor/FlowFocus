@@ -141,9 +141,10 @@ public class StorageContext : DbContext
                 DailyComplexityLimit = 100,
                 DailyTimeLimit = 480,
                 DailyTaskLimit = 10,
-                AutoDistributeEnabled = false,
+                AutoDistributeEnabled = true,
                 IsDarkMode = true,
-                HideTaskTitlesDefault = false
+                HideTaskTitlesDefault = false,
+                DefaultPriorityId = 3
             }
         );
     }
