@@ -1,18 +1,20 @@
 @inject IDialogService DialogService
-@inject ISnackbar Snackbar
 
 <div>
     <MudText Typo="Typo.subtitle2" Class="mb-2">Подзадачи</MudText>
     <div class="subtask-input mb-2">
         <MudTextField T="string" @bind-Value="NewSubtaskTitle"
+                      @key="_inputResetKey"
                       Placeholder="Название подзадачи"
                       Variant="Variant.Outlined"
                       Margin="Margin.Dense"
-                      OnKeyDown="OnSubtaskKeyDown"
+                      OnKeyUp="OnSubtaskKeyUp"
+                      Immediate="true"
+                      @ref="_newSubtaskField"
                       Class="flex-grow-1" />
         <MudIconButton Icon="@Icons.Material.Filled.Add"
                        Color="Color.Primary"
-                       OnClick="AddSubtask"
+                       OnClick="@AddSubtask"
                        Disabled="@string.IsNullOrWhiteSpace(NewSubtaskTitle)" />
     </div>
 
@@ -43,12 +45,39 @@
 
     private string NewSubtaskTitle { get; set; } = string.Empty;
 
-    private void AddSubtask()
+    // Реф поля, чтобы возвращать фокус после добавления
+    private MudTextField<string>? _newSubtaskField;
+
+    // Ключ для принудительного сброса внутреннего состояния MudTextField
+    private int _inputResetKey;
+
+    private async Task AddSubtask()
     {
         if (string.IsNullOrWhiteSpace(NewSubtaskTitle)) return;
         Subtasks.Add(new() { Title = NewSubtaskTitle.Trim() });
         NewSubtaskTitle = string.Empty;
-        _ = SubtasksChanged.InvokeAsync(Subtasks);
+        StateHasChanged();
+        await SubtasksChanged.InvokeAsync(Subtasks);
+
+        // Сбрасываем внутреннее состояние поля, чтобы визуально очистить значение
+        _inputResetKey++;
+        await InvokeAsync(StateHasChanged);
+        // Даем шанс компонентам обновиться
+        await Task.Yield();
+        await Task.Delay(30);
+
+        // Ставим фокус обратно в поле ввода, если возможно
+        try
+        {
+            if (_newSubtaskField != null)
+            {
+                await _newSubtaskField.FocusAsync();
+            }
+        }
+        catch
+        {
+            // игнорируем ошибки фокуса
+        }
     }
 
     private void RemoveSubtask(SubtaskDto dto)
@@ -86,11 +115,12 @@
         }
     }
 
-    private void OnSubtaskKeyDown(KeyboardEventArgs e)
+    private async Task OnSubtaskKeyUp(KeyboardEventArgs e)
     {
+        // Для Enter используем OnKeyUp, чтобы двусторонняя привязка успела обновить NewSubtaskTitle
         if (e.Key == "Enter")
         {
-            AddSubtask();
+            await AddSubtask();
         }
     }
 }

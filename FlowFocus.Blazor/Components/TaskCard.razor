@@ -123,13 +123,6 @@
             @if (DisplayMode != DisplayMode.Compact)
             {
                 <div class="task-settings-row">
-                    @if (Task.Priority != null || Task.EffectivePriority != null)
-                    {
-                        var priority = Task.EffectivePriority ?? Task.Priority;
-                        <MudChip T="string" Size="Size.Small" Style="@($"background-color: {priority!.Color}20; color: {priority.Color}")">
-                            @priority.Order
-                        </MudChip>
-                    }
                     @if (Task.Interest != null)
                     {
                         <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
