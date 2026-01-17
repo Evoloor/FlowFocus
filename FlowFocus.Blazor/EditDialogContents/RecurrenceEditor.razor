@@ -8,9 +8,8 @@
             <MudGrid>
                 <MudItem xs="12" sm="6">
                     <MudSelect T="RecurrenceChoice" @Value="_choice" Label="Тип" Dense="true" ValueChanged="OnChoiceChanged">
-                        <MudSelectItem Value="RecurrenceChoice.Daily">Ежедневно</MudSelectItem>
-                        <MudSelectItem Value="RecurrenceChoice.Weekly">Еженедельно</MudSelectItem>
                         <MudSelectItem Value="RecurrenceChoice.EveryN">Каждые N</MudSelectItem>
+                        <MudSelectItem Value="RecurrenceChoice.Weekly">По дням недели</MudSelectItem>
                     </MudSelect>
                 </MudItem>
 
@@ -63,7 +62,7 @@
     private enum RecurrenceChoice { Daily, Weekly, EveryN }
     private enum RecurrenceUnit { Days, Months, Years }
 
-    private RecurrenceChoice _choice;
+    private RecurrenceChoice _choice = RecurrenceChoice.EveryN;
     private RecurrenceUnit _unit = RecurrenceUnit.Days;
     private int? _interval;
 

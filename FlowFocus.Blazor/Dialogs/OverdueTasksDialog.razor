@@ -114,16 +114,12 @@
         var overdueTasks = TaskRepo.GetOverdueTasks(dayStartHour);
 
         // Сбрасываем даты просроченных задач, чтобы они были перераспределены
-        foreach (var overdueTask in overdueTasks)
+        foreach (var task in overdueTasks.Select(overdueTask => TaskRepo.GetById(overdueTask.Id)).OfType<TaskItem>().Where(task => !task.IsRecurring))
         {
-            var task = TaskRepo.GetById(overdueTask.Id);
-            if (task != null)
-            {
-                // Сбрасываем обе даты, чтобы задача была перераспределена по алгоритму
-                task.ActualAssignedDate = null;
-                task.UserAssignedDate = null;
-                TaskRepo.Update(task);
-            }
+            // Сбрасываем обе даты, чтобы задача была перераспределена по алгоритму
+            task.ActualAssignedDate = null;
+            task.UserAssignedDate = null;
+            TaskRepo.Update(task);
         }
 
         // Перераспределяем все задачи согласно алгоритму
@@ -169,4 +165,3 @@
         }
     }
 }
-

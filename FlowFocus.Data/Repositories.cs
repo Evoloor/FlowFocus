@@ -473,6 +473,25 @@ public class TaskRepository(StorageContext context, INotificationService notific
                 CreatedDate = DateTime.UtcNow
             };
 
+            // Копируем теги и повышения приоритета основной задачи
+            if (sourceTask.Tags != null && sourceTask.Tags.Count != 0)
+            {
+                newTask.Tags = sourceTask.Tags.Select(t => new TaskTag { TagId = t.TagId }).ToList();
+            }
+
+            if (sourceTask.PriorityEscalations != null && sourceTask.PriorityEscalations.Count != 0)
+            {
+                newTask.PriorityEscalations = sourceTask.PriorityEscalations
+                    .Select(e => new PriorityEscalation { TargetPriorityId = e.TargetPriorityId, EscalationDate = e.EscalationDate, IsApplied = e.IsApplied })
+                    .ToList();
+            }
+
+            // Копируем подзадачи рекурсивно (без сохранённых Id и без привязки к исходному RecurrenceSourceId)
+            if (sourceTask.Subtasks != null && sourceTask.Subtasks.Count != 0)
+            {
+                newTask.Subtasks = sourceTask.Subtasks.Select(s => CloneTaskForRecurrence(s)).ToList();
+            }
+
             Add(newTask);
         }
         catch (Exception ex)
@@ -480,6 +499,60 @@ public class TaskRepository(StorageContext context, INotificationService notific
             // Логируем и не даём упасть приложению
             Console.WriteLine($"CreateNextRecurrence error for task {sourceTask?.Id}: {ex}");
         }
+    }
+
+    /// <summary>
+    /// Рекурсивно клонирует задачу для использования в новой повторяющейся копии.
+    /// Возвращает новый объект TaskItem с Id == 0 и без привязанных внешних ссылок (RecurrenceSourceId очищен).
+    /// Копируются теги и правила повышения приоритета, а также вложенные подзадачи.
+    /// </summary>
+    private TaskItem CloneTaskForRecurrence(TaskItem source)
+    {
+        var clone = new TaskItem
+        {
+            // Id оставляем 0, EF/репозиторий назначит новый Id при добавлении
+            Title = source.Title,
+            Description = source.Description,
+            Status = TaskStatus.Planned,
+            PriorityId = source.PriorityId,
+            Interest = source.Interest,
+            Complexity = source.Complexity,
+            EstimatedMinutes = source.EstimatedMinutes,
+            IsFavorite = source.IsFavorite,
+            HideUnderSpoiler = source.HideUnderSpoiler,
+            // Подзадачи обычно не имеют собственной даты назначения — оставим null
+            UserAssignedDate = null,
+            ActualAssignedDate = null,
+            IsRecurring = source.IsRecurring,
+            RecurrenceType = source.RecurrenceType,
+            RecurrenceInterval = source.RecurrenceInterval,
+            RecurrenceWeekDays = source.RecurrenceWeekDays,
+            // Не переносим RecurrenceSourceId — чтобы подзадачи не стали корневыми источниками повторения
+            RecurrenceSourceId = null,
+            CreatedDate = DateTime.UtcNow
+        };
+
+        // Копируем теги
+        if (source.Tags != null && source.Tags.Count != 0)
+        {
+            clone.Tags = source.Tags.Select(t => new TaskTag { TagId = t.TagId }).ToList();
+        }
+
+        // Копируем повышения приоритета
+        if (source.PriorityEscalations != null && source.PriorityEscalations.Count != 0)
+        {
+            clone.PriorityEscalations = source.PriorityEscalations
+                .Select(e => new PriorityEscalation { TargetPriorityId = e.TargetPriorityId, EscalationDate = e.EscalationDate, IsApplied = e.IsApplied })
+                .ToList();
+        }
+
+        // Рекурсивно копируем вложенные подзадачи
+        if (source.Subtasks != null && source.Subtasks.Count != 0)
+        {
+            clone.Subtasks = source.Subtasks.Select(s => CloneTaskForRecurrence(s)).ToList();
+        }
+
+        return clone;
     }
 
     /// <summary>
