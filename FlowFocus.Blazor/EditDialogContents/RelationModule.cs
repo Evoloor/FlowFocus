@@ -15,6 +15,14 @@ public static class RelationModule
 
         foreach (var dto in validRelations)
         {
+            // Защитное получение id цели
+            var targetId = dto.TargetTask?.Id ?? 0;
+            if (targetId == 0)
+            {
+                // Пропускаем некорректную запись
+                continue;
+            }
+
             // Нормализуем типы связей для хранения в БД:
             // - Для логики блокировок в БД храним только RelationType.Blocks, где SourceTask блокирует TargetTask.
             // - Если пользователь указал BlockedBy (т.е. текущая задача блокируется другой), то в БД сохраняем запись с Source = другая задача, Target = текущая задача и Type = Blocks.
@@ -31,13 +39,13 @@ public static class RelationModule
                 case RelationType.BlockedBy:
                     // DTO означает: текущая задача блокируется указанной TargetTask
                     dbType = RelationType.Blocks;
-                    dbSourceId = dto.TargetTask!.Id; // Другой таск является source
+                    dbSourceId = targetId; // Другой таск является source
                     dbTargetId = task.Id > 0 ? task.Id : 0; // Текущий таск является целью
                     break;
                 case RelationType.Blocks:
                     dbType = RelationType.Blocks;
                     dbSourceId = task.Id > 0 ? task.Id : 0;
-                    dbTargetId = dto.TargetTask!.Id;
+                    dbTargetId = targetId;
                     break;
                 case RelationType.RelatedTo:
                 case RelationType.Subtask:
@@ -45,7 +53,7 @@ public static class RelationModule
                     // Обычные типы сохраняем напрямую (Source = текущая задача)
                     dbType = dto.Type;
                     dbSourceId = task.Id > 0 ? task.Id : 0;
-                    dbTargetId = dto.TargetTask!.Id;
+                    dbTargetId = targetId;
                     break;
             }
 

@@ -39,16 +39,42 @@ public class TaskRepository(StorageContext context, INotificationService notific
                 }
             }
             
-            // Устанавливаем SourceTaskId для связей перед сохранением
+            // Устанавливаем SourceTaskId/TargetTaskId для связей перед сохранением
             if (entity.Relations.Count != 0)
             {
-                foreach (var relation in entity.Relations)
+                for (var i = 0; i < entity.Relations.Count; i++)
                 {
+                    var relation = entity.Relations[i];
+                    // Если source не задан, назначаем текущую новую задачу как источник
                     if (relation.SourceTaskId == 0)
                     {
                         relation.SourceTaskId = entity.Id;
                     }
-                    relation.LastChangesOn = DateTime.UtcNow;
+
+                    // Если target не задан, создаём новый объект TaskRelation с нужным TargetTaskId
+                    // Так как TargetTaskId имеет init-only сеттер, нельзя присвоить его после создания объекта.
+                    if (relation.TargetTaskId == 0)
+                    {
+                        var replacement = new TaskRelation
+                        {
+                            SourceTaskId = relation.SourceTaskId == 0 ? entity.Id : relation.SourceTaskId,
+                            TargetTaskId = entity.Id,
+                            Type = relation.Type,
+                            LastChangesOn = DateTime.UtcNow
+                        };
+
+                        // Сохраняем Id для уже сохранённых записей (если было)
+                        if (relation.Id > 0)
+                        {
+                            replacement.Id = relation.Id;
+                        }
+
+                        entity.Relations[i] = replacement;
+                    }
+                    else
+                    {
+                        relation.LastChangesOn = DateTime.UtcNow;
+                    }
                 }
             }
             
@@ -1020,6 +1046,8 @@ public class TagSessionService(ITagRepository tagRepository) : ITagSessionServic
         return result;
     }
 }
+
+
 
 
 
