@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using FlowFocus.Core;
 using FlowFocus.Core.Services;
+using FlowFocus.Data.Repositories;
 
 namespace FlowFocus.Data;
 
