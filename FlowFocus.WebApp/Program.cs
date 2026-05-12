@@ -10,7 +10,6 @@ _ = builder.Services.AddMudServices()
     .AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Кастомный импорт сервисов - теперь централизован в FlowFocus.Data
 _ = builder.Services.AddDataLayer();
 
 var app = builder.Build();

@@ -324,7 +324,7 @@
         var incoming = (source?.InverseRelations ?? []).Select(r => new RelationDto
         {
             Id = r.Id,
-            // В базе теперь canonical хранится Blocks (Source -> Target).
+            // В базе canonical хранится Blocks (Source -> Target).
             // Для отображения в редакторе текущей задачи входящие блокировки показываем как BlockedBy (т.е. "Заблокирована"),
             // остальные типы передаём как есть.
             Type = r.Type == RelationType.Blocks ? RelationType.BlockedBy : r.Type,
@@ -340,7 +340,7 @@
 
         // Сохраняем оригинальные inverse relations отдельно, если понадобятся как readonly
 
-        // --- Новое: загрузим повышения приоритета в DTO для редактора ---
+        // загрузим повышения приоритета в DTO для редактора
         _escalations.Clear();
         if (source?.PriorityEscalations == null) return;
         foreach (var pe in source.PriorityEscalations)
@@ -495,7 +495,7 @@
                 _task.Status = TaskStatus.Planned;
             }
 
-            // Перед обновлением логики тегов — уменьшение счетчиков теперь выполняется в репозитории TaskRepository.Update/Delete.
+            // Перед обновлением логики тегов — уменьшение счетчиков выполняется в репозитории TaskRepository.Update/Delete.
             // Ранее здесь выполнялись вызовы TagRepo.DecrementUsage/CleanupUnusedTags — они удалены, чтобы избежать двойного уменьшения.
 
             // Обновляем теги задачи
@@ -506,7 +506,7 @@
                 // Tag = tag
             }).ToList();
 
-            // --- Новое: синхронизируем подзадачи из DTO в модель задачи ---
+            // синхронизируем подзадачи из DTO в модель задачи
             // При сохранении репозиторий ожидает TaskItem.Subtasks с существующими (Id>0) и новыми (Id==0) TaskItem объектами.
             var existingTracked = ExistingTask is { Id: > 0 } ? TaskRepo.GetById(ExistingTask.Id) : null;
 

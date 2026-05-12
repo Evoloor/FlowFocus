@@ -401,7 +401,7 @@ public class TaskRepository(StorageContext context, INotificationService notific
             )
             .Where(t =>
             {
-                // Собираем всех других блокеров (теперь мы учитываем только inverse relations с Type == Blocks)
+                // Собираем всех других блокеров (учитываем только inverse relations с Type == Blocks)
                 var otherInverseBlockers = t.InverseRelations
                     .Where(r => r.Type == RelationType.Blocks && r.SourceTaskId != taskId)
                     .Select(r => r.SourceTask)
