@@ -2,7 +2,7 @@
 
 <div>
     <MudText Typo="Typo.subtitle2" Class="mb-2">Подзадачи</MudText>
-    <div class="subtask-input mb-2">
+    <div class="subtask-input mb-2" style="display:flex; gap: 8px; align-items: center;">
         <MudTextField T="string" @bind-Value="NewSubtaskTitle"
                       @key="_inputResetKey"
                       Placeholder="Название подзадачи"
