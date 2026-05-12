@@ -21,23 +21,25 @@
             <div class="task-card-header">
                 @* Чекбокс / Иконка статуса *@
                 <div class="task-status-control">
-                    @if (Task.Status == TaskStatus.Blocked || Task.IsBlocked)
+                    @switch (Task.Status)
                     {
-                        <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Color="Color.Warning" />
-                    }
-                    else if (Task.Status == TaskStatus.Irrelevant)
-                    {
-                        <MudText Typo="Typo.caption" Class="vertical-text text-muted">Неактуально</MudText>
-                    }
-                    else
-                    {
-                        // Render an interactive checkbox for all non-blocked/non-irrelevant statuses,
-                        // including Completed — so user can un-check (reopen) the task.
-                        <MudCheckBox T="bool" Value="@(Task.Status == TaskStatus.Completed)"
-                                     ValueChanged="@OnTaskCompleted"
-                                     Size="Size.Small"
-                                     Color="Color.Primary"
-                                     Disabled="@(Task.Status == TaskStatus.NotConfigured)" />
+                        case TaskStatus.Planned:
+                        case TaskStatus.Completed:
+                            // Render an interactive checkbox for all non-blocked/non-irrelevant statuses,
+                            // including Completed — so user can un-check (reopen) the task.
+                            <MudCheckBox T="bool" Value="@(Task.Status == TaskStatus.Completed)"
+                                         ValueChanged="@OnTaskCompleted"
+                                         Size="Size.Small"
+                                         Color="Color.Primary"
+                                         Disabled="@(Task.Status == TaskStatus.NotConfigured)"/>
+                            break;
+                        case TaskStatus.Irrelevant:
+                            <MudText Typo="Typo.caption" Class="vertical-text text-muted">Неактуально</MudText>
+                            break;
+                            // TODO: check Task.IsBlocked
+                        case TaskStatus.Blocked:
+                            <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Color="Color.Warning"/>
+                            break;
                     }
                 </div>
 
