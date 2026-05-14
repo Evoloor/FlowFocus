@@ -103,6 +103,11 @@
                             }
                         </MudSelect>
                     }
+
+                    @* Чекбокс: скрыть задачи с вручную проставленной датой *@
+                    <div class="d-flex align-center gap-2">
+                        <MudCheckBox T="bool" @bind-Value="HideWithDates" Label="Скрыть с датами" Class="ml-2 mt-2" />
+                    </div>
                 </div>
             }
         </div>
@@ -199,9 +204,25 @@
     private IEnumerable<TaskStatus?> _selectedStatuses = new List<TaskStatus?> { TaskStatus.Planned, TaskStatus.NotConfigured, TaskStatus.Blocked };
     private DurationFilter _durationFilter = DurationFilter.All;
     private IEnumerable<int?> _selectedTagIds = new List<int?>();
+    // Флаг: скрывать задачи, у которых указана UserAssignedDate (ручная дата)
+    private bool _hideWithDates = false;
 
     private int _currentPage = 1;
     private int _pageSize = 25;
+
+    private bool HideWithDates
+    {
+        get => _hideWithDates;
+        set
+        {
+            if (_hideWithDates != value)
+            {
+                _hideWithDates = value;
+                _currentPage = 1;
+                _ = InvokeAsync(StateHasChanged);
+            }
+        }
+    }
 
     protected override void OnInitialized()
     {
@@ -263,7 +284,8 @@
         _dateRange != null ||
         _selectedStatuses.Any() ||
         _durationFilter != DurationFilter.All ||
-        _selectedTagIds.Any();
+        _selectedTagIds.Any() ||
+        _hideWithDates;
 
     private List<TaskItem> FilteredTasks
     {
@@ -315,6 +337,12 @@
             {
                 var tagIds = _selectedTagIds.Where(id => id != null).Cast<int>().ToList();
                 tasks = tasks.Where(t => t.Tags.Any(tt => tagIds.Contains(tt.TagId)));
+            }
+
+            // Скрыть задачи с вручную проставленной датой (UserAssignedDate)
+            if (_hideWithDates)
+            {
+                tasks = tasks.Where(t => t.UserAssignedDate == null );
             }
 
             // Сортировка
