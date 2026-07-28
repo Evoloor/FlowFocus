@@ -1,0 +1,29 @@
+@namespace FlowFocus.Blazor.Components
+
+@if (!string.IsNullOrEmpty(Task.Description) && DisplayMode != DisplayMode.Compact)
+{
+    @if (ShouldHideUnderSpoiler && !SpoilerRevealed)
+    {
+        <MudText Typo="Typo.caption" Class="text-muted">Описание скрыто</MudText>
+    }
+    else
+    {
+        <MudText Typo="Typo.body2" Class="task-description text-muted">
+            @Task.Description
+        </MudText>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public TaskItem Task { get; set; } = null!;
+
+    [Parameter]
+    public DisplayMode DisplayMode { get; set; }
+
+    [Parameter]
+    public bool ShouldHideUnderSpoiler { get; set; }
+
+    [Parameter]
+    public bool SpoilerRevealed { get; set; }
+}

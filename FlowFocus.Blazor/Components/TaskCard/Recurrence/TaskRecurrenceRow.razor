@@ -1,0 +1,45 @@
+@namespace FlowFocus.Blazor.Components
+
+@if (Task.IsRecurring && DisplayMode != DisplayMode.Compact)
+{
+    <div class="task-recurrence-row">
+        <MudIcon Icon="@Icons.Material.Filled.Repeat" Size="Size.Small" Class="me-1" />
+        <MudText Typo="Typo.caption">@GetRecurrenceText()</MudText>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public TaskItem Task { get; set; } = null!;
+
+    [Parameter]
+    public DisplayMode DisplayMode { get; set; }
+
+    private string GetRecurrenceText()
+    {
+        return Task.RecurrenceType switch
+        {
+            RecurrenceType.Daily => "Ежедневно",
+            RecurrenceType.EveryNDays => $"Каждые {Task.RecurrenceInterval ?? 1} дн",
+            RecurrenceType.Monthly => $"Каждые {Task.RecurrenceInterval ?? 1} мес",
+            RecurrenceType.Yearly => $"Каждые {Task.RecurrenceInterval ?? 1} лет",
+            RecurrenceType.WeekDays => FormatWeekDays(Task.RecurrenceWeekDays ?? 0),
+            _ => string.Empty
+        };
+    }
+
+    private static string FormatWeekDays(int mask)
+    {
+        if (mask == 0) return "Еженедельно";
+        var mapping = new (int Bit, string Name)[]
+        {
+            (1, "Пн"), (2, "Вт"), (4, "Ср"), (8, "Чт"), (16, "Пт"), (32, "Сб"), (64, "Вс")
+        };
+        var names = new List<string>();
+        foreach (var (bit, name) in mapping)
+        {
+            if ((mask & bit) != 0) names.Add(name);
+        }
+        return names.Count == 0 ? "Еженедельно" : $"Еженедельно ({string.Join(", ", names)})";
+    }
+}

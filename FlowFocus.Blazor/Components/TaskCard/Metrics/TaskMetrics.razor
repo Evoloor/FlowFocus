@@ -1,0 +1,36 @@
+@namespace FlowFocus.Blazor.Components
+
+@if (DisplayMode != DisplayMode.Compact)
+{
+    <div class="task-settings-row">
+        @if (Task.Interest != null)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
+                <MudIcon Icon="@Icons.Material.Filled.Interests" Size="Size.Small" Class="me-1" />
+                @Task.Interest
+            </MudChip>
+        }
+        @if (Task.Complexity != null)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">
+                <MudIcon Icon="@Icons.Material.Filled.Speed" Size="Size.Small" Class="me-1" />
+                @Task.Complexity
+            </MudChip>
+        }
+        @if (Task.EstimatedMinutes != null)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">
+                <MudIcon Icon="@Icons.Material.Filled.Timer" Size="Size.Small" Class="me-1" />
+                @Task.FormattedDuration
+            </MudChip>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public TaskItem Task { get; set; } = null!;
+
+    [Parameter]
+    public DisplayMode DisplayMode { get; set; }
+}

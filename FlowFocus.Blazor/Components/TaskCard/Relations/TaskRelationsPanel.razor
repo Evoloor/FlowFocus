@@ -1,0 +1,96 @@
+@namespace FlowFocus.Blazor.Components
+
+@if (!IsNested && (Task.Subtasks.Any() || Task.Relations.Any() || Task.InverseRelations.Any()))
+{
+    <div class="task-relations-panel">
+        @if (Task.Subtasks.Any())
+        {
+            <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
+                <MudExpansionPanel Text="@($"({Task.Subtasks.Count}) подзадач")" Expanded="true">
+                    @foreach (var subtask in Task.Subtasks)
+                    {
+                        <TaskCard Task="subtask" IsNested="true" DisplayMode="DisplayMode.Compact" OnTaskChanged="OnTaskChanged" />
+                    }
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        }
+
+        @if (RelatedToTasks.Any())
+        {
+            <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
+                <MudExpansionPanel Text="@($"Связана с ({RelatedToTasks.Count})")" IsInitiallyExpanded="false">
+                    @foreach (var relatedTask in RelatedToTasks)
+                    {
+                        <TaskCard Task="relatedTask" IsNested="true" DisplayMode="DisplayMode.Compact" OnTaskChanged="OnTaskChanged" />
+                    }
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        }
+
+        @if (BlocksTasks.Any())
+        {
+            <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
+                <MudExpansionPanel Text="@($"Блокирует ({BlocksTasks.Count})")" IsInitiallyExpanded="false">
+                    @foreach (var blockedTask in BlocksTasks)
+                    {
+                        <TaskCard Task="blockedTask" IsNested="true" DisplayMode="DisplayMode.Compact" OnTaskChanged="OnTaskChanged" />
+                    }
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        }
+
+        @if (BlockedByTasks.Any())
+        {
+            <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
+                <MudExpansionPanel Text="@($"Блокирована ({BlockedByTasks.Count})")" IsInitiallyExpanded="false">
+                    @foreach (var blocker in BlockedByTasks)
+                    {
+                        <TaskCard Task="blocker" IsNested="true" DisplayMode="DisplayMode.Compact" OnTaskChanged="OnTaskChanged" />
+                    }
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        }
+    </div>
+}
+else if (IsNested && TotalRelationsCount > 0)
+{
+    <MudText Typo="Typo.caption" Class="text-muted">
+        Связей: @TotalRelationsCount
+    </MudText>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public TaskItem Task { get; set; } = null!;
+
+    [Parameter]
+    public bool IsNested { get; set; }
+
+    [Parameter]
+    public EventCallback OnTaskChanged { get; set; }
+
+    private int TotalRelationsCount =>
+        Task.Subtasks.Count + Task.Relations.Count + Task.InverseRelations.Count;
+
+    private IReadOnlyList<TaskItem> RelatedToTasks =>
+        Task.Relations.Where(r => r.Type == RelationType.RelatedTo).Select(r => r.TargetTask)
+            .Concat(Task.InverseRelations.Where(r => r.Type == RelationType.RelatedTo).Select(r => r.SourceTask))
+            .Where(t => t != null)
+            .Cast<TaskItem>()
+            .Distinct()
+            .ToList();
+
+    private IReadOnlyList<TaskItem> BlocksTasks =>
+        Task.Relations.Where(r => r.Type == RelationType.Blocks).Select(r => r.TargetTask)
+            .Where(t => t != null)
+            .Cast<TaskItem>()
+            .Distinct()
+            .ToList();
+
+    private IReadOnlyList<TaskItem> BlockedByTasks =>
+        Task.InverseRelations.Where(r => r.Type == RelationType.Blocks).Select(r => r.SourceTask)
+            .Where(t => t != null)
+            .Cast<TaskItem>()
+            .Distinct()
+            .ToList();
+}

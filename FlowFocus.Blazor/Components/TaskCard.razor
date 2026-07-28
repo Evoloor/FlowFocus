@@ -6,279 +6,43 @@
 @inject IPlannerService PlannerService
 
 <MudPaper Class="@GetCardClass()" Style="@GetCardStyle()" Elevation="@(IsNested ? 0 : 1)">
-    @* Оверлей для неактуальных задач *@
     @if (Task.Status == TaskStatus.Irrelevant && !IsNested)
     {
         <div class="irrelevant-overlay">НЕАКТУАЛЬНО</div>
     }
 
     <div class="task-card-content">
-        @* Индикатор приоритета *@
         <div class="priority-indicator" style="@GetPriorityIndicatorStyle()"></div>
 
         <div class="task-card-main">
-            @* Верхняя строка: чекбокс/иконка + название + избранное *@
-            <div class="task-card-header">
-                @* Чекбокс / Иконка статуса *@
-                <div class="task-status-control">
-                    @switch (Task.Status)
-                    {
-                        case TaskStatus.Planned:
-                        case TaskStatus.Completed:
-                            // Render an interactive checkbox for all non-blocked/non-irrelevant statuses,
-                            // including Completed — so user can un-check (reopen) the task.
-                            <MudCheckBox T="bool" Value="@(Task.Status == TaskStatus.Completed)"
-                                         ValueChanged="@OnTaskCompleted"
-                                         Size="Size.Small"
-                                         Color="Color.Primary"
-                                         Disabled="@(Task.Status == TaskStatus.NotConfigured)"/>
-                            break;
-                        case TaskStatus.Irrelevant:
-                            <MudText Typo="Typo.caption" Class="vertical-text text-muted">Неактуально</MudText>
-                            break;
-                            // TODO: check Task.IsBlocked
-                        case TaskStatus.Blocked:
-                            <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Color="Color.Warning"/>
-                            break;
-                    }
-                </div>
+            <TaskCardHeader Task="Task"
+                            ShouldHideUnderSpoiler="ShouldHideUnderSpoiler"
+                            SpoilerRevealed="_spoilerRevealed"
+                            OnToggleSpoiler="ToggleSpoiler"
+                            OnTaskCompleted="OnTaskCompleted"
+                            OnToggleFavorite="ToggleFavorite" />
 
-                @* Название *@
-                <div class="task-title-container flex-grow-1">
-                    @if (Task.Status == TaskStatus.NotConfigured)
-                    {
-                        <MudIcon Icon="@Icons.Material.Filled.Settings" Size="Size.Small" Class="me-1" Color="Color.Info" />
-                    }
+            <TaskDateRow Task="Task" DayStartHour="@(_settings?.DayStartHour ?? 5)" />
 
-                    @if (ShouldHideUnderSpoiler)
-                    {
-                        @if (!_spoilerRevealed)
-                        {
-                            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@ToggleSpoiler"
-                                       Class="spoiler-button">
-                                <MudIcon Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Class="me-1" />
-                                <MudText Typo="Typo.body2">Показать</MudText>
-                            </MudButton>
-                        }
-                        else
-                        {
-                            <div class="d-flex align-center gap-2 flex-grow-1">
-                                <MudText Typo="Typo.body1" Class="@GetTitleClass()">@Task.Title</MudText>
-                                <MudIconButton Icon="@Icons.Material.Filled.VisibilityOff" Size="Size.Small"
-                                               OnClick="@ToggleSpoiler" Title="Скрыть" />
-                            </div>
-                        }
-                    }
-                    else
-                    {
-                        <MudText Typo="Typo.body1" Class="@GetTitleClass()">@Task.Title</MudText>
-                    }
-                </div>
+            <TaskDescription Task="Task"
+                             DisplayMode="DisplayMode"
+                             ShouldHideUnderSpoiler="ShouldHideUnderSpoiler"
+                             SpoilerRevealed="_spoilerRevealed" />
 
-                @* Избранное *@
-                <MudIconButton Icon="@(Task.IsFavorite ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarBorder)"
-                               Size="Size.Small"
-                               Color="@(Task.IsFavorite ? Color.Warning : Color.Default)"
-                               OnClick="@ToggleFavorite" />
-            </div>
+            <TaskMetrics Task="Task" DisplayMode="DisplayMode" />
 
-            @* Дата назначения / статус завершения *@
-            <div class="task-date-row">
-                @if (Task is { Status: TaskStatus.Completed, CompletedDate: not null })
-                {
-                    <MudText Typo="Typo.caption" Class="text-muted">
-                        Завершена @Task.CompletedDate.Value.ToString("dd.MM.yyyy")
-                    </MudText>
-                }
-                else if (Task.ActualAssignedDate != null || Task.UserAssignedDate != null)
-                {
-                    var date = Task.ActualAssignedDate ?? Task.UserAssignedDate;
-                    var isManual = Task.UserAssignedDate != null;
-                    var isOverdue = DateHelper.IsOverdue(date, _settings?.DayStartHour ?? 5);
+            <TaskRecurrenceRow Task="Task" DisplayMode="DisplayMode" />
 
-                    <MudIcon Icon="@(isManual ? Icons.Material.Filled.Settings : Icons.Material.Filled.AutoMode)"
-                             Size="Size.Small"
-                             Color="@(isOverdue ? Color.Error : isManual ? Color.Primary : Color.Default)"
-                             Class="me-1" />
-                    <MudText Typo="Typo.caption" Color="@(isOverdue ? Color.Error : Color.Default)">
-                        @date!.Value.ToString("dd.MM.yyyy")
-                    </MudText>
-                }
-            </div>
+            <TaskTags Task="Task" DisplayMode="DisplayMode" />
 
-            @* Описание (если есть и режим не компактный) *@
-            @if (!string.IsNullOrEmpty(Task.Description) && DisplayMode != DisplayMode.Compact)
-            {
-                @if (ShouldHideUnderSpoiler && !_spoilerRevealed)
-                {
-                    <MudText Typo="Typo.caption" Class="text-muted">Описание скрыто</MudText>
-                }
-                else
-                {
-                    <MudText Typo="Typo.body2" Class="task-description text-muted">
-                        @Task.Description
-                    </MudText>
-                }
-            }
+            <TaskRelationsPanel Task="Task" IsNested="IsNested" OnTaskChanged="OnTaskChanged" />
 
-            @* Строка настроек *@
-            @if (DisplayMode != DisplayMode.Compact)
-            {
-                <div class="task-settings-row">
-                    @if (Task.Interest != null)
-                    {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
-                            <MudIcon Icon="@Icons.Material.Filled.Interests" Size="Size.Small" Class="me-1" />
-                            @Task.Interest
-                        </MudChip>
-                    }
-                    @if (Task.Complexity != null)
-                    {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">
-                            <MudIcon Icon="@Icons.Material.Filled.Speed" Size="Size.Small" Class="me-1" />
-                            @Task.Complexity
-                        </MudChip>
-                    }
-                    @if (Task.EstimatedMinutes != null)
-                    {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">
-                            <MudIcon Icon="@Icons.Material.Filled.Timer" Size="Size.Small" Class="me-1" />
-                            @Task.FormattedDuration
-                        </MudChip>
-                    }
-                </div>
-            }
-
-            @* Строка повторения *@
-            @if (Task.IsRecurring && DisplayMode != DisplayMode.Compact)
-            {
-                <div class="task-recurrence-row">
-                    <MudIcon Icon="@Icons.Material.Filled.Repeat" Size="Size.Small" Class="me-1" />
-                    <MudText Typo="Typo.caption">@GetRecurrenceText()</MudText>
-                </div>
-            }
-
-            @* Теги *@
-            @if (Task.Tags.Any() && DisplayMode != DisplayMode.Compact)
-            {
-                <div class="task-tags-row">
-                    @foreach (var taskTag in Task.Tags.Take(AppConfig.MaxDisplayedTags))
-                    {
-                        <MudChip T="string" Size="Size.Small"
-                                 Variant="Variant.Filled"
-                                 Style="@($"background-color: {taskTag.Tag.BackgroundColor}; color: #333; border: none; cursor: default;")"
-                                 Clickable="false"
-                                 Deletable="false">
-                            @taskTag.Tag.Name
-                        </MudChip>
-                    }
-                    @if (Task.Tags.Count > AppConfig.MaxDisplayedTags)
-                    {
-                        <MudText Typo="Typo.caption" Class="text-muted">+@(Task.Tags.Count - AppConfig.MaxDisplayedTags)</MudText>
-                    }
-                </div>
-            }
-
-            @* Панель связей *@
-            @if (!IsNested && (Task.Subtasks.Any() || Task.Relations.Any() || Task.InverseRelations.Any()))
-            {
-                <div class="task-relations-panel">
-                    @* Подзадачи (развёрнуты по умолчанию) *@
-                    @if (Task.Subtasks.Any())
-                    {
-                        <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
-                            <MudExpansionPanel Text="@($"({Task.Subtasks.Count}) подзадач")" Expanded="true">
-                                @foreach (var subtask in Task.Subtasks)
-                                {
-                                    <TaskCard Task="subtask" IsNested="true" DisplayMode="DisplayMode.Compact" />
-                                }
-                            </MudExpansionPanel>
-                        </MudExpansionPanels>
-                    }
-
-                    @* Связанные задачи (свёрнуты) *@
-                    @{
-                        // Собираем списки задач из исходящих и входящих связей и приводим к задачам для удобного рендера
-                        var relatedToTasks = Task.Relations.Where(r => r.Type == RelationType.RelatedTo).Select(r => r.TargetTask).Where(t => t != null).ToList();
-                        relatedToTasks.AddRange(Task.InverseRelations.Where(r => r.Type == RelationType.RelatedTo).Select(r => r.SourceTask).Where(t => t != null));
-
-                        // Задачи, которые блокирует текущая (исходящие Blocks)
-                        var blocksTasks = Task.Relations.Where(r => r.Type == RelationType.Blocks).Select(r => r.TargetTask).Where(t => t != null).ToList();
-                        // Задачи, которые блокируют текущую (входящие Blocks)
-                        var blockedByTasks = Task.InverseRelations.Where(r => r.Type == RelationType.Blocks).Select(r => r.SourceTask).Where(t => t != null).ToList();
-
-                        // Убираем дубликаты
-                        relatedToTasks = relatedToTasks.Distinct().ToList();
-                        blocksTasks = blocksTasks.Distinct().ToList();
-                        blockedByTasks = blockedByTasks.Distinct().ToList();
-                    }
-
-                    @if (relatedToTasks.Any())
-                    {
-                        <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
-                            <MudExpansionPanel Text="@($"Связана с ({relatedToTasks.Count})")" IsInitiallyExpanded="false">
-                                @foreach (var relatedTask in relatedToTasks.OfType<TaskItem>())
-                                {
-                                    <TaskCard Task="relatedTask" IsNested="true" DisplayMode="DisplayMode.Compact" />
-                                }
-                            </MudExpansionPanel>
-                        </MudExpansionPanels>
-                    }
-
-                    @if (blocksTasks.Any())
-                    {
-                        <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
-                            <MudExpansionPanel Text="@($"Блокирует ({blocksTasks.Count})")" IsInitiallyExpanded="false">
-                                @foreach (var blockedTask in blocksTasks.OfType<TaskItem>())
-                                {
-                                    <TaskCard Task="blockedTask" IsNested="true" DisplayMode="DisplayMode.Compact" />
-                                }
-                            </MudExpansionPanel>
-                        </MudExpansionPanels>
-                    }
-
-                    @if (blockedByTasks.Any())
-                    {
-                        <MudExpansionPanels Elevation="0" Dense="true" Class="relations-group">
-                            <MudExpansionPanel Text="@($"Блокирована ({blockedByTasks.Count})")" IsInitiallyExpanded="false">
-                                @foreach (var blocker in blockedByTasks.OfType<TaskItem>())
-                                {
-                                    <TaskCard Task="blocker" IsNested="true" DisplayMode="DisplayMode.Compact" />
-                                }
-                            </MudExpansionPanel>
-                        </MudExpansionPanels>
-                    }
-                </div>
-            }
-            else if (IsNested && TotalRelationsCount > 0)
-            {
-                @* Для вложенных карточек показываем только количество связей *@
-                <MudText Typo="Typo.caption" Class="text-muted">
-                    Связей: @TotalRelationsCount
-                </MudText>
-            }
-
-            @* Элементы управления *@
-            @if (!IsNested)
-            {
-                <div class="task-actions">
-                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
-                                   OnClick="@OpenEditDialog" Title="Редактировать" />
-                    @if (Task.Status == TaskStatus.Irrelevant)
-                    {
-                        <MudIconButton Icon="@Icons.Material.Filled.Restore" Size="Size.Small"
-                                       OnClick="@RestoreFromIrrelevant" Title="Вернуть из неактуальных" />
-                    }
-                    else
-                    {
-                        <MudIconButton Icon="@Icons.Material.Filled.DoNotDisturb" Size="Size.Small"
-                                       OnClick="@MarkIrrelevant" Title="Сделать неактуальным"
-                                       Disabled="@(Task.Status == TaskStatus.Completed)" />
-                    }
-                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
-                                   OnClick="@DeleteTask" Title="Удалить" />
-                </div>
-            }
+            <TaskActions Task="Task"
+                         IsNested="IsNested"
+                         OnEdit="OpenEditDialog"
+                         OnRestoreFromIrrelevant="RestoreFromIrrelevant"
+                         OnMarkIrrelevant="MarkIrrelevant"
+                         OnDelete="DeleteTask" />
         </div>
     </div>
 </MudPaper>
@@ -311,9 +75,6 @@
     {
         _spoilerRevealed = !_spoilerRevealed;
     }
-
-    private int TotalRelationsCount =>
-        Task.Subtasks.Count + Task.Relations.Count + Task.InverseRelations.Count;
 
     private string GetCardClass()
     {
@@ -360,60 +121,16 @@
         return $"background-color: {color}";
     }
 
-    private string GetTitleClass()
-    {
-        var classes = new List<string>();
-
-        if (Task.Status == TaskStatus.Completed)
-            classes.Add("title-completed");
-        else if (Task.Status == TaskStatus.Irrelevant)
-            classes.Add("title-irrelevant");
-        else if (Task.Status == TaskStatus.NotConfigured)
-            classes.Add("title-not-configured");
-
-        return string.Join(" ", classes);
-    }
-
-    private string GetRecurrenceText()
-    {
-        return Task.RecurrenceType switch
-        {
-            RecurrenceType.Daily => "Ежедневно",
-            RecurrenceType.EveryNDays => $"Каждые {Task.RecurrenceInterval ?? 1} дн",
-            RecurrenceType.Monthly => $"Каждые {Task.RecurrenceInterval ?? 1} мес",
-            RecurrenceType.Yearly => $"Каждые {Task.RecurrenceInterval ?? 1} лет",
-            RecurrenceType.WeekDays => FormatWeekDays(Task.RecurrenceWeekDays ?? 0),
-            _ => string.Empty
-        };
-    }
-
-    private string FormatWeekDays(int mask)
-    {
-        if (mask == 0) return "Еженедельно";
-        var mapping = new (int Bit, string Name)[]
-        {
-            (1, "Пн"), (2, "Вт"), (4, "Ср"), (8, "Чт"), (16, "Пт"), (32, "Сб"), (64, "Вс")
-        };
-        var names = new List<string>();
-        foreach (var (bit, name) in mapping)
-        {
-            if ((mask & bit) != 0) names.Add(name);
-        }
-        return names.Count == 0 ? "Еженедельно" : $"Еженедельно ({string.Join(", ", names)})";
-    }
-
     private async Task OnTaskCompleted(bool completed)
     {
         if (completed)
         {
-            // Проверяем разблокируемые задачи
             var unblockedTasks = TaskRepo.GetTasksUnblockedBy(Task.Id);
 
             TaskRepo.CompleteTask(Task.Id);
 
             if (unblockedTasks.Any())
             {
-                // Показываем диалог с разблокированными задачами
                 var parameters = new DialogParameters<UnblockedTasksDialog>
                 {
                     { x => x.UnblockedTasks, unblockedTasks }
@@ -428,9 +145,7 @@
         }
         else
         {
-            // Снимаем пометку о выполнении
             TaskRepo.ReopenTask(Task.Id);
-            // Обновляем статусы заблокированных задач на всякий случай
             PlannerService.UpdateBlockedStatuses();
             Snackbar.Add("Отменено завершение задачи", Severity.Info);
             NotificationService.NotifyTasksChanged();
@@ -503,7 +218,6 @@
         if (confirmed == true)
         {
             TaskRepo.Delete(Task.Id);
-            // After deletion ensure blocked statuses updated
             PlannerService.UpdateBlockedStatuses();
             Snackbar.Add("Задача удалена", Severity.Success);
             NotificationService.NotifyTasksChanged();
@@ -517,7 +231,7 @@
         margin-bottom: 8px;
         overflow: hidden;
         transition: all 0.2s ease;
-        position: relative; /* Ограничиваем псевдоэлементы рамками карточки */
+        position: relative;
         z-index: 0;
     }
 
@@ -603,7 +317,6 @@
         border-top: 1px solid var(--mud-palette-lines-default);
     }
 
-    /* Статусы */
     .task-card-completed {
         opacity: 0.55;
         background: linear-gradient(135deg, rgba(76, 175, 80, 0.05) 0%, transparent 100%);
@@ -688,7 +401,6 @@
         opacity: 0.6;
     }
 
-    /* Вложенные карточки */
     .task-card-nested {
         margin: 4px 0;
         padding: 4px;
@@ -706,7 +418,6 @@
         width: 3px;
     }
 
-    /* Вертикальный текст */
     .vertical-text {
         writing-mode: vertical-rl;
         text-orientation: mixed;
@@ -741,7 +452,6 @@
         background: rgba(var(--mud-palette-primary-rgb), 0.1);
     }
 
-    /* Панель связей */
     .relations-group .mud-expansion-panel {
         background: transparent;
         margin-bottom: 4px;
@@ -759,7 +469,6 @@
         padding: 4px;
     }
 
-    /* Режимы отображения */
     .task-card-compact {
         margin-bottom: 4px;
     }
@@ -783,5 +492,5 @@
     .task-card-grid .task-card-main {
         justify-content: space-between;
     }
-    
+
 </style>

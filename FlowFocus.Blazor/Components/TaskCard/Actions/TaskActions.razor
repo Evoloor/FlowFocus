@@ -1,0 +1,42 @@
+@namespace FlowFocus.Blazor.Components
+
+@if (!IsNested)
+{
+    <div class="task-actions">
+        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                       OnClick="@OnEdit" Title="Редактировать" />
+        @if (Task.Status == TaskStatus.Irrelevant)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.Restore" Size="Size.Small"
+                           OnClick="@OnRestoreFromIrrelevant" Title="Вернуть из неактуальных" />
+        }
+        else
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.DoNotDisturb" Size="Size.Small"
+                           OnClick="@OnMarkIrrelevant" Title="Сделать неактуальным"
+                           Disabled="@(Task.Status == TaskStatus.Completed)" />
+        }
+        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                       OnClick="@OnDelete" Title="Удалить" />
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public TaskItem Task { get; set; } = null!;
+
+    [Parameter]
+    public bool IsNested { get; set; }
+
+    [Parameter]
+    public EventCallback OnEdit { get; set; }
+
+    [Parameter]
+    public EventCallback OnRestoreFromIrrelevant { get; set; }
+
+    [Parameter]
+    public EventCallback OnMarkIrrelevant { get; set; }
+
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+}

@@ -1,0 +1,93 @@
+@namespace FlowFocus.Blazor.Components
+
+<div class="task-card-header">
+    <div class="task-status-control">
+        @switch (Task.Status)
+        {
+            case TaskStatus.Planned:
+            case TaskStatus.Completed:
+                <MudCheckBox T="bool" Value="@(Task.Status == TaskStatus.Completed)"
+                             ValueChanged="@OnTaskCompleted"
+                             Size="Size.Small"
+                             Color="Color.Primary"
+                             Disabled="@(Task.Status == TaskStatus.NotConfigured)"/>
+                break;
+            case TaskStatus.Irrelevant:
+                <MudText Typo="Typo.caption" Class="vertical-text text-muted">Неактуально</MudText>
+                break;
+            case TaskStatus.Blocked:
+                <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Color="Color.Warning"/>
+                break;
+        }
+    </div>
+
+    <div class="task-title-container flex-grow-1">
+        @if (Task.Status == TaskStatus.NotConfigured)
+        {
+            <MudIcon Icon="@Icons.Material.Filled.Settings" Size="Size.Small" Class="me-1" Color="Color.Info" />
+        }
+
+        @if (ShouldHideUnderSpoiler)
+        {
+            @if (!SpoilerRevealed)
+            {
+                <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@OnToggleSpoiler"
+                           Class="spoiler-button">
+                    <MudIcon Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Class="me-1" />
+                    <MudText Typo="Typo.body2">Показать</MudText>
+                </MudButton>
+            }
+            else
+            {
+                <div class="d-flex align-center gap-2 flex-grow-1">
+                    <MudText Typo="Typo.body1" Class="@GetTitleClass()">@Task.Title</MudText>
+                    <MudIconButton Icon="@Icons.Material.Filled.VisibilityOff" Size="Size.Small"
+                                   OnClick="@OnToggleSpoiler" Title="Скрыть" />
+                </div>
+            }
+        }
+        else
+        {
+            <MudText Typo="Typo.body1" Class="@GetTitleClass()">@Task.Title</MudText>
+        }
+    </div>
+
+    <MudIconButton Icon="@(Task.IsFavorite ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarBorder)"
+                   Size="Size.Small"
+                   Color="@(Task.IsFavorite ? Color.Warning : Color.Default)"
+                   OnClick="@OnToggleFavorite" />
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public TaskItem Task { get; set; } = null!;
+
+    [Parameter]
+    public bool ShouldHideUnderSpoiler { get; set; }
+
+    [Parameter]
+    public bool SpoilerRevealed { get; set; }
+
+    [Parameter]
+    public EventCallback OnToggleSpoiler { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnTaskCompleted { get; set; }
+
+    [Parameter]
+    public EventCallback OnToggleFavorite { get; set; }
+
+    private string GetTitleClass()
+    {
+        var classes = new List<string>();
+
+        if (Task.Status == TaskStatus.Completed)
+            classes.Add("title-completed");
+        else if (Task.Status == TaskStatus.Irrelevant)
+            classes.Add("title-irrelevant");
+        else if (Task.Status == TaskStatus.NotConfigured)
+            classes.Add("title-not-configured");
+
+        return string.Join(" ", classes);
+    }
+}

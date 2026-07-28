@@ -1,0 +1,29 @@
+@namespace FlowFocus.Blazor.Components
+
+@if (Task.Tags.Any() && DisplayMode != DisplayMode.Compact)
+{
+    <div class="task-tags-row">
+        @foreach (var taskTag in Task.Tags.Take(AppConfig.MaxDisplayedTags))
+        {
+            <MudChip T="string" Size="Size.Small"
+                     Variant="Variant.Filled"
+                     Style="@($"background-color: {taskTag.Tag.BackgroundColor}; color: #333; border: none; cursor: default;")"
+                     Clickable="false"
+                     Deletable="false">
+                @taskTag.Tag.Name
+            </MudChip>
+        }
+        @if (Task.Tags.Count > AppConfig.MaxDisplayedTags)
+        {
+            <MudText Typo="Typo.caption" Class="text-muted">+@(Task.Tags.Count - AppConfig.MaxDisplayedTags)</MudText>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public TaskItem Task { get; set; } = null!;
+
+    [Parameter]
+    public DisplayMode DisplayMode { get; set; }
+}

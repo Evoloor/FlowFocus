@@ -1,0 +1,32 @@
+@namespace FlowFocus.Blazor.Components
+
+<div class="task-date-row">
+    @if (Task is { Status: TaskStatus.Completed, CompletedDate: not null })
+    {
+        <MudText Typo="Typo.caption" Class="text-muted">
+            Завершена @Task.CompletedDate.Value.ToString("dd.MM.yyyy")
+        </MudText>
+    }
+    else if (Task.ActualAssignedDate != null || Task.UserAssignedDate != null)
+    {
+        var date = Task.ActualAssignedDate ?? Task.UserAssignedDate;
+        var isManual = Task.UserAssignedDate != null;
+        var isOverdue = DateHelper.IsOverdue(date, DayStartHour);
+
+        <MudIcon Icon="@(isManual ? Icons.Material.Filled.Settings : Icons.Material.Filled.AutoMode)"
+                 Size="Size.Small"
+                 Color="@(isOverdue ? Color.Error : isManual ? Color.Primary : Color.Default)"
+                 Class="me-1" />
+        <MudText Typo="Typo.caption" Color="@(isOverdue ? Color.Error : Color.Default)">
+            @date!.Value.ToString("dd.MM.yyyy")
+        </MudText>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public TaskItem Task { get; set; } = null!;
+
+    [Parameter]
+    public int DayStartHour { get; set; } = 5;
+}
