@@ -155,6 +155,9 @@ namespace FlowFocus.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime?>("ActualAssignedDate")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime?>("CompletedDate")
                         .HasColumnType("TEXT");
 
@@ -166,9 +169,6 @@ namespace FlowFocus.Data.Migrations
 
                     b.Property<string>("Description")
                         .HasMaxLength(5000)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("DistributedAssignedDate")
                         .HasColumnType("TEXT");
 
                     b.Property<int?>("EffectivePriorityId")
@@ -209,10 +209,6 @@ namespace FlowFocus.Data.Migrations
 
                     b.Property<int?>("RecurrenceWeekDays")
                         .HasColumnType("INTEGER");
-
-                    b.Property<DateTime?>("RecurringAssignedDate")
-                        .HasColumnType("TEXT")
-                        .HasColumnName("ActualAssignedDate");
 
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");
