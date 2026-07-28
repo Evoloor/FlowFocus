@@ -3,6 +3,7 @@ using System;
 using FlowFocus.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FlowFocus.Data.Migrations
 {
     [DbContext(typeof(StorageContext))]
-    partial class StorageContextModelSnapshot : ModelSnapshot
+    [Migration("20260514180744_AssignedDateSeparation")]
+    partial class AssignedDateSeparation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.10");
@@ -44,7 +47,7 @@ namespace FlowFocus.Data.Migrations
 
                     b.HasIndex("TaskId");
 
-                    b.ToTable("PriorityEscalations", (string)null);
+                    b.ToTable("PriorityEscalations");
                 });
 
             modelBuilder.Entity("FlowFocus.Core.Models.PriorityLevel", b =>
@@ -71,7 +74,7 @@ namespace FlowFocus.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Priorities", (string)null);
+                    b.ToTable("Priorities");
 
                     b.HasData(
                         new
@@ -146,7 +149,7 @@ namespace FlowFocus.Data.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Tags", (string)null);
+                    b.ToTable("Tags");
                 });
 
             modelBuilder.Entity("FlowFocus.Core.Models.TaskItem", b =>
@@ -233,7 +236,7 @@ namespace FlowFocus.Data.Migrations
 
                     b.HasIndex("PriorityId");
 
-                    b.ToTable("Tasks", (string)null);
+                    b.ToTable("Tasks");
                 });
 
             modelBuilder.Entity("FlowFocus.Core.Models.TaskRelation", b =>
@@ -260,7 +263,7 @@ namespace FlowFocus.Data.Migrations
 
                     b.HasIndex("TargetTaskId");
 
-                    b.ToTable("TaskRelations", (string)null);
+                    b.ToTable("TaskRelations");
                 });
 
             modelBuilder.Entity("FlowFocus.Core.Models.TaskTag", b =>
@@ -281,7 +284,7 @@ namespace FlowFocus.Data.Migrations
 
                     b.HasIndex("TaskId");
 
-                    b.ToTable("TaskTags", (string)null);
+                    b.ToTable("TaskTags");
                 });
 
             modelBuilder.Entity("FlowFocus.Core.Models.UserSettings", b =>
@@ -319,7 +322,7 @@ namespace FlowFocus.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Settings", (string)null);
+                    b.ToTable("Settings");
 
                     b.HasData(
                         new
