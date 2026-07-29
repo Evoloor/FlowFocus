@@ -79,7 +79,7 @@
                 if (task == null) return false;
                 return task.Status != TaskStatus.Completed &&
                        task.Status != TaskStatus.Irrelevant &&
-                       DateHelper.IsOverdue(task.ActualAssignedDate, dayStartHour);
+                       DateHelper.IsOverdue(task.ScheduledDate, dayStartHour);
             });
         }
     }
@@ -116,9 +116,9 @@
         // Сбрасываем даты просроченных задач, чтобы они были перераспределены
         foreach (var task in overdueTasks.Select(overdueTask => TaskRepo.GetById(overdueTask.Id)).OfType<TaskItem>().Where(task => !task.IsRecurring))
         {
-            // Сбрасываем обе даты, чтобы задача была перераспределена по алгоритму
-            task.ActualAssignedDate = null;
-            task.UserAssignedDate = null;
+            // Сбрасываем дату и помечаем для авто-распределения плановиком (Scenario 3 из спецификации)
+            task.ScheduledDate = null;
+            task.DateSource = DateSource.AutoFlexible;
             TaskRepo.Update(task);
         }
 

@@ -7,10 +7,10 @@
             Завершена @Task.CompletedDate.Value.ToString("dd.MM.yyyy")
         </MudText>
     }
-    else if (Task.ActualAssignedDate != null || Task.UserAssignedDate != null)
+    else if (Task.ScheduledDate != null)
     {
-        var date = Task.ActualAssignedDate ?? Task.UserAssignedDate;
-        var isManual = Task.UserAssignedDate != null;
+        var date = Task.ScheduledDate;
+        var isManual = Task.DateSource == DateSource.Manual;
         var isOverdue = DateHelper.IsOverdue(date, DayStartHour);
 
         <MudIcon Icon="@(isManual ? Icons.Material.Filled.Settings : Icons.Material.Filled.AutoMode)"

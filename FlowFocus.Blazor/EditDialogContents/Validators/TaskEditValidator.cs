@@ -73,8 +73,8 @@ public static class TaskEditValidator
                 blocked = task;
             }
 
-            var blockerDate = blocker.UserAssignedDate ?? blocker.ActualAssignedDate;
-            var blockedDate = blocked.UserAssignedDate ?? blocked.ActualAssignedDate;
+            var blockerDate = blocker.ScheduledDate;
+            var blockedDate = blocked.ScheduledDate;
 
             if (blockerDate.HasValue && blockedDate.HasValue)
             {
