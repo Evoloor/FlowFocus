@@ -16,9 +16,9 @@ public class PlannerService(
     /// <summary>
     /// Шаг 1: Актуализация приоритетов на основе таблиц повышения
     /// </summary>
-    public void ActualizePriorities(int dayStartHour)
+    public void ActualizePriorities()
     {
-        var logicalToday = DateHelper.GetLogicalToday(dayStartHour);
+        var today = TodoDay.Today;
         var tasks = taskRepository.GetAll();
 
         foreach (var task in tasks)
@@ -31,7 +31,7 @@ public class PlannerService(
                 continue;
             
             var escalations = task.PriorityEscalations
-                .Where(e => !e.IsApplied && e.EscalationDate.Date <= logicalToday)
+                .Where(e => !e.IsApplied && e.EscalationDate.Date <= today.Date)
                 .OrderBy(e => e.TargetPriority?.Order ?? 99)
                 .ToList();
 
@@ -91,7 +91,7 @@ public class PlannerService(
             .ThenByDescending(t => t.Interest ?? 0)
             .ToList();
 
-        var currentDate = DateHelper.GetLogicalToday(settings.DayStartHour);
+        var currentDate = TodoDay.Today;
         var dailyStats = new DailyStats();
 
         foreach (var task in sortedTasks)
@@ -109,10 +109,10 @@ public class PlannerService(
             var trackedTask = context.Tasks.Find(task.Id);
             if (trackedTask != null)
             {
-                trackedTask.ScheduledDate = currentDate;
+                trackedTask.ScheduledDate = currentDate.ToDateTime();
                 // DateSource остаётся AutoFlexible — плановик назначил дату
                 trackedTask.LastChangesOn = DateTime.UtcNow;
-                Console.WriteLine($"Planner: assigned non-recurring task {task.Id} '{task.Title}' -> {currentDate:yyyy-MM-dd}");
+                Console.WriteLine($"Planner: assigned non-recurring task {task.Id} '{task.Title}' -> {currentDate}");
             }
 
             // Обновляем статистику дня (подзадачи не учитываются в счётчике задач)
@@ -129,7 +129,7 @@ public class PlannerService(
     /// </summary>
     public void RecalculateAll(UserSettings settings)
     {
-        ActualizePriorities(settings.DayStartHour);
+        ActualizePriorities();
         DistributeTasks(settings);
         UpdateBlockedStatuses();
     }
@@ -209,7 +209,7 @@ public class PlannerService(
     /// </summary>
     private void HandleRecurringBeforeDistribution(UserSettings settings)
     {
-        var logicalToday = DateHelper.GetLogicalToday(settings.DayStartHour);
+        var today = TodoDay.Today;
 
         var allRecurring = context.Tasks
             .AsNoTracking()
@@ -222,10 +222,10 @@ public class PlannerService(
         var recurringTasks = allRecurring.Where(t =>
         {
             // Задачи с Manual-датой, которая ещё не просрочена, не трогаем
-            if (t.DateSource == DateSource.Manual && !DateHelper.IsOverdue(t.ScheduledDate, settings.DayStartHour))
+            if (t.DateSource == DateSource.Manual && !today.IsOverdue(t.ScheduledDate))
                 return false;
 
-            return DateHelper.IsOverdue(t.ScheduledDate, settings.DayStartHour) || t.ScheduledDate == null;
+            return today.IsOverdue(t.ScheduledDate) || t.ScheduledDate == null;
         }).ToList();
 
         Console.WriteLine($"Planner: found {recurringTasks.Count} recurring candidates for handling");
@@ -252,7 +252,7 @@ public class PlannerService(
                     baseCandidate = task.ScheduledDate.Value.Date;
                 else
                     // Если у повторяющейся задачи нет предыдущей даты, ставим базу вчера
-                    baseCandidate = DateTime.UtcNow.Date.AddDays(-1);
+                    baseCandidate = TodoDay.Today.Yesterday.ToDateTime();
             }
 
             // Продвигаем по правилу повтора, пока не дойдём до даты >= logicalToday
@@ -261,7 +261,7 @@ public class PlannerService(
                 continue;
 
             var guard = 0;
-            while (nextDate.HasValue && nextDate.Value.Date < logicalToday.Date && guard < 365)
+            while (nextDate.HasValue && nextDate.Value.Date < today.Date && guard < 365)
             {
                 baseCandidate = nextDate.Value.Date;
                 nextDate = GetNextRecurrenceDateFromBase(task, baseCandidate);
@@ -270,9 +270,9 @@ public class PlannerService(
 
             // Scenario B: мутируем существующую задачу на месте
             // Если следующая дата в будущем — используем её; иначе — сегодня
-            var assigned = nextDate.HasValue && nextDate.Value.Date >= logicalToday.Date
+            var assigned = nextDate.HasValue && nextDate.Value.Date >= today.Date
                 ? nextDate.Value.Date
-                : logicalToday;
+                : today.ToDateTime();
 
             var trackedTask = context.Tasks.Find(task.Id);
             if (trackedTask != null)

@@ -347,13 +347,13 @@ public class TaskRepository(StorageContext context, INotificationService notific
             .ToList();
     }
 
-    public List<TaskItem> GetTodayTasks(int dayStartHour)
+    public List<TaskItem> GetTodayTasks()
     {
-        var logicalToday = DateHelper.GetLogicalToday(dayStartHour);
+        var today = TodoDay.Today;
         var all = GetAll();
         return FilterOutSubtasks(all)
             .Where(t => t.ScheduledDate != null &&
-                        t.ScheduledDate.Value.Date == logicalToday.Date &&
+                        today.IsSameDay(t.ScheduledDate) &&
                         t.Status != TaskStatus.Completed &&
                         t.Status != TaskStatus.Irrelevant)
             .ToList();
@@ -361,8 +361,8 @@ public class TaskRepository(StorageContext context, INotificationService notific
 
     public List<TaskItem> GetTomorrowTasks()
     {
-        var tomorrow = DateTime.Today.AddDays(1);
-        return GetTasksForDate(tomorrow);
+        var tomorrow = TodoDay.Today.Tomorrow;
+        return GetTasksForDate(tomorrow.ToDateTime());
     }
 
     public List<TaskItem> GetNotConfiguredTasks()
@@ -379,13 +379,13 @@ public class TaskRepository(StorageContext context, INotificationService notific
         return GetAll().Count(t => t.ParentTaskId == null && t.Status == TaskStatus.NotConfigured);
     }
 
-    public List<TaskItem> GetOverdueTasks(int dayStartHour)
+    public List<TaskItem> GetOverdueTasks()
     {
-        var logicalToday = DateHelper.GetLogicalToday(dayStartHour);
+        var today = TodoDay.Today;
         var all = GetAll();
         return FilterOutSubtasks(all)
             .Where(t => t.ScheduledDate != null &&
-                        t.ScheduledDate.Value.Date < logicalToday.Date &&
+                        today.IsOverdue(t.ScheduledDate) &&
                         t.Status != TaskStatus.Completed &&
                         t.Status != TaskStatus.Irrelevant)
             .ToList();
@@ -429,16 +429,17 @@ public class TaskRepository(StorageContext context, INotificationService notific
 
         // Для просроченных задач дата завершения должна быть равна дате назначения.
         // Это важно для правильного расчёта следующей даты повторения.
-        var completedDate = task.ScheduledDate;
-        if (completedDate != null && completedDate.Value.Date < DateTime.UtcNow.Date)
+        var today = TodoDay.Today;
+        DateTime? completedDate;
+        if (task.ScheduledDate != null && today.IsOverdue(task.ScheduledDate))
         {
             // Задача просрочена — используем дату назначения
-            completedDate = completedDate.Value.Date;
+            completedDate = task.ScheduledDate.Value.Date;
         }
         else
         {
-            // Задача не просрочена — используем текущую дату
-            completedDate = DateTime.UtcNow;
+            // Задача не просрочена — используем текущий Todo-день
+            completedDate = today.ToDateTime();
         }
 
         UpdatePartial(taskId, t =>
@@ -588,7 +589,7 @@ public class TaskRepository(StorageContext context, INotificationService notific
     private DateTime? CalculateNextRecurrenceDate(TaskItem task)
     {
         // completedDate — дата завершения, если установлена, иначе сейчас
-        var completedDate = task.CompletedDate ?? DateTime.UtcNow;
+        var completedDate = task.CompletedDate ?? TodoDay.Today.ToDateTime();
 
         // Если задача имела дату назначения и выполнение произошло раньше неё (досрочное выполнение),
         // используем ScheduledDate как базу — чтобы не «сдвигать» следующую итерацию назад.
@@ -668,16 +669,17 @@ public class TaskRepository(StorageContext context, INotificationService notific
         if (task == null) return;
 
         // Для просроченных задач дата завершения должна быть равна дате назначения
-        var completedDate = task.ScheduledDate;
-        if (completedDate != null && completedDate.Value.Date < DateTime.UtcNow.Date)
+        var today = TodoDay.Today;
+        DateTime? completedDate;
+        if (task.ScheduledDate != null && today.IsOverdue(task.ScheduledDate))
         {
             // Задача просрочена — используем дату назначения
-            completedDate = completedDate.Value.Date;
+            completedDate = task.ScheduledDate.Value.Date;
         }
         else
         {
-            // Задача не просрочена — используем текущую дату
-            completedDate = DateTime.UtcNow;
+            // Задача не просрочена — используем текущий Todo-день
+            completedDate = today.ToDateTime();
         }
 
         // Обновляем статус и дату завершения
@@ -715,11 +717,11 @@ public class TaskRepository(StorageContext context, INotificationService notific
 
     public TaskItem? GetLeastPriorityTaskOfDay()
     {
-        var today = DateTime.Today;
+        var today = TodoDay.Today;
         var all = GetAll();
         var todayTasks = FilterOutSubtasks(all)
             .Where(t => t.ScheduledDate != null &&
-                        t.ScheduledDate.Value.Date == today &&
+                        today.IsSameDay(t.ScheduledDate) &&
                         t.Status != TaskStatus.Completed &&
                         t.Status != TaskStatus.Irrelevant);
         return todayTasks

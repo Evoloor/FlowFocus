@@ -56,5 +56,9 @@ public static class ServiceCollectionExtensions
 
         // Автоматическое создание БД и применение миграций
         context.Database.Migrate();
+
+        // Инициализация TodoDay настройкой времени начала дня
+        var settingsRepo = scope.ServiceProvider.GetRequiredService<ISettingsRepository>();
+        TodoDay.Configure(settingsRepo.GetUserSettings().DayStartHour);
     }
 }

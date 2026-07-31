@@ -82,7 +82,7 @@
         if (_currentTask == null || _settings == null) return;
 
         // Проверяем свободное место
-        var todayTasks = TaskRepo.GetTodayTasks(_settings.DayStartHour);
+        var todayTasks = TaskRepo.GetTodayTasks();
         var todayCount = todayTasks.Count;
         var todayComplexity = todayTasks.Sum(t => t.TotalComplexity);
         var todayTime = todayTasks.Sum(t => t.TotalEstimatedMinutes);
@@ -115,7 +115,7 @@
         }
 
         // Добавляем задачу на сегодня (пользователь явно выбрал, поэтому Manual)
-        _currentTask.ScheduledDate = DateHelper.GetLogicalToday(_settings.DayStartHour);
+        _currentTask.ScheduledDate = TodoDay.Today.ToDateTime();
         _currentTask.DateSource = DateSource.Manual;
         _currentTask.Status = TaskStatus.Planned;
         TaskRepo.Update(_currentTask);

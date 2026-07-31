@@ -11,7 +11,7 @@
     {
         var date = Task.ScheduledDate;
         var isManual = Task.DateSource == DateSource.Manual;
-        var isOverdue = DateHelper.IsOverdue(date, DayStartHour);
+        var isOverdue = Today.IsOverdue(date);
 
         <MudIcon Icon="@(isManual ? Icons.Material.Filled.Settings : Icons.Material.Filled.AutoMode)"
                  Size="Size.Small"
@@ -28,5 +28,5 @@
     public TaskItem Task { get; set; } = null!;
 
     [Parameter]
-    public int DayStartHour { get; set; } = 5;
+    public TodoDay Today { get; set; }
 }

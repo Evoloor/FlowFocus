@@ -11,7 +11,7 @@ public interface ITaskRepository : IRepository<TaskItem>
     List<TaskItem> GetTasksForDate(DateTime date);
 
     /// <summary>Получить задачи на сегодня</summary>
-    List<TaskItem> GetTodayTasks(int dayStartHour);
+    List<TaskItem> GetTodayTasks();
 
     /// <summary>Получить задачи на завтра</summary>
     List<TaskItem> GetTomorrowTasks();
@@ -23,7 +23,7 @@ public interface ITaskRepository : IRepository<TaskItem>
     int GetNotConfiguredCount();
 
     /// <summary>Получить просроченные задачи</summary>
-    List<TaskItem> GetOverdueTasks(int dayStartHour);
+    List<TaskItem> GetOverdueTasks();
 
     /// <summary>Получить задачи, которые разблокируются при выполнении указанной задачи</summary>
     List<TaskItem> GetTasksUnblockedBy(int taskId);

@@ -356,20 +356,21 @@
     {
         if (DefaultFilter == null) return tasks;
 
+        var today = TodoDay.Today;
         return DefaultFilter.Type switch
         {
             TaskListFilterType.Today => tasks.Where(t =>
-                t.ScheduledDate?.Date == DateHelper.GetLogicalToday(_settings?.DayStartHour ?? 5) &&
+                today.IsSameDay(t.ScheduledDate) &&
                 t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant),
 
             TaskListFilterType.Tomorrow => tasks.Where(t =>
-                t.ScheduledDate?.Date == DateHelper.GetTomorrow(_settings?.DayStartHour ?? 5) &&
+                today.IsTomorrow(t.ScheduledDate) &&
                 t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant),
 
             TaskListFilterType.NotConfigured => tasks.Where(t => t.Status == TaskStatus.NotConfigured),
 
             TaskListFilterType.Overdue => tasks.Where(t =>
-                DateHelper.IsOverdue(t.ScheduledDate, _settings?.DayStartHour ?? 5) &&
+                today.IsOverdue(t.ScheduledDate) &&
                 t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant),
 
             _ => tasks

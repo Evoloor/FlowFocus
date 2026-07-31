@@ -4,7 +4,7 @@
 
     @foreach (var escalation in Escalations)
     {
-        var isEscalationDateDisabled = escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date < DateTime.Today;
+        var isEscalationDateDisabled = escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date < TodoDay.Today.ToDateTime();
         <div class="escalation-row mb-2">
             <MudSelect T="int" @bind-Value="escalation.TargetPriorityId"
                        Label="Приоритет"
@@ -22,7 +22,7 @@
                                Label="Дата"
                                Variant="Variant.Outlined"
                                Margin="Margin.Dense"
-                               MinDate="@DateTime.Today"
+                               MinDate="@TodoDay.Today.ToDateTime()"
                                Disabled="@isEscalationDateDisabled"/>
             </MudTooltip>
             <MudIconButton Icon="@Icons.Material.Filled.Delete"
@@ -79,7 +79,7 @@
 
         var available = GetAvailablePrioritiesForEscalation().FirstOrDefault(p => Escalations.All(e => e.TargetPriorityId != p.Id));
         if (available == null) return;
-        Escalations.Add(new() { TargetPriorityId = available.Id, EscalationDate = DateTime.Today.AddDays(7) });
+        Escalations.Add(new() { TargetPriorityId = available.Id, EscalationDate = TodoDay.Today.AddDays(7).ToDateTime() });
     }
 
     private void RemoveEscalation(EscalationDto escalation)

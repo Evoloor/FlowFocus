@@ -1,3 +1,4 @@
+using FlowFocus.Core;
 using FlowFocus.Core.Models;
 
 namespace FlowFocus.Blazor.EditDialogContents;
@@ -22,7 +23,7 @@ public static class EscalationModule
                         Id = existing.Id,
                         TaskId = task.Id > 0 ? task.Id : existing.TaskId,
                         TargetPriorityId = dto.TargetPriorityId,
-                        EscalationDate = dto.EscalationDate ?? DateTime.Today,
+                        EscalationDate = dto.EscalationDate ?? TodoDay.Today.ToDateTime(),
                         IsApplied = existing.IsApplied,
                         LastChangesOn = DateTime.UtcNow
                     };
@@ -34,7 +35,7 @@ public static class EscalationModule
                     {
                         TaskId = task.Id > 0 ? task.Id : 0,
                         TargetPriorityId = dto.TargetPriorityId,
-                        EscalationDate = dto.EscalationDate ?? DateTime.Today,
+                        EscalationDate = dto.EscalationDate ?? TodoDay.Today.ToDateTime(),
                         IsApplied = false,
                         LastChangesOn = DateTime.UtcNow
                     };
@@ -47,7 +48,7 @@ public static class EscalationModule
                 {
                     TaskId = task.Id > 0 ? task.Id : 0,
                     TargetPriorityId = dto.TargetPriorityId,
-                    EscalationDate = dto.EscalationDate ?? DateTime.Today,
+                    EscalationDate = dto.EscalationDate ?? TodoDay.Today.ToDateTime(),
                     IsApplied = false,
                     LastChangesOn = DateTime.UtcNow
                 };
