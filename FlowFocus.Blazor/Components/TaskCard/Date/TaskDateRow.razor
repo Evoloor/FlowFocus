@@ -7,11 +7,11 @@
             Завершена @Task.CompletedDate.Value.ToString("dd.MM.yyyy")
         </MudText>
     }
-    else if (Task.ActualAssignedDate != null || Task.UserAssignedDate != null)
+    else if (Task.ScheduledDate != null)
     {
-        var date = Task.ActualAssignedDate ?? Task.UserAssignedDate;
-        var isManual = Task.UserAssignedDate != null;
-        var isOverdue = DateHelper.IsOverdue(date, DayStartHour);
+        var date = Task.ScheduledDate;
+        var isManual = Task.DateSource == DateSource.Manual;
+        var isOverdue = Today.IsOverdue(date);
 
         <MudIcon Icon="@(isManual ? Icons.Material.Filled.Settings : Icons.Material.Filled.AutoMode)"
                  Size="Size.Small"
@@ -28,5 +28,5 @@
     public TaskItem Task { get; set; } = null!;
 
     [Parameter]
-    public int DayStartHour { get; set; } = 5;
+    public TodoDay Today { get; set; }
 }

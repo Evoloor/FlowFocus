@@ -1,3 +1,4 @@
+using FlowFocus.Core;
 using FlowFocus.Core.Models;
 
 namespace FlowFocus.Blazor.EditDialogContents.Validators;
@@ -19,7 +20,7 @@ public static class TaskEditValidator
             : 99;
 
         var prevPriorityOrder = currentPriorityOrder;
-        var prevDate = DateTime.Today;
+        var prevDate = TodoDay.Today.ToDateTime();
 
         foreach (var escalation in escalationList)
         {
@@ -32,7 +33,7 @@ public static class TaskEditValidator
                     $"Нельзя задать повышение приоритета до \"{targetPriority.Name}\" — он не выше предыдущего.");
             }
 
-            if (escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date < DateTime.Today)
+            if (escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date < TodoDay.Today.ToDateTime())
             {
                 errors.Add($"Дата повышения {escalation.EscalationDate.Value:dd.MM.yyyy} уже в прошлом");
             }
@@ -73,8 +74,8 @@ public static class TaskEditValidator
                 blocked = task;
             }
 
-            var blockerDate = blocker.UserAssignedDate ?? blocker.ActualAssignedDate;
-            var blockedDate = blocked.UserAssignedDate ?? blocked.ActualAssignedDate;
+            var blockerDate = blocker.ScheduledDate;
+            var blockedDate = blocked.ScheduledDate;
 
             if (blockerDate.HasValue && blockedDate.HasValue)
             {

@@ -1,6 +1,5 @@
-﻿@page "/"
+@page "/"
 @inject ITaskRepository TaskRepo
-@inject ISettingsRepository SettingsRepo
 
 <PageTitle>FlowFocus - Сегодня</PageTitle>
 
@@ -25,17 +24,15 @@
 @code {
     private List<TaskItem> _overdueTasks = [];
     private bool _showOverdueDialog;
-    private UserSettings? _settings;
 
     protected override void OnInitialized()
     {
-        _settings = SettingsRepo.GetUserSettings();
         CheckOverdueTasks();
     }
 
     private void CheckOverdueTasks()
     {
-        _overdueTasks = TaskRepo.GetOverdueTasks(_settings?.DayStartHour ?? 5);
+        _overdueTasks = TaskRepo.GetOverdueTasks();
         _showOverdueDialog = _overdueTasks.Any();
     }
 

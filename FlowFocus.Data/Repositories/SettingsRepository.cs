@@ -26,5 +26,6 @@ public class SettingsRepository(StorageContext context, INotificationService not
     public void UpdateSettings(UserSettings settings)
     {
         Update(settings);
+        TodoDay.Configure(settings.DayStartHour);
     }
 }

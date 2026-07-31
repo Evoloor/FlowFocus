@@ -8,7 +8,7 @@ namespace FlowFocus.Core;
 public interface IPlannerService
 {
     /// <summary>Пересчитать приоритеты на основе таблиц повышения</summary>
-    void ActualizePriorities(int dayStartHour);
+    void ActualizePriorities();
 
     /// <summary>Распределить задачи по дням</summary>
     void DistributeTasks(UserSettings settings);

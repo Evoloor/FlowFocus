@@ -22,7 +22,7 @@
                             OnTaskCompleted="OnTaskCompleted"
                             OnToggleFavorite="ToggleFavorite" />
 
-            <TaskDateRow Task="Task" DayStartHour="@(_settings?.DayStartHour ?? 5)" />
+            <TaskDateRow Task="Task" Today="@TodoDay.Today" />
 
             <TaskDescription Task="Task"
                              DisplayMode="DisplayMode"

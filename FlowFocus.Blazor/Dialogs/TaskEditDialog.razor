@@ -38,7 +38,8 @@
                 @if (!IsSubtaskMode)
                 {
                     <MudItem xs="12" sm="6">
-                        <MudDatePicker T="DateTime?" @bind-Date="_task.UserAssignedDate"
+                        <MudDatePicker T="DateTime?" Date="_scheduledDate"
+                                       DateChanged="OnScheduledDateChanged"
                                        Label="Дата назначения"
                                        Placeholder="Автоматически"
                                        Variant="Variant.Outlined"
@@ -194,6 +195,8 @@
     private bool _isFormValid;
     private TaskItem _task = new();
     private TaskItem? _originalTask; // Для отслеживания изменений
+    // Local mirror of the scheduled date; changes via the date picker set DateSource explicitly
+    private DateTime? _scheduledDate;
     private List<PriorityLevel> _priorities = [];
     private List<Tag> _suggestedTags = [];
     private List<Tag> _selectedTags = [];
@@ -249,6 +252,9 @@
             _originalTask = null;
             StateHasChanged();
         }
+
+        // Синхронизируем локальное зеркало даты из модели
+        _scheduledDate = _task.ScheduledDate;
 
         // Конвертируем время
         if (_task.EstimatedMinutes != null)
@@ -483,12 +489,6 @@
                 _ => _estimatedValue
             };
 
-            // Если фактическая дата не установлена, приравниваем к ручной
-            if (_task.UserAssignedDate != null)
-            {
-                _task.ActualAssignedDate = _task.UserAssignedDate;
-            }
-
             // Устанавливаем статус Planned для настроенных задач
             if (_task.Status == TaskStatus.NotConfigured && !IsSubtaskMode)
             {
@@ -649,10 +649,27 @@
         MudDialog.Cancel();
     }
 
+    /// <summary>
+    /// Handles date picker changes. Setting a date marks the source as Manual (user intent).
+    /// Clearing the date marks it as AutoFlexible so the planner can re-assign it.
+    /// Editing an existing task does NOT change this logic — the date source follows the user's action.
+    /// </summary>
+    private void OnScheduledDateChanged(DateTime? value)
+    {
+        _scheduledDate = value;
+        _task.ScheduledDate = value;
+        _task.DateSource = value.HasValue ? DateSource.Manual : DateSource.AutoFlexible;
+    }
+
     private List<string> ValidateTask()
     {
         var errors = new List<string>();
         if (string.IsNullOrWhiteSpace(_task.Title)) errors.Add("Название обязательно");
+
+        // При создании новой повторяющейся задачи дата обязательна
+        if (_task.IsRecurring && !IsEdit && _task.ScheduledDate == null)
+            errors.Add("Для повторяющейся задачи необходимо указать дату начала");
+
         return errors;
     }
 
@@ -663,7 +680,7 @@
         {
             if (_originalTask == null) return true;
             if (_originalTask.PriorityId != _task.PriorityId) return true;
-            if (_originalTask.UserAssignedDate != _task.UserAssignedDate) return true;
+            if (_originalTask.ScheduledDate != _task.ScheduledDate) return true;
         }
         catch
         {

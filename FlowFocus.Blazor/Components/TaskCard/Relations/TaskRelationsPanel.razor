@@ -9,7 +9,7 @@
                 <MudExpansionPanel Text="@($"({Task.Subtasks.Count}) подзадач")" Expanded="true">
                     @foreach (var subtask in Task.Subtasks)
                     {
-                        <TaskCard Task="subtask" IsNested="true" DisplayMode="DisplayMode.Compact" OnTaskChanged="OnTaskChanged" />
+                        <TaskCard @key="subtask.Id" Task="subtask" IsNested="true" DisplayMode="DisplayMode.Compact" OnTaskChanged="OnTaskChanged" />
                     }
                 </MudExpansionPanel>
             </MudExpansionPanels>
@@ -21,7 +21,7 @@
                 <MudExpansionPanel Text="@($"Связана с ({RelatedToTasks.Count})")" IsInitiallyExpanded="false">
                     @foreach (var relatedTask in RelatedToTasks)
                     {
-                        <TaskCard Task="relatedTask" IsNested="true" DisplayMode="DisplayMode.Compact" OnTaskChanged="OnTaskChanged" />
+                        <TaskCard @key="relatedTask.Id" Task="relatedTask" IsNested="true" DisplayMode="DisplayMode.Compact" OnTaskChanged="OnTaskChanged" />
                     }
                 </MudExpansionPanel>
             </MudExpansionPanels>
@@ -33,7 +33,7 @@
                 <MudExpansionPanel Text="@($"Блокирует ({BlocksTasks.Count})")" IsInitiallyExpanded="false">
                     @foreach (var blockedTask in BlocksTasks)
                     {
-                        <TaskCard Task="blockedTask" IsNested="true" DisplayMode="DisplayMode.Compact" OnTaskChanged="OnTaskChanged" />
+                        <TaskCard @key="blockedTask.Id" Task="blockedTask" IsNested="true" DisplayMode="DisplayMode.Compact" OnTaskChanged="OnTaskChanged" />
                     }
                 </MudExpansionPanel>
             </MudExpansionPanels>
@@ -45,7 +45,7 @@
                 <MudExpansionPanel Text="@($"Блокирована ({BlockedByTasks.Count})")" IsInitiallyExpanded="false">
                     @foreach (var blocker in BlockedByTasks)
                     {
-                        <TaskCard Task="blocker" IsNested="true" DisplayMode="DisplayMode.Compact" OnTaskChanged="OnTaskChanged" />
+                        <TaskCard @key="blocker.Id" Task="blocker" IsNested="true" DisplayMode="DisplayMode.Compact" OnTaskChanged="OnTaskChanged" />
                     }
                 </MudExpansionPanel>
             </MudExpansionPanels>

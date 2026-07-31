@@ -16,9 +16,9 @@ public class PlannerService(
     /// <summary>
     /// Шаг 1: Актуализация приоритетов на основе таблиц повышения
     /// </summary>
-    public void ActualizePriorities(int dayStartHour)
+    public void ActualizePriorities()
     {
-        var logicalToday = DateHelper.GetLogicalToday(dayStartHour);
+        var today = TodoDay.Today;
         var tasks = taskRepository.GetAll();
 
         foreach (var task in tasks)
@@ -31,7 +31,7 @@ public class PlannerService(
                 continue;
             
             var escalations = task.PriorityEscalations
-                .Where(e => !e.IsApplied && e.EscalationDate.Date <= logicalToday)
+                .Where(e => !e.IsApplied && e.EscalationDate.Date <= today.Date)
                 .OrderBy(e => e.TargetPriority?.Order ?? 99)
                 .ToList();
 
@@ -64,19 +64,23 @@ public class PlannerService(
     }
 
     /// <summary>
-    /// Шаг 2: Распределение задач по дням
+    /// Шаг 2: Распределение задач по дням.
+    /// Перераспределяются только задачи с DateSource == AutoFlexible.
+    /// Задачи с Manual или AutoFixed остаются на своих датах.
     /// </summary>
     public void DistributeTasks(UserSettings settings)
     {
-        // Сначала обрабатываем повторяющиеся задачи: если у них нет ручной даты и они просрочены/неназначены,
-        // назначаем ближайшую дату повторения или сегодня, если ближайшая уже просрочена.
+        // Сначала обрабатываем повторяющиеся задачи: если они просрочены/неназначены,
+        // мутируем их на месте (Scenario B из спецификации).
         HandleRecurringBeforeDistribution(settings);
 
+        // Задачи с AutoFlexible — кандидаты для авто-распределения
         var tasks = taskRepository.GetAll()
             .Where(t => t.ParentTaskId == null) // Исключаем подзадачи
             .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
-            .Where(t => t.UserAssignedDate == null) // Только задачи без ручной даты
-            // Исключаем повторяющиеся задачи и реплики, чтобы их даты управлялись правилами повторения
+            // Только задачи, которые плановик может свободно перемещать
+            .Where(t => t.DateSource == DateSource.AutoFlexible)
+            // Исключаем повторяющиеся задачи и реплики — их даты управляются правилами повторения
             .Where(t => !t.IsRecurring && t.RecurrenceSourceId == null)
             .ToList();
 
@@ -87,7 +91,7 @@ public class PlannerService(
             .ThenByDescending(t => t.Interest ?? 0)
             .ToList();
 
-        var currentDate = DateHelper.GetLogicalToday(settings.DayStartHour);
+        var currentDate = TodoDay.Today;
         var dailyStats = new DailyStats();
 
         foreach (var task in sortedTasks)
@@ -105,32 +109,16 @@ public class PlannerService(
             var trackedTask = context.Tasks.Find(task.Id);
             if (trackedTask != null)
             {
-                trackedTask.ActualAssignedDate = currentDate;
+                trackedTask.ScheduledDate = currentDate.ToDateTime();
+                // DateSource остаётся AutoFlexible — плановик назначил дату
                 trackedTask.LastChangesOn = DateTime.UtcNow;
-                Console.WriteLine($"Planner: assigned non-recurring task {task.Id} '{task.Title}' -> {currentDate:yyyy-MM-dd}");
+                Console.WriteLine($"Planner: assigned non-recurring task {task.Id} '{task.Title}' -> {currentDate}");
             }
 
             // Обновляем статистику дня (подзадачи не учитываются в счётчике задач)
             dailyStats.TotalComplexity += task.TotalComplexity;
             dailyStats.TotalMinutes += task.TotalEstimatedMinutes;
             dailyStats.TaskCount++;
-        }
-
-        // Обрабатываем задачи с ручной датой
-        var fixedDateTasks = taskRepository.GetAll()
-            .Where(t => t.ParentTaskId == null)
-            .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
-            .Where(t => t.UserAssignedDate != null)
-            // Не перезаписываем даты для повторяющихся задач / реплик
-            .Where(t => !t.IsRecurring && t.RecurrenceSourceId == null)
-            .ToList();
-
-        foreach (var task in fixedDateTasks)
-        {
-            var trackedTask = context.Tasks.Find(task.Id);
-            if (trackedTask == null) continue;
-            trackedTask.ActualAssignedDate = task.UserAssignedDate;
-            trackedTask.LastChangesOn = DateTime.UtcNow;
         }
 
         taskRepository.SaveChanges();
@@ -141,7 +129,7 @@ public class PlannerService(
     /// </summary>
     public void RecalculateAll(UserSettings settings)
     {
-        ActualizePriorities(settings.DayStartHour);
+        ActualizePriorities();
         DistributeTasks(settings);
         UpdateBlockedStatuses();
     }
@@ -215,12 +203,13 @@ public class PlannerService(
     }
 
     /// <summary>
-    /// Обработать повторяющиеся задачи перед основным распределением: назначить им ближайшую по правилу даты повторения
-    /// или, если следующая дата меньше или равна сегодняшней, назначить на сегодня.
+    /// Обработать просроченные повторяющиеся задачи перед основным распределением.
+    /// Scenario B из спецификации: мутируем задачу на месте — устанавливаем ScheduledDate = сегодня,
+    /// DateSource = AutoFixed. Новый клон НЕ создаётся.
     /// </summary>
     private void HandleRecurringBeforeDistribution(UserSettings settings)
     {
-        var logicalToday = DateHelper.GetLogicalToday(settings.DayStartHour);
+        var today = TodoDay.Today;
 
         var allRecurring = context.Tasks
             .AsNoTracking()
@@ -229,90 +218,76 @@ public class PlannerService(
             .Where(t => t.IsRecurring)
             .ToList();
 
-        // Оставляем только те повторы, которые просрочены по ActualAssignedDate или UserAssignedDate, либо ещё не назначены
+        // Кандидаты: просрочены или ещё не назначены (и не закреплены пользователем вручную с актуальной датой)
         var recurringTasks = allRecurring.Where(t =>
-                DateHelper.IsOverdue(t.ActualAssignedDate, settings.DayStartHour) ||
-                DateHelper.IsOverdue(t.UserAssignedDate, settings.DayStartHour) ||
-                (t.ActualAssignedDate == null && t.UserAssignedDate == null)
-            ).ToList();
+        {
+            // Задачи с Manual-датой, которая ещё не просрочена, не трогаем
+            if (t.DateSource == DateSource.Manual && !today.IsOverdue(t.ScheduledDate))
+                return false;
+
+            return today.IsOverdue(t.ScheduledDate) || t.ScheduledDate == null;
+        }).ToList();
 
         Console.WriteLine($"Planner: found {recurringTasks.Count} recurring candidates for handling");
         foreach (var c in recurringTasks)
         {
-            Console.WriteLine($"Planner: candidate {c.Id} '{c.Title}' RecType={c.RecurrenceType} IsRecurring={c.IsRecurring} Actual={c.ActualAssignedDate?.ToString("yyyy-MM-dd") ?? "<null>"} User={c.UserAssignedDate?.ToString("yyyy-MM-dd") ?? "<null>"} Completed={c.CompletedDate?.ToString("yyyy-MM-dd") ?? "<null>"}");
+            Console.WriteLine($"Planner: candidate {c.Id} '{c.Title}' RecType={c.RecurrenceType} IsRecurring={c.IsRecurring} Scheduled={c.ScheduledDate?.ToString("yyyy-MM-dd") ?? "<null>"} DateSource={c.DateSource}");
         }
 
         foreach (var task in recurringTasks)
         {
-            // Уважать ручную дату, если пользователь её установил
-            // Если у задачи есть ручная дата, и она не просрочена (т.е. сегодня или в будущем), ничего не делаем.
-            // Если же ручная дата в прошлом, нам нужно продвинуть задачу по правилу повтора.
-            if (task.UserAssignedDate != null && !DateHelper.IsOverdue(task.UserAssignedDate, settings.DayStartHour))
-                continue;
-
-            // Если задача уже назначена на сегодня или в будущем — ничего не делаем
-            if (task.ActualAssignedDate != null && !DateHelper.IsOverdue(task.ActualAssignedDate, settings.DayStartHour))
-                continue;
-
-            // Вычисляем базовую дату для расчёта следующей повторки: используем логику для завершённых задач как в репозитории;
-            // для незавершённых — используем последнюю назначенную дату (ActualAssignedDate/UserAssignedDate) или вчера, если не задано.
+            // Вычисляем следующую дату по правилу повторения от последней известной базы
             DateTime baseCandidate;
             if (task.CompletedDate.HasValue)
             {
-                // если задача была завершена — используем логику репозитория
+                // Если задача была завершена, используем дату завершения как базу
                 var completedDate = task.CompletedDate.Value;
-                var assignedDate = task.UserAssignedDate ?? completedDate;
+                var assignedDate = task.ScheduledDate ?? completedDate;
                 baseCandidate = completedDate.Date >= assignedDate.Date ? completedDate.Date : assignedDate.Date;
             }
             else
             {
-                // незавершённая задача: берём последнюю назначенную дату как базу, чтобы пройти серией missed occurrences
-                if (task.ActualAssignedDate.HasValue)
-                    baseCandidate = task.ActualAssignedDate.Value.Date;
-                else if (task.UserAssignedDate.HasValue)
-                    baseCandidate = task.UserAssignedDate.Value.Date;
+                // Незавершённая задача: берём последнюю назначенную дату как базу
+                if (task.ScheduledDate.HasValue)
+                    baseCandidate = task.ScheduledDate.Value.Date;
                 else
-                    // если у повторяющейся задачи нет предыдущей даты, поставим базу вчера, чтобы nextDate мог быть сегодня
-                    baseCandidate = DateTime.UtcNow.Date.AddDays(-1);
+                    // Если у повторяющейся задачи нет предыдущей даты, ставим базу вчера
+                    baseCandidate = TodoDay.Today.Yesterday.ToDateTime();
             }
 
-            // Продвигаем по правилу повтора, пока не дойдём до даты >= logicalToday (защита итераций)
+            // Продвигаем по правилу повтора, пока не дойдём до даты >= logicalToday
             var nextDate = GetNextRecurrenceDateFromBase(task, baseCandidate);
             if (nextDate == null)
                 continue;
 
             var guard = 0;
-            while (nextDate.HasValue && nextDate.Value.Date < logicalToday.Date && guard < 365)
+            while (nextDate.HasValue && nextDate.Value.Date < today.Date && guard < 365)
             {
-                // сдвигаем базу на найденную дату и считаем следующую
                 baseCandidate = nextDate.Value.Date;
                 nextDate = GetNextRecurrenceDateFromBase(task, baseCandidate);
                 guard++;
             }
 
-            DateTime assigned;
-            if (nextDate.HasValue && nextDate.Value.Date >= logicalToday.Date)
-                assigned = nextDate.Value.Date;
-            else
-                // если по какой-то причине не получилось получить будущую дату, назначаем на сегодня
-                assigned = logicalToday;
+            // Scenario B: мутируем существующую задачу на месте
+            // Если следующая дата в будущем — используем её; иначе — сегодня
+            var assigned = nextDate.HasValue && nextDate.Value.Date >= today.Date
+                ? nextDate.Value.Date
+                : today.ToDateTime();
 
             var trackedTask = context.Tasks.Find(task.Id);
             if (trackedTask != null)
             {
-                // Устанавливаем и UserAssignedDate (если не было), и ActualAssignedDate — это назначение по правилу повтора
-                if (trackedTask.UserAssignedDate == null)
-                    trackedTask.UserAssignedDate = assigned;
-                trackedTask.ActualAssignedDate = assigned;
+                trackedTask.ScheduledDate = assigned;
+                trackedTask.DateSource = DateSource.AutoFixed;
                 trackedTask.LastChangesOn = DateTime.UtcNow;
-                Console.WriteLine($"Planner: recurring task {task.Id} '{task.Title}' moved from Actual={task.ActualAssignedDate?.ToString("yyyy-MM-dd") ?? "<null>"} User={task.UserAssignedDate?.ToString("yyyy-MM-dd") ?? "<null>"} -> Assigned={assigned:yyyy-MM-dd}");
+                Console.WriteLine($"Planner: recurring task {task.Id} '{task.Title}' mutated in-place -> Scheduled={assigned:yyyy-MM-dd} DateSource=AutoFixed");
             }
         }
 
         taskRepository.SaveChanges();
     }
 
-    // Новая реализация: рассчитывает следующую дату повтора, считая от baseDate
+    // Рассчитывает следующую дату повтора, считая от baseDate
     private DateTime? GetNextRecurrenceDateFromBase(TaskItem task, DateTime baseDate)
     {
         return task.RecurrenceType switch

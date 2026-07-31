@@ -132,7 +132,7 @@
         {
             @foreach (var task in PagedTasks)
             {
-                <TaskCard Task="task" DisplayMode="_displayMode" OnTaskChanged="@HandleTaskChanged" />
+                <TaskCard @key="task.Id" Task="task" DisplayMode="_displayMode" OnTaskChanged="@HandleTaskChanged" />
             }
         }
     </div>
@@ -204,7 +204,7 @@
     private IEnumerable<TaskStatus?> _selectedStatuses = new List<TaskStatus?> { TaskStatus.Planned, TaskStatus.NotConfigured, TaskStatus.Blocked };
     private DurationFilter _durationFilter = DurationFilter.All;
     private IEnumerable<int?> _selectedTagIds = new List<int?>();
-    // Флаг: скрывать задачи, у которых указана UserAssignedDate (ручная дата)
+    // Флаг: скрывать задачи с DateSource == Manual (вручную назначена дата пользователем)
     private bool _hideWithDates = false;
 
     private int _currentPage = 1;
@@ -308,11 +308,11 @@
             // Фильтр по дате
             if (_dateRange?.Start != null)
             {
-                tasks = tasks.Where(t => t.ActualAssignedDate >= _dateRange.Start);
+                tasks = tasks.Where(t => t.ScheduledDate >= _dateRange.Start);
             }
             if (_dateRange?.End != null)
             {
-                tasks = tasks.Where(t => t.ActualAssignedDate <= _dateRange.End);
+                tasks = tasks.Where(t => t.ScheduledDate <= _dateRange.End);
             }
 
             // Фильтр по статусу
@@ -339,10 +339,10 @@
                 tasks = tasks.Where(t => t.Tags.Any(tt => tagIds.Contains(tt.TagId)));
             }
 
-            // Скрыть задачи с вручную проставленной датой (UserAssignedDate)
+            // Скрыть задачи без вручной даты (AutoFlexible = ещё не назначено пользователем)
             if (_hideWithDates)
             {
-                tasks = tasks.Where(t => t.UserAssignedDate == null );
+                tasks = tasks.Where(t => t.DateSource != DateSource.Manual);
             }
 
             // Сортировка
@@ -356,20 +356,21 @@
     {
         if (DefaultFilter == null) return tasks;
 
+        var today = TodoDay.Today;
         return DefaultFilter.Type switch
         {
             TaskListFilterType.Today => tasks.Where(t =>
-                t.ActualAssignedDate?.Date == DateHelper.GetLogicalToday(_settings?.DayStartHour ?? 5) &&
+                today.IsSameDay(t.ScheduledDate) &&
                 t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant),
 
             TaskListFilterType.Tomorrow => tasks.Where(t =>
-                t.ActualAssignedDate?.Date == DateHelper.GetTomorrow(_settings?.DayStartHour ?? 5) &&
+                today.IsTomorrow(t.ScheduledDate) &&
                 t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant),
 
             TaskListFilterType.NotConfigured => tasks.Where(t => t.Status == TaskStatus.NotConfigured),
 
             TaskListFilterType.Overdue => tasks.Where(t =>
-                DateHelper.IsOverdue(t.ActualAssignedDate, _settings?.DayStartHour ?? 5) &&
+                today.IsOverdue(t.ScheduledDate) &&
                 t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant),
 
             _ => tasks
@@ -386,8 +387,8 @@
                 .ThenByDescending(t => t.Interest ?? 0)
                 .ThenBy(t => t.EstimatedMinutes ?? 9999),
 
-            SortType.DateAsc => tasks.OrderBy(t => t.ActualAssignedDate ?? DateTime.MaxValue),
-            SortType.DateDesc => tasks.OrderByDescending(t => t.ActualAssignedDate ?? DateTime.MinValue),
+            SortType.DateAsc => tasks.OrderBy(t => t.ScheduledDate ?? DateTime.MaxValue),
+            SortType.DateDesc => tasks.OrderByDescending(t => t.ScheduledDate ?? DateTime.MinValue),
 
             SortType.ComplexityAsc => tasks.OrderBy(t => t.Complexity ?? 0),
             SortType.ComplexityDesc => tasks.OrderByDescending(t => t.Complexity ?? 0),

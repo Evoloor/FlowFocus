@@ -15,7 +15,7 @@
         <div class="unblocked-tasks-list">
             @foreach (var task in UnblockedTasks)
             {
-                <TaskCard Task="task" DisplayMode="DisplayMode.Compact" />
+                <TaskCard @key="task.Id" Task="task" DisplayMode="DisplayMode.Compact" />
             }
         </div>
     </DialogContent>

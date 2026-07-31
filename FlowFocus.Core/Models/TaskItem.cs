@@ -58,11 +58,16 @@ public class TaskItem : IAuditEntity
     public int? EstimatedMinutes { get; set; }
 
     // === Даты ===
-    /// <summary>Дата назначения, установленная пользователем</summary>
-    public DateTime? UserAssignedDate { get; set; }
+    /// <summary>
+    /// Единственная дата планирования задачи.
+    /// Её источник и поведение определяются полем <see cref="DateSource"/>.
+    /// </summary>
+    public DateTime? ScheduledDate { get; set; }
 
-    /// <summary>Фактическая дата назначения (устанавливается алгоритмом или равна UserAssignedDate)</summary>
-    public DateTime? ActualAssignedDate { get; set; }
+    /// <summary>
+    /// Определяет, кем и как была назначена дата <see cref="ScheduledDate"/>.
+    /// </summary>
+    public DateSource DateSource { get; set; } = DateSource.AutoFlexible;
 
     /// <summary>Дата завершения задачи</summary>
     public DateTime? CompletedDate { get; set; }
@@ -163,8 +168,8 @@ public class TaskItem : IAuditEntity
         Interest = source.Interest;
         Complexity = source.Complexity;
         EstimatedMinutes = source.EstimatedMinutes;
-        UserAssignedDate = source.UserAssignedDate;
-        ActualAssignedDate = source.ActualAssignedDate;
+        ScheduledDate = source.ScheduledDate;
+        DateSource = source.DateSource;
         CompletedDate = source.CompletedDate;
         CreatedDate = source.CreatedDate;
         IsRecurring = source.IsRecurring;

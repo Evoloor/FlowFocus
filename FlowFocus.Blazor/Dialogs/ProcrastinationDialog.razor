@@ -82,7 +82,7 @@
         if (_currentTask == null || _settings == null) return;
 
         // Проверяем свободное место
-        var todayTasks = TaskRepo.GetTodayTasks(_settings.DayStartHour);
+        var todayTasks = TaskRepo.GetTodayTasks();
         var todayCount = todayTasks.Count;
         var todayComplexity = todayTasks.Sum(t => t.TotalComplexity);
         var todayTime = todayTasks.Sum(t => t.TotalEstimatedMinutes);
@@ -106,16 +106,17 @@
 
                 if (result == true)
                 {
-                    // Вытесняем задачу
-                    leastPriorityTask.ActualAssignedDate = null;
+                    // Вытесняем задачу — сбрасываем дату и переводим в AutoFlexible
+                    leastPriorityTask.ScheduledDate = null;
+                    leastPriorityTask.DateSource = DateSource.AutoFlexible;
                     TaskRepo.Update(leastPriorityTask);
                 }
             }
         }
 
-        // Добавляем задачу на сегодня
-        _currentTask.ActualAssignedDate = DateHelper.GetLogicalToday(_settings.DayStartHour);
-        _currentTask.UserAssignedDate = _currentTask.ActualAssignedDate;
+        // Добавляем задачу на сегодня (пользователь явно выбрал, поэтому Manual)
+        _currentTask.ScheduledDate = TodoDay.Today.ToDateTime();
+        _currentTask.DateSource = DateSource.Manual;
         _currentTask.Status = TaskStatus.Planned;
         TaskRepo.Update(_currentTask);
 
