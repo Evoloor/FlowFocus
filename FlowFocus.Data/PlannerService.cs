@@ -123,8 +123,36 @@ public class PlannerService(
         var today = TodoDay.Today;
         var tomorrow = today.AddDays(1);
 
+        // Собираем все задачи (Manual / AutoFixed), у которых уже зафиксирована дата
+        var fixedTasks = taskRepository.GetAll()
+            .Where(t => t.ParentTaskId == null)
+            .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
+            .Where(t => t.DateSource == DateSource.Manual || t.DateSource == DateSource.AutoFixed)
+            .Where(t => t.ScheduledDate.HasValue)
+            .ToList();
+
+        // Заполняем стартовую статистику на сегодня и на завтра на основе фиксированных задач
+        DailyStats todayStats = new();
+        DailyStats tomorrowStats = new();
+
+        foreach (var task in fixedTasks)
+        {
+            if (today.IsSameDay(task.ScheduledDate))
+            {
+                todayStats.TotalComplexity += task.TotalComplexity;
+                todayStats.TotalMinutes += task.TotalEstimatedMinutes;
+                todayStats.TaskCount++;
+            }
+            else if (today.IsTomorrow(task.ScheduledDate))
+            {
+                tomorrowStats.TotalComplexity += task.TotalComplexity;
+                tomorrowStats.TotalMinutes += task.TotalEstimatedMinutes;
+                tomorrowStats.TaskCount++;
+            }
+        }
+
         var currentDate = today;
-        DailyStats dailyStats = new();
+        DailyStats dailyStats = todayStats;
 
         foreach (var task in sortedTasks)
         {
@@ -134,7 +162,7 @@ public class PlannerService(
             while (!CanAddToDay(task, dailyStats, settings, isLargeTask))
             {
                 currentDate = currentDate.AddDays(1);
-                dailyStats = new();
+                dailyStats = currentDate == tomorrow ? tomorrowStats : new DailyStats();
             }
 
             var trackedTask = context.Tasks.Find(task.Id);
