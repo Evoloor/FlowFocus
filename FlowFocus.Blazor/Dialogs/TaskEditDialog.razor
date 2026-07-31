@@ -489,6 +489,12 @@
                 _ => _estimatedValue
             };
 
+            // Если дата назначения не указана явно, тип даты должен быть AutoFlexible
+            if (_task.ScheduledDate == null)
+            {
+                _task.DateSource = DateSource.AutoFlexible;
+            }
+
             // Устанавливаем статус Planned для настроенных задач
             if (_task.Status == TaskStatus.NotConfigured && !IsSubtaskMode)
             {

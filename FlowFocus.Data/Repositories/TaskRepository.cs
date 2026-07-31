@@ -577,7 +577,7 @@ public class TaskRepository(StorageContext context, INotificationService notific
         // Рекурсивно копируем вложенные подзадачи
         if (source.Subtasks != null && source.Subtasks.Count != 0)
         {
-            clone.Subtasks = source.Subtasks.Select(s => CloneTaskForRecurrence(s)).ToList();
+            clone.Subtasks = source.Subtasks.Select(CloneTaskForRecurrence).ToList();
         }
 
         return clone;
@@ -683,10 +683,10 @@ public class TaskRepository(StorageContext context, INotificationService notific
         }
 
         // Обновляем статус и дату завершения
-        UpdatePartial(taskId, task =>
+        UpdatePartial(taskId, t =>
         {
-            task.Status = TaskStatus.Irrelevant;
-            task.CompletedDate = completedDate;
+            t.Status = TaskStatus.Irrelevant;
+            t.CompletedDate = completedDate;
         });
 
         // Для повторяющихся задач создаём следующий экземпляр (используя установленную completedDate)

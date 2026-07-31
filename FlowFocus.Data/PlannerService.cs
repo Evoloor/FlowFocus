@@ -68,6 +68,35 @@ public class PlannerService(
     /// Перераспределяются только задачи с DateSource == AutoFlexible.
     /// Задачи с Manual или AutoFixed остаются на своих датах.
     /// </summary>
+    /// <summary>
+    /// Нормализация перед перераспределением:
+    /// Задачи со статусом источника даты Manual или AutoFixed, у которых не указана дата (ScheduledDate == null),
+    /// приводятся к источнику AutoFlexible.
+    /// </summary>
+    public void NormalizeTaskDateSources()
+    {
+        var tasksToNormalize = context.Tasks
+            .Where(t => t.ScheduledDate == null)
+            .Where(t => t.DateSource == DateSource.Manual || t.DateSource == DateSource.AutoFixed)
+            .ToList();
+
+        if (tasksToNormalize.Count != 0)
+        {
+            foreach (var task in tasksToNormalize)
+            {
+                task.DateSource = DateSource.AutoFlexible;
+                task.LastChangesOn = DateTime.UtcNow;
+            }
+            taskRepository.SaveChanges();
+        }
+    }
+
+    /// <summary>
+    /// Шаг 2: Распределение задач по дням.
+    /// Перераспределяются только задачи с DateSource == AutoFlexible.
+    /// Задачи с Manual или AutoFixed остаются на своих датах.
+    /// Детальный просчёт выполняется только для "сегодня" и "завтра". Оставшиеся задачи сбросят ScheduledDate = null.
+    /// </summary>
     public void DistributeTasks(UserSettings settings)
     {
         // Сначала обрабатываем повторяющиеся задачи: если они просрочены/неназначены,
@@ -91,28 +120,39 @@ public class PlannerService(
             .ThenByDescending(t => t.Interest ?? 0)
             .ToList();
 
-        var currentDate = TodoDay.Today;
+        var today = TodoDay.Today;
+        var tomorrow = today.AddDays(1);
+
+        var currentDate = today;
         DailyStats dailyStats = new();
 
         foreach (var task in sortedTasks)
         {
             var isLargeTask = IsLargeTask(task, settings);
 
-            // Проверяем лимиты
+            // Проверяем лимиты для текущего дня. Если превышен, пытаемся перейти на следующий день.
             while (!CanAddToDay(task, dailyStats, settings, isLargeTask))
             {
                 currentDate = currentDate.AddDays(1);
                 dailyStats = new();
             }
 
-            // Назначаем задачу на текущий день
             var trackedTask = context.Tasks.Find(task.Id);
             if (trackedTask != null)
             {
-                trackedTask.ScheduledDate = currentDate.ToDateTime();
-                // DateSource остаётся AutoFlexible — плановик назначил дату
+                // Детальный просчёт только для "сегодня" и "завтра"
+                if (currentDate <= tomorrow)
+                {
+                    trackedTask.ScheduledDate = currentDate.ToDateTime();
+                    Console.WriteLine($"Planner: assigned non-recurring task {task.Id} '{task.Title}' -> {currentDate}");
+                }
+                else
+                {
+                    // Остальные задачи не имеют даты назначения
+                    trackedTask.ScheduledDate = null;
+                    Console.WriteLine($"Planner: task {task.Id} '{task.Title}' beyond tomorrow, clearing ScheduledDate");
+                }
                 trackedTask.LastChangesOn = DateTime.UtcNow;
-                Console.WriteLine($"Planner: assigned non-recurring task {task.Id} '{task.Title}' -> {currentDate}");
             }
 
             // Обновляем статистику дня (подзадачи не учитываются в счётчике задач)
@@ -129,6 +169,7 @@ public class PlannerService(
     /// </summary>
     public void RecalculateAll(UserSettings settings)
     {
+        NormalizeTaskDateSources();
         ActualizePriorities();
         DistributeTasks(settings);
         UpdateBlockedStatuses();
@@ -275,13 +316,11 @@ public class PlannerService(
                 : today.ToDateTime();
 
             var trackedTask = context.Tasks.Find(task.Id);
-            if (trackedTask != null)
-            {
-                trackedTask.ScheduledDate = assigned;
-                trackedTask.DateSource = DateSource.AutoFixed;
-                trackedTask.LastChangesOn = DateTime.UtcNow;
-                Console.WriteLine($"Planner: recurring task {task.Id} '{task.Title}' mutated in-place -> Scheduled={assigned:yyyy-MM-dd} DateSource=AutoFixed");
-            }
+            if (trackedTask == null) continue;
+            trackedTask.ScheduledDate = assigned;
+            trackedTask.DateSource = DateSource.AutoFixed;
+            trackedTask.LastChangesOn = DateTime.UtcNow;
+            Console.WriteLine($"Planner: recurring task {task.Id} '{task.Title}' mutated in-place -> Scheduled={assigned:yyyy-MM-dd} DateSource=AutoFixed");
         }
 
         taskRepository.SaveChanges();
