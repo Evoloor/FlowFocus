@@ -10,7 +10,7 @@ public static class TaskEditValidator
     public static ValidationResult ValidateEscalations(IEnumerable<EscalationDto>? escalations, TaskItem task,
         List<PriorityLevel> priorities)
     {
-        var errors = new List<string>();
+        List<string> errors = [];
         var escalationList =
             escalations?.Where(e => e.EscalationDate != null).OrderBy(e => e.EscalationDate).ToList() ??
             [];
@@ -53,7 +53,7 @@ public static class TaskEditValidator
     public static ValidationResult ValidateRelations(IEnumerable<RelationDto>? relations, TaskItem task,
         List<PriorityLevel> priorities)
     {
-        var errors = new List<string>();
+        List<string> errors = [];
         var relationList = relations?.Where(r => r.TargetTask != null).ToList() ?? [];
 
         foreach (var relation in relationList)

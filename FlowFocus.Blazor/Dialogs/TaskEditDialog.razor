@@ -202,7 +202,7 @@
     private List<Tag> _selectedTags = [];
     private HashSet<int> _selectedTagIds = [];
     // Исходные id тегов при открытии диалога — нужны для расчёта удалённых тегов при сохранении
-    private HashSet<int> _originalTagIds = new();
+    private HashSet<int> _originalTagIds = [];
     private List<SubtaskDto> _subtasks = [];
     private List<RelationDto> _relations = [];
     private readonly List<EscalationDto> _escalations = [];
@@ -295,13 +295,13 @@
             _selectedTags = source.Tags.Select(tt => tt.Tag).Where(t => t != null).ToList();
             _selectedTagIds = _selectedTags.Select(t => t.Id).ToHashSet();
             // Сохраняем исходный набор id тегов для последующей проверки удалённых
-            _originalTagIds = new HashSet<int>(_selectedTagIds);
+            _originalTagIds = new(_selectedTagIds);
         }
         else
         {
             _selectedTags = [];
             _selectedTagIds = [];
-            _originalTagIds = new();
+            _originalTagIds = [];
         }
 
         // Загружаем подзадачи из оригинальной задачи (конструктор копирования не копирует навигационные свойства)
@@ -351,7 +351,7 @@
         if (source?.PriorityEscalations == null) return;
         foreach (var pe in source.PriorityEscalations)
         {
-            _escalations.Add(new EscalationDto
+            _escalations.Add(new()
             {
                 Id = pe.Id,
                 TargetPriorityId = pe.TargetPriorityId,
@@ -514,7 +514,7 @@
                 .Where(s => !s.IsDeleted)
                 .Select(dto =>
                 {
-                    var ti = new TaskItem();
+                    TaskItem ti = new();
                     // Для существующих подзадач устанавливаем Id, и пробуем сохранить CreatedDate если он есть в tracked
                     if (dto.Id is > 0)
                     {
@@ -663,7 +663,7 @@
 
     private List<string> ValidateTask()
     {
-        var errors = new List<string>();
+        List<string> errors = [];
         if (string.IsNullOrWhiteSpace(_task.Title)) errors.Add("Название обязательно");
 
         // При создании новой повторяющейся задачи дата обязательна

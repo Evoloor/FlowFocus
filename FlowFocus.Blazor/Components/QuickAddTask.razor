@@ -96,7 +96,7 @@
     {
         if (!IsValid) return;
 
-        var task = new TaskItem
+        TaskItem task = new()
         {
             Title = _taskTitle.Trim(),
             Status = TaskStatus.NotConfigured,
@@ -128,7 +128,7 @@
 
     private async Task OpenEditDialog()
     {
-        var parameters = new DialogParameters<TaskEditDialog>();
+        DialogParameters<TaskEditDialog> parameters = new();
 
         // Если уже введено название, передаём его в диалог
         if (!string.IsNullOrWhiteSpace(_taskTitle))
@@ -136,7 +136,7 @@
             parameters.Add(x => x.InitialTitle, _taskTitle.Trim());
         }
 
-        var options = new DialogOptions
+        DialogOptions options = new()
         {
             MaxWidth = MaxWidth.Medium,
             FullWidth = true,

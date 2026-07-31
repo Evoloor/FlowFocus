@@ -95,12 +95,12 @@
 
     private async Task EditSubtask(SubtaskDto subtask)
     {
-        var parameters = new DialogParameters<SubtaskEditDialog>
+        DialogParameters<SubtaskEditDialog> parameters = new()
         {
             { x => x.ExistingSubtask, subtask }
         };
 
-        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        DialogOptions options = new() { MaxWidth = MaxWidth.Small, FullWidth = true };
         var dialog = await DialogService.ShowAsync<SubtaskEditDialog>("Редактировать подзадачу", parameters, options);
         var result = await dialog.Result;
 

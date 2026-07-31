@@ -9,7 +9,7 @@ public static class EscalationModule
     public static List<PriorityEscalation> SyncEscalationsToTask(List<EscalationDto> dtos, TaskItem task, TaskItem? existingTask, List<PriorityLevel> priorities)
     {
         var existingEscalationsSource = existingTask?.PriorityEscalations ?? [];
-        var resultEscalations = new List<PriorityEscalation>();
+        List<PriorityEscalation> resultEscalations = [];
 
         foreach (var dto in dtos)
         {
@@ -18,7 +18,7 @@ public static class EscalationModule
                 var existing = existingEscalationsSource.FirstOrDefault(e => e.Id == dto.Id.Value);
                 if (existing != null)
                 {
-                    var updatedEscalation = new PriorityEscalation
+                    PriorityEscalation updatedEscalation = new()
                     {
                         Id = existing.Id,
                         TaskId = task.Id > 0 ? task.Id : existing.TaskId,
@@ -31,7 +31,7 @@ public static class EscalationModule
                 }
                 else
                 {
-                    var newEscalation = new PriorityEscalation
+                    PriorityEscalation newEscalation = new()
                     {
                         TaskId = task.Id > 0 ? task.Id : 0,
                         TargetPriorityId = dto.TargetPriorityId,
@@ -44,7 +44,7 @@ public static class EscalationModule
             }
             else
             {
-                var newEscalation = new PriorityEscalation
+                PriorityEscalation newEscalation = new()
                 {
                     TaskId = task.Id > 0 ? task.Id : 0,
                     TargetPriorityId = dto.TargetPriorityId,

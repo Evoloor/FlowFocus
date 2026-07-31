@@ -79,7 +79,7 @@
 
     private string GetTitleClass()
     {
-        var classes = new List<string>();
+        List<string> classes = [];
 
         if (Task.Status == TaskStatus.Completed)
             classes.Add("title-completed");

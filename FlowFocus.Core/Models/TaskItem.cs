@@ -38,12 +38,6 @@ public class TaskItem : IAuditEntity
     [ForeignKey(nameof(PriorityId))]
     public PriorityLevel? Priority { get; init; }
 
-    /// <summary>Текущий эффективный приоритет (после применения повышений)</summary>
-    public int? EffectivePriorityId { get; set; }
-
-    [ForeignKey(nameof(EffectivePriorityId))]
-    public PriorityLevel? EffectivePriority { get; init; }
-
     // === Оценки ===
     /// <summary>Интересность задачи (1-10)</summary>
     [Range(1, 10)]
@@ -164,7 +158,6 @@ public class TaskItem : IAuditEntity
         Status = source.Status;
         IsFavorite = source.IsFavorite;
         PriorityId = source.PriorityId;
-        EffectivePriorityId = source.EffectivePriorityId;
         Interest = source.Interest;
         Complexity = source.Complexity;
         EstimatedMinutes = source.EstimatedMinutes;

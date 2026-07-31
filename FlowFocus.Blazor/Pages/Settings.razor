@@ -313,7 +313,7 @@
             // Сохраняем приоритеты
             foreach (var item in _priorityItems)
             {
-                var priority = new PriorityLevel
+                PriorityLevel priority = new()
                 {
                     Id = item.Id > 0 ? item.Id : 0,
                     Order = item.Order,

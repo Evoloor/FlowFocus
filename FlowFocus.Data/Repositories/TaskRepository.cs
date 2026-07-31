@@ -55,7 +55,7 @@ public class TaskRepository(StorageContext context, INotificationService notific
                     // Так как TargetTaskId имеет init-only сеттер, нельзя присвоить его после создания объекта.
                     if (relation.TargetTaskId == 0)
                     {
-                        var replacement = new TaskRelation
+                        TaskRelation replacement = new()
                         {
                             SourceTaskId = relation.SourceTaskId == 0 ? entity.Id : relation.SourceTaskId,
                             TargetTaskId = entity.Id,
@@ -176,7 +176,7 @@ public class TaskRepository(StorageContext context, INotificationService notific
         // Проверяем и обновляем usageCount для удалённых тегов
         if (removedTagIds.Count != 0)
         {
-            var tagRepo = new TagRepository(Context, NotificationService);
+            TagRepository tagRepo = new(Context, NotificationService);
             // Для каждого удалённого тега уменьшаем usageCount и при необходимости удаляем сам тег
             foreach (var id in removedTagIds)
             {
@@ -320,7 +320,6 @@ public class TaskRepository(StorageContext context, INotificationService notific
         GetDbSet()
             .AsNoTracking()
             .Include(t => t.Priority)
-            .Include(t => t.EffectivePriority)
             .Include(t => t.Tags).ThenInclude(tt => tt.Tag)
             .Include(t => t.Relations).ThenInclude(r => r.TargetTask)
             .Include(t => t.InverseRelations).ThenInclude(r => r.SourceTask)
@@ -479,7 +478,7 @@ public class TaskRepository(StorageContext context, INotificationService notific
             if (exists) return;
              
 
-            var newTask = new TaskItem
+            TaskItem newTask = new()
             {
                 Title = sourceTask.Title,
                 Description = sourceTask.Description,
@@ -536,7 +535,7 @@ public class TaskRepository(StorageContext context, INotificationService notific
     /// </summary>
     private TaskItem CloneTaskForRecurrence(TaskItem source)
     {
-        var clone = new TaskItem
+        TaskItem clone = new()
         {
             // Id оставляем 0, EF/репозиторий назначит новый Id при добавлении
             Title = source.Title,
@@ -619,7 +618,7 @@ public class TaskRepository(StorageContext context, INotificationService notific
         var day = baseDate.Day;
         var daysInTarget = DateTime.DaysInMonth(target.Year, target.Month);
         var chosenDay = day > daysInTarget ? daysInTarget : day;
-        return new DateTime(target.Year, target.Month, chosenDay);
+        return new(target.Year, target.Month, chosenDay);
     }
 
     /// <summary>
@@ -634,7 +633,7 @@ public class TaskRepository(StorageContext context, INotificationService notific
 
         var daysInTarget = DateTime.DaysInMonth(targetYear, month);
         var chosenDay = day > daysInTarget ? daysInTarget : day;
-        return new DateTime(targetYear, month, chosenDay);
+        return new(targetYear, month, chosenDay);
     }
 
     /// <summary>
@@ -711,7 +710,7 @@ public class TaskRepository(StorageContext context, INotificationService notific
         return FilterOutSubtasks(all)
             .Where(t => t is { Interest: >= AppConfig.MinProcrastinationInterest, Status: TaskStatus.Planned } &&
                         !excludeIds.Contains(t.Id))
-            .OrderByDescending(t => t.Interest - Math.Sqrt(t.EffectivePriority?.Order ?? t.Priority?.Order ?? 99))
+            .OrderByDescending(t => t.Interest - Math.Sqrt(t.Priority?.Order ?? 99))
             .FirstOrDefault();
     }
 
@@ -726,7 +725,7 @@ public class TaskRepository(StorageContext context, INotificationService notific
                         t.Status != TaskStatus.Irrelevant);
         return todayTasks
             .Where(t => t.Status == TaskStatus.Planned)
-            .OrderByDescending(t => t.EffectivePriority?.Order ?? t.Priority?.Order ?? 99)
+            .OrderByDescending(t => t.Priority?.Order ?? 99)
             .ThenBy(t => t.Interest ?? 0)
             .FirstOrDefault();
     }
@@ -761,7 +760,7 @@ public class TaskRepository(StorageContext context, INotificationService notific
             // Уменьшаем usageCount для тегов, которые были связаны с удалённой задачей
             if (tagIds.Count != 0)
             {
-                var tagRepo = new TagRepository(Context, NotificationService);
+                TagRepository tagRepo = new(Context, NotificationService);
                 foreach (var tagId in tagIds)
                 {
                     try
@@ -777,7 +776,7 @@ public class TaskRepository(StorageContext context, INotificationService notific
                 try
                 {
                     // Попробуем удалить физически неиспользуемые теги
-                    var tagRepoCleanup = new TagRepository(Context, NotificationService);
+                    TagRepository tagRepoCleanup = new(Context, NotificationService);
                     tagRepoCleanup.CleanupUnusedTags(tagIds);
                 }
                 catch

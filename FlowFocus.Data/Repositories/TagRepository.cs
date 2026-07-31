@@ -22,7 +22,7 @@ public class TagRepository(StorageContext context, INotificationService notifica
         var existing = GetByName(name);
         if (existing != null) return existing;
 
-        var tag = new Tag
+        Tag tag = new()
         {
             Name = name,
             BackgroundColor = GeneratePastelColor()

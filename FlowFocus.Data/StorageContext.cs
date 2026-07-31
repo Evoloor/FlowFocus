@@ -48,11 +48,6 @@ public class StorageContext : DbContext
                 .HasForeignKey(e => e.PriorityId)
                 .OnDelete(DeleteBehavior.SetNull);
 
-            entity.HasOne(e => e.EffectivePriority)
-                .WithMany()
-                .HasForeignKey(e => e.EffectivePriorityId)
-                .OnDelete(DeleteBehavior.SetNull);
-
             entity.HasMany(e => e.Tags)
                 .WithOne(e => e.Task)
                 .HasForeignKey(e => e.TaskId)

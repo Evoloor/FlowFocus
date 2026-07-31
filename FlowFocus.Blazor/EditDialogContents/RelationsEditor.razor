@@ -98,7 +98,7 @@
         if (Relations.Count >= AppConfig.MaxTaskRelations)
             return;
 
-        var newRel = new RelationDto { Type = RelationType.RelatedTo };
+        RelationDto newRel = new() { Type = RelationType.RelatedTo };
         if (candidates.Count == 1)
         {
             // Если доступен ровно один кандидат, предвыбираем его

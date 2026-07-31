@@ -54,12 +54,12 @@
     {
         foreach (var task in UnblockedTasks)
         {
-            var parameters = new DialogParameters<TaskEditDialog>
+            DialogParameters<TaskEditDialog> parameters = new()
             {
                 { x => x.ExistingTask, task }
             };
 
-            var options = new DialogOptions
+            DialogOptions options = new()
             {
                 MaxWidth = MaxWidth.Medium,
                 FullWidth = true

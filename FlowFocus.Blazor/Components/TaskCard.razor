@@ -78,7 +78,7 @@
 
     private string GetCardClass()
     {
-        var classes = new List<string> { "task-card" };
+        List<string> classes = ["task-card"];
 
         if (Task.Status == TaskStatus.Completed)
             classes.Add("task-card-completed");
@@ -102,11 +102,11 @@
 
     private string GetCardStyle()
     {
-        var styles = new List<string>();
+        List<string> styles = [];
 
         if (Task.Status == TaskStatus.Blocked || Task.IsBlocked)
         {
-            var priority = Task.EffectivePriority ?? Task.Priority;
+            var priority = Task.Priority;
             var color = priority?.Color ?? "#808080";
             styles.Add($"border: 3px solid {color} !important");
         }
@@ -116,7 +116,7 @@
 
     private string GetPriorityIndicatorStyle()
     {
-        var priority = Task.EffectivePriority ?? Task.Priority;
+        var priority = Task.Priority;
         var color = priority?.Color ?? "#808080";
         return $"background-color: {color}";
     }
@@ -131,7 +131,7 @@
 
             if (unblockedTasks.Any())
             {
-                var parameters = new DialogParameters<UnblockedTasksDialog>
+                DialogParameters<UnblockedTasksDialog> parameters = new()
                 {
                     { x => x.UnblockedTasks, unblockedTasks }
                 };
@@ -163,12 +163,12 @@
 
     private async Task OpenEditDialog()
     {
-        var parameters = new DialogParameters<TaskEditDialog>
+        DialogParameters<TaskEditDialog> parameters = new()
         {
             { x => x.ExistingTask, Task }
         };
 
-        var options = new DialogOptions
+        DialogOptions options = new()
         {
             MaxWidth = MaxWidth.Medium,
             FullWidth = true,

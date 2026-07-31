@@ -18,7 +18,7 @@ public class TagSessionService(ITagRepository tagRepository) : ITagSessionServic
 
     public List<Tag> GetSuggestedTags(int count = 5)
     {
-        var result = new List<Tag>();
+        List<Tag> result = [];
 
         // Сперва последний использованный тег из хипа (за сессию), если такой имеется и он ещё валиден
         if (LastUsedTag != null)

@@ -31,12 +31,12 @@
     private static string FormatWeekDays(int mask)
     {
         if (mask == 0) return "Еженедельно";
-        var mapping = new (int Bit, string Name)[]
-        {
+        (int Bit, string Name)[] mapping =
+        [
             (1, "Пн"), (2, "Вт"), (4, "Ср"), (8, "Чт"), (16, "Пт"), (32, "Сб"), (64, "Вс")
-        };
-        var names = new List<string>();
-        foreach (var (bit, name) in mapping)
+        ];
+        List<string> names = [];
+        foreach ((var bit, var name) in mapping)
         {
             if ((mask & bit) != 0) names.Add(name);
         }

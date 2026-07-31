@@ -11,7 +11,7 @@ public static class RelationModule
         var validRelations = dtos.Where(r => r.TargetTask is not null && !r.TargetTask.IsRecurring).ToList();
         var existingRelationsSource = existingTask?.Relations ?? [];
         var existingRelationsInverse = existingTask?.InverseRelations ?? [];
-        var resultRelations = new List<TaskRelation>();
+        List<TaskRelation> resultRelations = [];
 
         foreach (var dto in validRelations)
         {
@@ -63,7 +63,7 @@ public static class RelationModule
                                ?? existingRelationsInverse.FirstOrDefault(r => r.Id == dto.Id.Value);
                 if (existing != null)
                 {
-                    var updatedRelation = new TaskRelation
+                    TaskRelation updatedRelation = new()
                     {
                         Id = existing.Id,
                         SourceTaskId = dbSourceId != 0 ? dbSourceId : existing.SourceTaskId,
@@ -77,7 +77,7 @@ public static class RelationModule
             }
 
             // Добавляем новую запись
-            var newRelation = new TaskRelation
+            TaskRelation newRelation = new()
             {
                 SourceTaskId = dbSourceId,
                 TargetTaskId = dbTargetId,

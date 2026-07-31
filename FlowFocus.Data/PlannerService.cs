@@ -43,7 +43,7 @@ public class PlannerService(
                 var trackedTask = context.Tasks.Find(task.Id);
                 if (trackedTask != null)
                 {
-                    trackedTask.EffectivePriorityId = highestEscalation.TargetPriorityId;
+                    trackedTask.PriorityId = highestEscalation.TargetPriorityId;
                     trackedTask.LastChangesOn = DateTime.UtcNow;
                 }
 
@@ -92,7 +92,7 @@ public class PlannerService(
             .ToList();
 
         var currentDate = TodoDay.Today;
-        var dailyStats = new DailyStats();
+        DailyStats dailyStats = new();
 
         foreach (var task in sortedTasks)
         {
@@ -147,7 +147,7 @@ public class PlannerService(
                 continue;
 
             // Собираем всех активных блокеров как из обратных связей Blocks (Source -> this)
-            var blockers = new List<TaskItem?>();
+            List<TaskItem?> blockers = [];
 
             blockers.AddRange(task.InverseRelations
                 .Where(r => r.Type == RelationType.Blocks)
@@ -178,7 +178,7 @@ public class PlannerService(
 
     private int GetEffectivePriorityOrder(TaskItem task)
     {
-        return task.EffectivePriority?.Order ?? task.Priority?.Order ?? 99;
+        return task.Priority?.Order ?? 99;
     }
 
     private bool IsLargeTask(TaskItem task, UserSettings settings)
@@ -308,7 +308,7 @@ public class PlannerService(
         var day = baseDate.Day;
         var daysInTarget = DateTime.DaysInMonth(target.Year, target.Month);
         var chosenDay = day > daysInTarget ? daysInTarget : day;
-        return new DateTime(target.Year, target.Month, chosenDay);
+        return new(target.Year, target.Month, chosenDay);
     }
 
     private DateTime CalculateNextYearDate(DateTime baseDate, int yearsInterval)
@@ -320,7 +320,7 @@ public class PlannerService(
 
         var daysInTarget = DateTime.DaysInMonth(targetYear, month);
         var chosenDay = day > daysInTarget ? daysInTarget : day;
-        return new DateTime(targetYear, month, chosenDay);
+        return new(targetYear, month, chosenDay);
     }
 
     private DateTime CalculateNextWeekDayDate(DateTime baseDate, int weekDaysMask)

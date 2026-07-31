@@ -215,12 +215,10 @@
         get => _hideWithDates;
         set
         {
-            if (_hideWithDates != value)
-            {
-                _hideWithDates = value;
-                _currentPage = 1;
-                _ = InvokeAsync(StateHasChanged);
-            }
+            if (_hideWithDates == value) return;
+            _hideWithDates = value;
+            _currentPage = 1;
+            _ = InvokeAsync(StateHasChanged);
         }
     }
 
@@ -383,7 +381,7 @@
         {
             SortType.Relevance => tasks
                 .OrderBy(t => t.Status == TaskStatus.Planned ? 0 : 1)
-                .ThenBy(t => t.EffectivePriority?.Order ?? t.Priority?.Order ?? 99)
+                .ThenBy(t => t.Priority?.Order ?? 99)
                 .ThenByDescending(t => t.Interest ?? 0)
                 .ThenBy(t => t.EstimatedMinutes ?? 9999),
 
