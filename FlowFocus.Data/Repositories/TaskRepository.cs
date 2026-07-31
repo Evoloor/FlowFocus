@@ -113,6 +113,7 @@ public class TaskRepository(StorageContext context, INotificationService notific
                     .Include(t => t.Tags)
                     .Include(t => t.Subtasks)
                     .Include(t => t.Relations)
+                    .Include(t => t.InverseRelations)
                     .Include(t => t.PriorityEscalations)
                     .FirstOrDefault(e => e.Id == entity.Id);
                     
