@@ -26,7 +26,7 @@ public class TagSessionService(ITagRepository tagRepository) : ITagSessionServic
             try
             {
                 var existing = tagRepository.GetById(LastUsedTag.Id);
-                if (existing != null && existing.UsageCount > 0)
+                if (existing is { UsageCount: > 0 })
                 {
                     result.Add(existing);
                 }

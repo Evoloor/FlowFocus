@@ -51,4 +51,22 @@ public interface ITaskRepository : IRepository<TaskItem>
 
     /// <summary>Удалить запись о связи между задачами</summary>
     void DeleteRelation(int relationId);
+
+    /// <summary>Применить повышение приоритета к задаче</summary>
+    void ApplyPriorityEscalation(int taskId, int targetPriorityId, IEnumerable<int> appliedEscalationIds);
+
+    /// <summary>Нормализовать источники дат у задач без даты</summary>
+    void NormalizeTaskDateSources();
+
+    /// <summary>Обновить расписание и источник даты задачи</summary>
+    void UpdateTaskSchedule(int taskId, DateTime? scheduledDate, FlowFocus.Core.Enums.DateSource? dateSource = null);
+
+    /// <summary>Обновить статус задачи</summary>
+    void UpdateTaskStatus(int taskId, FlowFocus.Core.Enums.TaskStatus status);
+
+    /// <summary>Получить повторяющиеся задачи-кандидаты для обработки планировщиком</summary>
+    List<TaskItem> GetRecurringCandidatesForPlanner();
+
+    /// <summary>Мутировать повторяющуюся задачу на месте (Scenario B)</summary>
+    void MutateRecurringTaskInPlace(int taskId, DateTime assignedDate);
 }

@@ -2,16 +2,13 @@ using FlowFocus.Core;
 using FlowFocus.Core.Enums;
 using FlowFocus.Core.Models;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
-using Microsoft.EntityFrameworkCore;
 
 namespace FlowFocus.Data;
 
 /// <summary>
 /// Сервис алгоритмического планирования задач
 /// </summary>
-public class PlannerService(
-    ITaskRepository taskRepository,
-    StorageContext context) : IPlannerService
+public class PlannerService(ITaskRepository taskRepository) : IPlannerService
 {
     /// <summary>
     /// Шаг 1: Актуализация приоритетов на основе таблиц повышения
@@ -35,60 +32,25 @@ public class PlannerService(
                 .OrderBy(e => e.TargetPriority?.Order ?? 99)
                 .ToList();
 
-            if (escalations.Count != 0)
-            {
-                var highestEscalation = escalations.First();
+            if (escalations.Count == 0) continue;
+            var highestEscalation = escalations.First();
                 
-                // Обновляем эффективный приоритет
-                var trackedTask = context.Tasks.Find(task.Id);
-                if (trackedTask != null)
-                {
-                    trackedTask.PriorityId = highestEscalation.TargetPriorityId;
-                    trackedTask.LastChangesOn = DateTime.UtcNow;
-                }
-
-                // Помечаем повышения как применённые
-                foreach (var escalation in escalations)
-                {
-                    var trackedEscalation = context.PriorityEscalations.Find(escalation.Id);
-                    if (trackedEscalation != null)
-                    {
-                        trackedEscalation.IsApplied = true;
-                        trackedEscalation.LastChangesOn = DateTime.UtcNow;
-                    }
-                }
-            }
+            taskRepository.ApplyPriorityEscalation(
+                task.Id,
+                highestEscalation.TargetPriorityId,
+                escalations.Select(e => e.Id)
+            );
         }
-
-        taskRepository.SaveChanges();
     }
 
-    /// <summary>
-    /// Шаг 2: Распределение задач по дням.
-    /// Перераспределяются только задачи с DateSource == AutoFlexible.
-    /// Задачи с Manual или AutoFixed остаются на своих датах.
-    /// </summary>
     /// <summary>
     /// Нормализация перед перераспределением:
     /// Задачи со статусом источника даты Manual или AutoFixed, у которых не указана дата (ScheduledDate == null),
     /// приводятся к источнику AutoFlexible.
     /// </summary>
-    public void NormalizeTaskDateSources()
+    private void NormalizeTaskDateSources()
     {
-        var tasksToNormalize = context.Tasks
-            .Where(t => t.ScheduledDate == null)
-            .Where(t => t.DateSource == DateSource.Manual || t.DateSource == DateSource.AutoFixed)
-            .ToList();
-
-        if (tasksToNormalize.Count != 0)
-        {
-            foreach (var task in tasksToNormalize)
-            {
-                task.DateSource = DateSource.AutoFlexible;
-                task.LastChangesOn = DateTime.UtcNow;
-            }
-            taskRepository.SaveChanges();
-        }
+        taskRepository.NormalizeTaskDateSources();
     }
 
     /// <summary>
@@ -110,7 +72,7 @@ public class PlannerService(
             // Только задачи, которые плановик может свободно перемещать
             .Where(t => t.DateSource == DateSource.AutoFlexible)
             // Исключаем повторяющиеся задачи и реплики — их даты управляются правилами повторения
-            .Where(t => !t.IsRecurring && t.RecurrenceSourceId == null)
+            .Where(t => t is { IsRecurring: false, RecurrenceSourceId: null })
             .ToList();
 
         // Сортировка по релевантности
@@ -165,22 +127,17 @@ public class PlannerService(
                 dailyStats = currentDate == tomorrow ? tomorrowStats : new DailyStats();
             }
 
-            var trackedTask = context.Tasks.Find(task.Id);
-            if (trackedTask != null)
+            // Детальный просчёт только для "сегодня" и "завтра"
+            if (currentDate <= tomorrow)
             {
-                // Детальный просчёт только для "сегодня" и "завтра"
-                if (currentDate <= tomorrow)
-                {
-                    trackedTask.ScheduledDate = currentDate.ToDateTime();
-                    Console.WriteLine($"Planner: assigned non-recurring task {task.Id} '{task.Title}' -> {currentDate}");
-                }
-                else
-                {
-                    // Остальные задачи не имеют даты назначения
-                    trackedTask.ScheduledDate = null;
-                    Console.WriteLine($"Planner: task {task.Id} '{task.Title}' beyond tomorrow, clearing ScheduledDate");
-                }
-                trackedTask.LastChangesOn = DateTime.UtcNow;
+                taskRepository.UpdateTaskSchedule(task.Id, currentDate.ToDateTime());
+                Console.WriteLine($"Planner: assigned non-recurring task {task.Id} '{task.Title}' -> {currentDate}");
+            }
+            else
+            {
+                // Остальные задачи не имеют даты назначения
+                taskRepository.UpdateTaskSchedule(task.Id, null);
+                Console.WriteLine($"Planner: task {task.Id} '{task.Title}' beyond tomorrow, clearing ScheduledDate");
             }
 
             // Обновляем статистику дня (подзадачи не учитываются в счётчике задач)
@@ -188,8 +145,6 @@ public class PlannerService(
             dailyStats.TotalMinutes += task.TotalEstimatedMinutes;
             dailyStats.TaskCount++;
         }
-
-        taskRepository.SaveChanges();
     }
 
     /// <summary>
@@ -224,25 +179,17 @@ public class PlannerService(
 
             var hasActiveBlockers = blockers.Any(b => b != null && b.Status != TaskStatus.Completed && b.Status != TaskStatus.Irrelevant);
 
-            var trackedTask = context.Tasks.Find(task.Id);
-            if (trackedTask != null)
+            // Если есть активные блокеры, устанавливаем статус Blocked
+            if (hasActiveBlockers && task.Status != TaskStatus.Blocked)
             {
-                // Если есть активные блокеры, устанавливаем статус Blocked
-                if (hasActiveBlockers && trackedTask.Status != TaskStatus.Blocked)
-                {
-                    trackedTask.Status = TaskStatus.Blocked;
-                    trackedTask.LastChangesOn = DateTime.UtcNow;
-                }
-                // Если нет активных блокеров, но статус Blocked, возвращаем к Planned
-                else if (!hasActiveBlockers && trackedTask.Status == TaskStatus.Blocked)
-                {
-                    trackedTask.Status = TaskStatus.Planned;
-                    trackedTask.LastChangesOn = DateTime.UtcNow;
-                }
+                taskRepository.UpdateTaskStatus(task.Id, TaskStatus.Blocked);
+            }
+            // Если нет активных блокеров, но статус Blocked, возвращаем к Planned
+            else if (!hasActiveBlockers && task.Status == TaskStatus.Blocked)
+            {
+                taskRepository.UpdateTaskStatus(task.Id, TaskStatus.Planned);
             }
         }
-
-        taskRepository.SaveChanges();
     }
 
     private int GetEffectivePriorityOrder(TaskItem task)
@@ -276,26 +223,10 @@ public class PlannerService(
     /// Scenario B из спецификации: мутируем задачу на месте — устанавливаем ScheduledDate = сегодня,
     /// DateSource = AutoFixed. Новый клон НЕ создаётся.
     /// </summary>
-    private void HandleRecurringBeforeDistribution(UserSettings settings)
+    private void HandleRecurringBeforeDistribution(UserSettings _)
     {
         var today = TodoDay.Today;
-
-        var allRecurring = context.Tasks
-            .AsNoTracking()
-            .Where(t => t.ParentTaskId == null)
-            .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
-            .Where(t => t.IsRecurring)
-            .ToList();
-
-        // Кандидаты: просрочены или ещё не назначены (и не закреплены пользователем вручную с актуальной датой)
-        var recurringTasks = allRecurring.Where(t =>
-        {
-            // Задачи с Manual-датой, которая ещё не просрочена, не трогаем
-            if (t.DateSource == DateSource.Manual && !today.IsOverdue(t.ScheduledDate))
-                return false;
-
-            return today.IsOverdue(t.ScheduledDate) || t.ScheduledDate == null;
-        }).ToList();
+        var recurringTasks = taskRepository.GetRecurringCandidatesForPlanner();
 
         Console.WriteLine($"Planner: found {recurringTasks.Count} recurring candidates for handling");
         foreach (var c in recurringTasks)
@@ -317,11 +248,7 @@ public class PlannerService(
             else
             {
                 // Незавершённая задача: берём последнюю назначенную дату как базу
-                if (task.ScheduledDate.HasValue)
-                    baseCandidate = task.ScheduledDate.Value.Date;
-                else
-                    // Если у повторяющейся задачи нет предыдущей даты, ставим базу вчера
-                    baseCandidate = TodoDay.Today.Yesterday.ToDateTime();
+                baseCandidate = task.ScheduledDate?.Date ?? TodoDay.Today.Yesterday.ToDateTime();
             }
 
             // Продвигаем по правилу повтора, пока не дойдём до даты >= logicalToday
@@ -343,15 +270,9 @@ public class PlannerService(
                 ? nextDate.Value.Date
                 : today.ToDateTime();
 
-            var trackedTask = context.Tasks.Find(task.Id);
-            if (trackedTask == null) continue;
-            trackedTask.ScheduledDate = assigned;
-            trackedTask.DateSource = DateSource.AutoFixed;
-            trackedTask.LastChangesOn = DateTime.UtcNow;
+            taskRepository.MutateRecurringTaskInPlace(task.Id, assigned);
             Console.WriteLine($"Planner: recurring task {task.Id} '{task.Title}' mutated in-place -> Scheduled={assigned:yyyy-MM-dd} DateSource=AutoFixed");
         }
-
-        taskRepository.SaveChanges();
     }
 
     // Рассчитывает следующую дату повтора, считая от baseDate

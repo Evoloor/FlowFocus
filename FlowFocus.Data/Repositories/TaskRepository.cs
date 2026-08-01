@@ -813,4 +813,101 @@ public class TaskRepository(StorageContext context, INotificationService notific
             t.CompletedDate = null;
         });
     }
+
+    public void ApplyPriorityEscalation(int taskId, int targetPriorityId, IEnumerable<int> appliedEscalationIds)
+    {
+        lock (CacheLock)
+        {
+            var trackedTask = Context.Tasks
+                .Include(t => t.PriorityEscalations)
+                .FirstOrDefault(t => t.Id == taskId);
+
+            if (trackedTask != null)
+            {
+                trackedTask.PriorityId = targetPriorityId;
+                trackedTask.LastChangesOn = DateTime.UtcNow;
+
+                var escalationSet = appliedEscalationIds.ToHashSet();
+                foreach (var escalation in trackedTask.PriorityEscalations.Where(e => escalationSet.Contains(e.Id)))
+                {
+                    escalation.IsApplied = true;
+                    escalation.LastChangesOn = DateTime.UtcNow;
+                }
+
+                Context.SaveChanges();
+                MarkDirty();
+            }
+        }
+    }
+
+    public void NormalizeTaskDateSources()
+    {
+        lock (CacheLock)
+        {
+            var tasksToNormalize = Context.Tasks
+                .Where(t => t.ScheduledDate == null)
+                .Where(t => t.DateSource == DateSource.Manual || t.DateSource == DateSource.AutoFixed)
+                .ToList();
+
+            if (tasksToNormalize.Count == 0) return;
+
+            foreach (var task in tasksToNormalize)
+            {
+                task.DateSource = DateSource.AutoFlexible;
+                task.LastChangesOn = DateTime.UtcNow;
+            }
+
+            Context.SaveChanges();
+            MarkDirty();
+        }
+    }
+
+    public void UpdateTaskSchedule(int taskId, DateTime? scheduledDate, DateSource? dateSource = null)
+    {
+        UpdatePartial(taskId, t =>
+        {
+            t.ScheduledDate = scheduledDate;
+            if (dateSource.HasValue)
+            {
+                t.DateSource = dateSource.Value;
+            }
+        });
+    }
+
+    public void UpdateTaskStatus(int taskId, TaskStatus status)
+    {
+        UpdatePartial(taskId, t =>
+        {
+            t.Status = status;
+        });
+    }
+
+    public List<TaskItem> GetRecurringCandidatesForPlanner()
+    {
+        var today = TodoDay.Today;
+
+        var allRecurring = Context.Tasks
+            .AsNoTracking()
+            .Where(t => t.ParentTaskId == null)
+            .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
+            .Where(t => t.IsRecurring)
+            .ToList();
+
+        return allRecurring.Where(t =>
+        {
+            if (t.DateSource == DateSource.Manual && !today.IsOverdue(t.ScheduledDate))
+                return false;
+
+            return today.IsOverdue(t.ScheduledDate) || t.ScheduledDate == null;
+        }).ToList();
+    }
+
+    public void MutateRecurringTaskInPlace(int taskId, DateTime assignedDate)
+    {
+        UpdatePartial(taskId, t =>
+        {
+            t.ScheduledDate = assignedDate;
+            t.DateSource = DateSource.AutoFixed;
+        });
+    }
 }
