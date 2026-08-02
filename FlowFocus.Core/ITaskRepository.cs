@@ -53,20 +53,23 @@ public interface ITaskRepository : IRepository<TaskItem>
     void DeleteRelation(int relationId);
 
     /// <summary>Применить повышение приоритета к задаче</summary>
-    void ApplyPriorityEscalation(int taskId, int targetPriorityId, IEnumerable<int> appliedEscalationIds);
+    void ApplyPriorityEscalation(int taskId, int targetPriorityId, IEnumerable<int> appliedEscalationIds, bool saveChanges = true);
 
     /// <summary>Нормализовать источники дат у задач без даты</summary>
-    void NormalizeTaskDateSources();
+    void NormalizeTaskDateSources(bool saveChanges = true);
 
     /// <summary>Обновить расписание и источник даты задачи</summary>
-    void UpdateTaskSchedule(int taskId, DateTime? scheduledDate, FlowFocus.Core.Enums.DateSource? dateSource = null);
+    void UpdateTaskSchedule(int taskId, DateTime? scheduledDate, FlowFocus.Core.Enums.DateSource? dateSource = null, bool saveChanges = true);
 
     /// <summary>Обновить статус задачи</summary>
-    void UpdateTaskStatus(int taskId, FlowFocus.Core.Enums.TaskStatus status);
+    void UpdateTaskStatus(int taskId, FlowFocus.Core.Enums.TaskStatus status, bool saveChanges = true);
 
     /// <summary>Получить повторяющиеся задачи-кандидаты для обработки планировщиком</summary>
     List<TaskItem> GetRecurringCandidatesForPlanner();
 
     /// <summary>Мутировать повторяющуюся задачу на месте (Scenario B)</summary>
     void MutateRecurringTaskInPlace(int taskId, DateTime assignedDate);
+
+    /// <summary>Сохранить пакетные изменения и уведомить UI 1 раз</summary>
+    void SaveChangesAndNotify();
 }

@@ -269,7 +269,7 @@ public class TaskRepository(
         }
     }
 
-    public void ApplyPriorityEscalation(int taskId, int targetPriorityId, IEnumerable<int> appliedEscalationIds)
+    public void ApplyPriorityEscalation(int taskId, int targetPriorityId, IEnumerable<int> appliedEscalationIds, bool saveChanges = true)
     {
         lock (CacheLock)
         {
@@ -289,12 +289,15 @@ public class TaskRepository(
                 escalation.LastChangesOn = DateTime.UtcNow;
             }
 
-            Context.SaveChanges();
-            MarkDirty();
+            if (saveChanges)
+            {
+                Context.SaveChanges();
+                MarkDirty();
+            }
         }
     }
 
-    public void NormalizeTaskDateSources()
+    public void NormalizeTaskDateSources(bool saveChanges = true)
     {
         lock (CacheLock)
         {
@@ -364,7 +367,7 @@ public class TaskRepository(
                 }
             }
 
-            if (hasChanges)
+            if (hasChanges && saveChanges)
             {
                 Context.SaveChanges();
                 MarkDirty();
@@ -372,7 +375,7 @@ public class TaskRepository(
         }
     }
 
-    public void UpdateTaskSchedule(int taskId, DateTime? scheduledDate, DateSource? dateSource = null) =>
+    public void UpdateTaskSchedule(int taskId, DateTime? scheduledDate, DateSource? dateSource = null, bool saveChanges = true) =>
         UpdatePartial(taskId, t =>
         {
             t.ScheduledDate = scheduledDate;
@@ -380,10 +383,10 @@ public class TaskRepository(
             {
                 t.DateSource = dateSource.Value;
             }
-        });
+        }, saveChanges);
 
-    public void UpdateTaskStatus(int taskId, TaskStatus status) =>
-        UpdatePartial(taskId, t => t.Status = status);
+    public void UpdateTaskStatus(int taskId, TaskStatus status, bool saveChanges = true) =>
+        UpdatePartial(taskId, t => t.Status = status, saveChanges);
 
     public void MutateRecurringTaskInPlace(int taskId, DateTime assignedDate) =>
         UpdatePartial(taskId, t =>

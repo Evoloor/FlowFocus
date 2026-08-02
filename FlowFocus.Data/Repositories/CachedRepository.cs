@@ -108,7 +108,7 @@ public abstract class CachedRepository<T>(StorageContext context, INotificationS
         }
     }
 
-    protected void UpdatePartial(int id, Action<T> updateAction)
+    protected void UpdatePartial(int id, Action<T> updateAction, bool saveChanges = true)
     {
         lock (CacheLock)
         {
@@ -116,8 +116,11 @@ public abstract class CachedRepository<T>(StorageContext context, INotificationS
             if (entity == null) return;
             updateAction(entity);
             entity.LastChangesOn = DateTime.UtcNow;
-            Context.SaveChanges();
-            MarkDirty();
+            if (saveChanges)
+            {
+                Context.SaveChanges();
+                MarkDirty();
+            }
         }
     }
 
@@ -153,5 +156,14 @@ public abstract class CachedRepository<T>(StorageContext context, INotificationS
     {
         Context.SaveChanges();
         MarkDirty();
+    }
+
+    public void SaveChangesAndNotify()
+    {
+        lock (CacheLock)
+        {
+            Context.SaveChanges();
+            MarkDirty();
+        }
     }
 }

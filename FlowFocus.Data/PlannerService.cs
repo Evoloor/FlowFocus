@@ -38,7 +38,8 @@ public class PlannerService(ITaskRepository taskRepository) : IPlannerService
             taskRepository.ApplyPriorityEscalation(
                 task.Id,
                 highestEscalation.TargetPriorityId,
-                escalations.Select(e => e.Id)
+                escalations.Select(e => e.Id),
+                saveChanges: false
             );
         }
     }
@@ -50,7 +51,7 @@ public class PlannerService(ITaskRepository taskRepository) : IPlannerService
     /// </summary>
     private void NormalizeTaskDateSources()
     {
-        taskRepository.NormalizeTaskDateSources();
+        taskRepository.NormalizeTaskDateSources(saveChanges: false);
     }
 
     /// <summary>
@@ -130,13 +131,13 @@ public class PlannerService(ITaskRepository taskRepository) : IPlannerService
             // Детальный просчёт только для "сегодня" и "завтра"
             if (currentDate <= tomorrow)
             {
-                taskRepository.UpdateTaskSchedule(task.Id, currentDate.ToDateTime());
+                taskRepository.UpdateTaskSchedule(task.Id, currentDate.ToDateTime(), saveChanges: false);
                 Console.WriteLine($"Planner: assigned non-recurring task {task.Id} '{task.Title}' -> {currentDate}");
             }
             else
             {
                 // Остальные задачи не имеют даты назначения
-                taskRepository.UpdateTaskSchedule(task.Id, null);
+                taskRepository.UpdateTaskSchedule(task.Id, null, saveChanges: false);
                 Console.WriteLine($"Planner: task {task.Id} '{task.Title}' beyond tomorrow, clearing ScheduledDate");
             }
 
@@ -156,6 +157,8 @@ public class PlannerService(ITaskRepository taskRepository) : IPlannerService
         ActualizePriorities();
         DistributeTasks(settings);
         UpdateBlockedStatuses();
+
+        taskRepository.SaveChangesAndNotify();
     }
 
     /// <summary>
@@ -182,12 +185,12 @@ public class PlannerService(ITaskRepository taskRepository) : IPlannerService
             // Если есть активные блокеры, устанавливаем статус Blocked
             if (hasActiveBlockers && task.Status != TaskStatus.Blocked)
             {
-                taskRepository.UpdateTaskStatus(task.Id, TaskStatus.Blocked);
+                taskRepository.UpdateTaskStatus(task.Id, TaskStatus.Blocked, saveChanges: false);
             }
             // Если нет активных блокеров, но статус Blocked, возвращаем к Planned
             else if (!hasActiveBlockers && task.Status == TaskStatus.Blocked)
             {
-                taskRepository.UpdateTaskStatus(task.Id, TaskStatus.Planned);
+                taskRepository.UpdateTaskStatus(task.Id, TaskStatus.Planned, saveChanges: false);
             }
         }
     }
