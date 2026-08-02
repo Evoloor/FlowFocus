@@ -367,6 +367,72 @@ public class TaskRepository(
                 }
             }
 
+            // 3. Нормализация приоритетов блокирующих задач
+            NormalizeBlockingTaskPriorities(saveChanges: false);
+
+            if (hasChanges && saveChanges)
+            {
+                Context.SaveChanges();
+                MarkDirty();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Нормализация приоритетов блокирующих задач:
+    /// Повышает приоритет всех блокирующих задач до уровня заблокированных (если текущий приоритет ниже).
+    /// </summary>
+    public void NormalizeBlockingTaskPriorities(bool saveChanges = true)
+    {
+        lock (CacheLock)
+        {
+            var hasChanges = false;
+
+            var activeTasks = Context.Tasks
+                .Include(t => t.Priority)
+                .Include(t => t.Relations)
+                .Include(t => t.InverseRelations)
+                .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant)
+                .ToList();
+
+            var prioritiesById = Context.Priorities.ToDictionary(p => p.Id);
+
+            bool changed;
+            do
+            {
+                changed = false;
+                foreach (var blockedTask in activeTasks)
+                {
+                    if (!blockedTask.PriorityId.HasValue) continue;
+                    if (!prioritiesById.TryGetValue(blockedTask.PriorityId.Value, out var blockedPriority)) continue;
+
+                    var blockingRelations = blockedTask.InverseRelations
+                        .Where(r => r.Type == RelationType.Blocks)
+                        .ToList();
+
+                    foreach (var relation in blockingRelations)
+                    {
+                        var blockingTask = activeTasks.FirstOrDefault(t => t.Id == relation.SourceTaskId);
+                        if (blockingTask == null) continue;
+
+                        int blockingOrder = int.MaxValue;
+                        if (blockingTask.PriorityId.HasValue && prioritiesById.TryGetValue(blockingTask.PriorityId.Value, out var blockingPriority))
+                        {
+                            blockingOrder = blockingPriority.Order;
+                        }
+
+                        // Меньший Order означает более высокий приоритет. Приоритет ниже = Order больше или null.
+                        if (blockingOrder > blockedPriority.Order)
+                        {
+                            blockingTask.PriorityId = blockedPriority.Id;
+                            blockingTask.LastChangesOn = DateTime.UtcNow;
+                            changed = true;
+                            hasChanges = true;
+                        }
+                    }
+                }
+            } while (changed);
+
             if (hasChanges && saveChanges)
             {
                 Context.SaveChanges();
