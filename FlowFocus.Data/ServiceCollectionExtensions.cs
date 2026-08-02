@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using FlowFocus.Core;
 using FlowFocus.Core.Services;
 using FlowFocus.Data.Repositories;
+using FlowFocus.Data.Services;
 
 namespace FlowFocus.Data;
 
@@ -23,6 +24,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITagRepository, TagRepository>();
 
         // Сервисы
+        services.AddScoped<ITaskRecurrenceService, TaskRecurrenceService>();
         services.AddScoped<IPlannerService, PlannerService>();
         services.AddScoped<ITagSessionService, TagSessionService>();
 
@@ -43,6 +45,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITagRepository, TagRepository>();
 
         // Сервисы
+        services.AddScoped<ITaskRecurrenceService, TaskRecurrenceService>();
         services.AddScoped<IPlannerService, PlannerService>();
         services.AddScoped<ITagSessionService, TagSessionService>();
 

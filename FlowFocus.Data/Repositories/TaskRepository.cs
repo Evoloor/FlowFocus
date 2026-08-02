@@ -2,18 +2,24 @@ using FlowFocus.Core;
 using FlowFocus.Core.Enums;
 using FlowFocus.Core.Models;
 using FlowFocus.Core.Services;
+using FlowFocus.Data.Repositories.Helpers;
+using FlowFocus.Data.Services;
 using Microsoft.EntityFrameworkCore;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Data.Repositories;
 
 /// <summary>
-/// Репозиторий задач
+/// Репозиторий задач (Чистый Data Access & Queries)
 /// </summary>
-public class TaskRepository(StorageContext context, INotificationService notificationService) 
+public class TaskRepository(
+    StorageContext context,
+    INotificationService notificationService,
+    ITaskRecurrenceService? recurrenceService = null)
     : CachedRepository<TaskItem>(context, notificationService), ITaskRepository
 {
     private readonly Lazy<TagRepository> _tagRepository = new(() => new TagRepository(context, notificationService));
+    private readonly ITaskRecurrenceService _recurrenceService = recurrenceService ?? new TaskRecurrenceService();
 
     protected override DbSet<TaskItem> GetDbSet() => Context.Tasks;
 
@@ -30,9 +36,9 @@ public class TaskRepository(StorageContext context, INotificationService notific
 
             entity.LastChangesOn = DateTime.UtcNow;
 
-            PrepareSubtasksForAdd(entity);
-            PrepareRelationsForAdd(entity);
-            PrepareEscalationsForAdd(entity);
+            TaskGraphSyncHelper.PrepareSubtasksForAdd(entity);
+            TaskGraphSyncHelper.PrepareRelationsForAdd(entity);
+            TaskGraphSyncHelper.PrepareEscalationsForAdd(entity);
 
             GetDbSet().Add(entity);
             Context.SaveChanges();
@@ -60,13 +66,15 @@ public class TaskRepository(StorageContext context, INotificationService notific
 
             Context.Entry(trackedEntity).CurrentValues.SetValues(entity);
 
-            UpdateTags(trackedEntity, entity);
-            UpdateSubtasks(trackedEntity, entity);
-            UpdateRelations(trackedEntity, entity);
-            UpdateEscalations(trackedEntity, entity);
+            var removedTagIds = TaskGraphSyncHelper.UpdateTags(Context, trackedEntity, entity);
+            TaskGraphSyncHelper.UpdateSubtasks(Context, trackedEntity, entity);
+            TaskGraphSyncHelper.UpdateRelations(Context, trackedEntity, entity);
+            TaskGraphSyncHelper.UpdateEscalations(Context, trackedEntity, entity);
 
             trackedEntity.LastChangesOn = DateTime.UtcNow;
             Context.SaveChanges();
+
+            CleanupTagsIfAny(removedTagIds);
             MarkDirty();
         }
     }
@@ -94,195 +102,6 @@ public class TaskRepository(StorageContext context, INotificationService notific
 
             CleanupTagsIfAny(tagIds);
             MarkDirty();
-        }
-    }
-
-    #endregion
-
-    #region Add Helpers
-
-    private static void PrepareSubtasksForAdd(TaskItem entity)
-    {
-        foreach (var subtask in entity.Subtasks)
-        {
-            subtask.ParentTaskId ??= entity.Id;
-            if (subtask.CreatedDate == default)
-            {
-                subtask.CreatedDate = DateTime.UtcNow;
-            }
-            subtask.Status = TaskStatus.Planned;
-        }
-    }
-
-    private static void PrepareRelationsForAdd(TaskItem entity)
-    {
-        for (var i = 0; i < entity.Relations.Count; i++)
-        {
-            var relation = entity.Relations[i];
-            
-            if (relation.SourceTaskId == 0)
-            {
-                relation.SourceTaskId = entity.Id;
-            }
-
-            if (relation.TargetTaskId == 0)
-            {
-                entity.Relations[i] = new TaskRelation
-                {
-                    Id = relation.Id > 0 ? relation.Id : 0,
-                    SourceTaskId = relation.SourceTaskId == 0 ? entity.Id : relation.SourceTaskId,
-                    TargetTaskId = entity.Id,
-                    Type = relation.Type,
-                    LastChangesOn = DateTime.UtcNow
-                };
-            }
-            else
-            {
-                relation.LastChangesOn = DateTime.UtcNow;
-            }
-        }
-    }
-
-    private static void PrepareEscalationsForAdd(TaskItem entity)
-    {
-        foreach (var escalation in entity.PriorityEscalations)
-        {
-            if (escalation.TaskId == 0)
-            {
-                escalation.TaskId = entity.Id;
-            }
-            escalation.LastChangesOn = DateTime.UtcNow;
-        }
-    }
-
-    #endregion
-
-    #region Update Helpers
-
-    private void UpdateTags(TaskItem tracked, TaskItem source)
-    {
-        var sourceTagIds = source.Tags.Select(st => st.TagId).ToHashSet();
-        var trackedTagIds = tracked.Tags.Select(tt => tt.TagId).ToHashSet();
-
-        var tagsToRemove = tracked.Tags.Where(tt => !sourceTagIds.Contains(tt.TagId)).ToList();
-        var removedTagIds = tagsToRemove.Select(tt => tt.TagId).ToList();
-
-        foreach (var tag in tagsToRemove)
-        {
-            Context.TaskTags.Remove(tag);
-        }
-
-        foreach (var sourceTag in source.Tags.Where(st => !trackedTagIds.Contains(st.TagId)))
-        {
-            Context.TaskTags.Add(new TaskTag
-            {
-                TaskId = tracked.Id,
-                TagId = sourceTag.TagId
-            });
-        }
-
-        CleanupTagsIfAny(removedTagIds);
-    }
-
-    private void UpdateSubtasks(TaskItem tracked, TaskItem source)
-    {
-        var subtasksToRemove = tracked.Subtasks
-            .Where(st => !source.Subtasks.Any(sst => sst.Id == st.Id && sst.Id > 0))
-            .ToList();
-
-        foreach (var subtask in subtasksToRemove)
-        {
-            Context.Tasks.Remove(subtask);
-        }
-
-        foreach (var sourceSubtask in source.Subtasks)
-        {
-            if (sourceSubtask.Id > 0)
-            {
-                var existing = tracked.Subtasks.FirstOrDefault(s => s.Id == sourceSubtask.Id);
-                if (existing != null)
-                {
-                    Context.Entry(existing).CurrentValues.SetValues(sourceSubtask);
-                }
-            }
-            else
-            {
-                sourceSubtask.ParentTaskId = tracked.Id;
-                Context.Tasks.Add(sourceSubtask);
-            }
-        }
-    }
-
-    private void UpdateRelations(TaskItem tracked, TaskItem source)
-    {
-        var desired = source.Relations ?? [];
-        var trackedAll = (tracked.Relations ?? []).Concat(tracked.InverseRelations ?? []).ToList();
-
-        var toRemove = trackedAll.Where(r =>
-            !((r.Id > 0 && desired.Any(d => d.Id > 0 && d.Id == r.Id)) ||
-              desired.Any(d => d.SourceTaskId == r.SourceTaskId && d.TargetTaskId == r.TargetTaskId && d.Type == r.Type))
-        ).ToList();
-
-        foreach (var rel in toRemove)
-        {
-            Context.TaskRelations.Remove(rel);
-        }
-
-        foreach (var desiredRel in desired)
-        {
-            TaskRelation? existing = null;
-
-            if (desiredRel.Id > 0)
-            {
-                existing = trackedAll.FirstOrDefault(r => r.Id == desiredRel.Id);
-            }
-
-            existing ??= trackedAll.FirstOrDefault(r => 
-                r.SourceTaskId == desiredRel.SourceTaskId && 
-                r.TargetTaskId == desiredRel.TargetTaskId && 
-                r.Type == desiredRel.Type);
-
-            if (existing != null)
-            {
-                Context.Entry(existing).CurrentValues.SetValues(desiredRel);
-            }
-            else
-            {
-                if (desiredRel.SourceTaskId == 0)
-                {
-                    desiredRel.SourceTaskId = tracked.Id;
-                }
-                Context.TaskRelations.Add(desiredRel);
-            }
-        }
-    }
-
-    private void UpdateEscalations(TaskItem tracked, TaskItem source)
-    {
-        var escalationsToRemove = tracked.PriorityEscalations
-            .Where(e => !source.PriorityEscalations.Any(se => se.Id == e.Id && se.Id > 0))
-            .ToList();
-
-        foreach (var escalation in escalationsToRemove)
-        {
-            Context.PriorityEscalations.Remove(escalation);
-        }
-
-        foreach (var sourceEscalation in source.PriorityEscalations)
-        {
-            if (sourceEscalation.Id > 0)
-            {
-                var existing = tracked.PriorityEscalations.FirstOrDefault(e => e.Id == sourceEscalation.Id);
-                if (existing != null)
-                {
-                    Context.Entry(existing).CurrentValues.SetValues(sourceEscalation);
-                }
-            }
-            else
-            {
-                sourceEscalation.TaskId = tracked.Id;
-                Context.PriorityEscalations.Add(sourceEscalation);
-            }
         }
     }
 
@@ -418,7 +237,13 @@ public class TaskRepository(StorageContext context, INotificationService notific
         if (task.IsRecurring && task.RecurrenceType != RecurrenceType.None)
         {
             task.CompletedDate = completedDate;
-            CreateNextRecurrence(task);
+            _recurrenceService.HandleTaskCompletionRecurrence(
+                task,
+                (sourceId, start, end) => Context.Tasks.AsNoTracking().Any(t =>
+                    ((t.RecurrenceSourceId.HasValue && t.RecurrenceSourceId.Value == sourceId) ||
+                     (!t.RecurrenceSourceId.HasValue && t.Id == sourceId))
+                    && t.ScheduledDate.HasValue && t.ScheduledDate.Value >= start && t.ScheduledDate.Value < end),
+                Add);
         }
     }
 
@@ -519,119 +344,4 @@ public class TaskRepository(StorageContext context, INotificationService notific
     }
 
     #endregion
-
-    #region Recurrence Rules
-
-    private void CreateNextRecurrence(TaskItem sourceTask)
-    {
-        try
-        {
-            var nextDate = CalculateNextRecurrenceDate(sourceTask);
-            if (nextDate == null) return;
-
-            var sourceId = sourceTask.RecurrenceSourceId ?? sourceTask.Id;
-            var start = nextDate.Value.Date;
-            var end = start.AddDays(1);
-
-            var exists = Context.Tasks
-                .AsNoTracking()
-                .Any(t => ((t.RecurrenceSourceId.HasValue && t.RecurrenceSourceId.Value == sourceId) ||
-                           (!t.RecurrenceSourceId.HasValue && t.Id == sourceId))
-                          && t.ScheduledDate.HasValue && t.ScheduledDate.Value >= start && t.ScheduledDate.Value < end);
-
-            if (exists) return;
-
-            var newTask = CloneTaskItem(sourceTask, isParent: true, scheduledDate: nextDate, dateSource: DateSource.AutoFixed, recurrenceSourceId: sourceId);
-
-            Add(newTask);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"CreateNextRecurrence error for task {sourceTask?.Id}: {ex}");
-        }
-    }
-
-    private TaskItem CloneTaskItem(
-        TaskItem source, 
-        bool isParent, 
-        DateTime? scheduledDate = null, 
-        DateSource? dateSource = null, 
-        int? recurrenceSourceId = null) => new()
-    {
-        Title = source.Title,
-        Description = source.Description,
-        Status = TaskStatus.Planned,
-        PriorityId = source.PriorityId,
-        Interest = source.Interest,
-        Complexity = source.Complexity,
-        EstimatedMinutes = source.EstimatedMinutes,
-        IsFavorite = source.IsFavorite,
-        HideUnderSpoiler = source.HideUnderSpoiler,
-        ScheduledDate = isParent ? (scheduledDate ?? source.ScheduledDate) : null,
-        DateSource = isParent ? (dateSource ?? source.DateSource) : DateSource.AutoFlexible,
-        IsRecurring = source.IsRecurring,
-        RecurrenceType = source.RecurrenceType,
-        RecurrenceInterval = source.RecurrenceInterval,
-        RecurrenceWeekDays = source.RecurrenceWeekDays,
-        RecurrenceSourceId = isParent ? (recurrenceSourceId ?? source.RecurrenceSourceId) : null,
-        CreatedDate = DateTime.UtcNow,
-        Tags = source.Tags?.Select(t => new TaskTag { TagId = t.TagId }).ToList() ?? [],
-        PriorityEscalations = source.PriorityEscalations?
-            .Select(e => new PriorityEscalation { TargetPriorityId = e.TargetPriorityId, EscalationDate = e.EscalationDate, IsApplied = e.IsApplied })
-            .ToList() ?? [],
-        Subtasks = source.Subtasks?.Select(s => CloneTaskItem(s, isParent: false)).ToList() ?? []
-    };
-
-    private static DateTime? CalculateNextRecurrenceDate(TaskItem task)
-    {
-        var completedDate = task.CompletedDate ?? TodoDay.Today.ToDateTime();
-        var assignedDate = task.ScheduledDate ?? completedDate;
-        var baseDate = completedDate.Date >= assignedDate.Date ? completedDate.Date : assignedDate.Date;
-
-        return task.RecurrenceType switch
-        {
-            RecurrenceType.Daily => baseDate.AddDays(1),
-            RecurrenceType.EveryNDays => baseDate.AddDays(task.RecurrenceInterval ?? 1),
-            RecurrenceType.WeekDays => CalculateNextWeekDayDate(baseDate, task.RecurrenceWeekDays ?? 0),
-            RecurrenceType.Monthly => CalculateNextMonthDate(baseDate, task.RecurrenceInterval ?? 1),
-            RecurrenceType.Yearly => CalculateNextYearDate(baseDate, task.RecurrenceInterval ?? 1),
-            _ => null
-        };
-    }
-
-    private static DateTime CalculateNextMonthDate(DateTime baseDate, int monthsInterval)
-    {
-        var interval = monthsInterval <= 0 ? 1 : monthsInterval;
-        var target = baseDate.AddMonths(interval);
-        var daysInTarget = DateTime.DaysInMonth(target.Year, target.Month);
-        return new DateTime(target.Year, target.Month, Math.Min(baseDate.Day, daysInTarget));
-    }
-
-    private static DateTime CalculateNextYearDate(DateTime baseDate, int yearsInterval)
-    {
-        var interval = yearsInterval <= 0 ? 1 : yearsInterval;
-        var targetYear = baseDate.Year + interval;
-        var daysInTarget = DateTime.DaysInMonth(targetYear, baseDate.Month);
-        return new DateTime(targetYear, baseDate.Month, Math.Min(baseDate.Day, daysInTarget));
-    }
-
-    private static DateTime CalculateNextWeekDayDate(DateTime baseDate, int weekDaysMask)
-    {
-        var currentDay = (int)baseDate.DayOfWeek;
-
-        for (var i = 1; i <= 7; i++)
-        {
-            var nextDay = (currentDay + i) % 7;
-            var nextMaskDay = nextDay == 0 ? 64 : 1 << (nextDay - 1);
-
-            if ((weekDaysMask & nextMaskDay) != 0)
-            {
-                return baseDate.AddDays(i);
-            }
-        }
-
-        return baseDate.AddDays(7);
-    }
-
-    #endregion
-}
+}
