@@ -298,20 +298,77 @@ public class TaskRepository(
     {
         lock (CacheLock)
         {
+            var hasChanges = false;
+
+            // 1. Нормализация неназначенных дат: если ScheduledDate == null и DateSource не AutoFlexible
             var tasksToNormalize = Context.Tasks
                 .Where(t => t.ScheduledDate == null && (t.DateSource == DateSource.Manual || t.DateSource == DateSource.AutoFixed))
                 .ToList();
 
-            if (tasksToNormalize.Count == 0) return;
-
-            foreach (var task in tasksToNormalize)
+            if (tasksToNormalize.Count > 0)
             {
-                task.DateSource = DateSource.AutoFlexible;
-                task.LastChangesOn = DateTime.UtcNow;
+                foreach (var task in tasksToNormalize)
+                {
+                    task.DateSource = DateSource.AutoFlexible;
+                    task.LastChangesOn = DateTime.UtcNow;
+                }
+                hasChanges = true;
             }
 
-            Context.SaveChanges();
-            MarkDirty();
+            // 2. Нормализация повторяющихся задач: проверка на просроченность и сброс слишком далеких дат
+            var today = TodoDay.Today;
+            var todayDt = today.ToDateTime();
+
+            // Собираем из базы все задачи для анализа серии повторений без N+1 запросов
+            var allTasks = Context.Tasks.AsNoTracking().ToList();
+
+            var lastCompletedDates = allTasks
+                .Where(t => t.Status == TaskStatus.Completed && t.CompletedDate.HasValue)
+                .GroupBy(t => t.RecurrenceSourceId ?? t.Id)
+                .ToDictionary(g => g.Key, g => g.Max(t => t.CompletedDate!.Value));
+
+            var activeRecurringTasks = Context.Tasks
+                .Where(t => t.ParentTaskId == null)
+                .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
+                .Where(t => t.IsRecurring || t.RecurrenceSourceId != null)
+                .Where(t => t.DateSource != DateSource.Manual)
+                .ToList();
+
+            foreach (var task in activeRecurringTasks)
+            {
+                var sourceId = task.RecurrenceSourceId ?? task.Id;
+                DateTime? nextDate = null;
+
+                if (lastCompletedDates.TryGetValue(sourceId, out var lastCompleted))
+                {
+                    nextDate = _recurrenceService.CalculateNextRecurrenceDateFromBase(task, lastCompleted);
+                }
+
+                // Если задача не выполнялась вовсе или рассчитанный очередной срок <= today, значит просрочена/должна выполняться сегодня
+                DateTime targetDate;
+                if (nextDate == null || nextDate.Value.Date <= todayDt.Date)
+                {
+                    targetDate = todayDt;
+                }
+                else
+                {
+                    targetDate = nextDate.Value.Date;
+                }
+
+                if (task.ScheduledDate != targetDate || task.DateSource != DateSource.AutoFixed)
+                {
+                    task.ScheduledDate = targetDate;
+                    task.DateSource = DateSource.AutoFixed;
+                    task.LastChangesOn = DateTime.UtcNow;
+                    hasChanges = true;
+                }
+            }
+
+            if (hasChanges)
+            {
+                Context.SaveChanges();
+                MarkDirty();
+            }
         }
     }
 

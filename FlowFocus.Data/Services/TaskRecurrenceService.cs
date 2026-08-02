@@ -18,6 +18,11 @@ public class TaskRecurrenceService : ITaskRecurrenceService
         var assignedDate = task.ScheduledDate ?? completedDate;
         var baseDate = completedDate.Date >= assignedDate.Date ? completedDate.Date : assignedDate.Date;
 
+        return CalculateNextRecurrenceDateFromBase(task, baseDate);
+    }
+
+    public DateTime? CalculateNextRecurrenceDateFromBase(TaskItem task, DateTime baseDate)
+    {
         return task.RecurrenceType switch
         {
             RecurrenceType.Daily => baseDate.AddDays(1),
