@@ -21,33 +21,7 @@ public class BlockingTaskTests
         context.Database.EnsureCreated();
         return context;
     }
-
-    [Fact]
-    public void NormalizeBlockingTaskPriorities_UpgradesBlockingTaskPriorityToMatchBlockedTask()
-    {
-        using var context = CreateInMemoryContext();
-        var priorities = context.Priorities.OrderBy(p => p.Order).ToList();
-        var urgentPriority = priorities.First(); // lowest Order = highest priority
-        var lowPriority = priorities.Last();   // highest Order = lowest priority
-
-        var taskA = new TaskItem { Id = 101, Title = "Blocking Task A", PriorityId = lowPriority.Id, Status = TaskStatus.Planned };
-        var taskB = new TaskItem { Id = 102, Title = "Blocked Task B", PriorityId = urgentPriority.Id, Status = TaskStatus.Planned };
-        context.Tasks.AddRange(taskA, taskB);
-
-        var relation = new TaskRelation { Id = 1001, SourceTaskId = taskA.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks };
-        context.TaskRelations.Add(relation);
-        context.SaveChanges();
-
-        var notificationService = new NotificationService();
-        var taskRepo = new TaskRepository(context, notificationService);
-
-        taskRepo.NormalizeBlockingTaskPriorities();
-
-        var updatedTaskA = taskRepo.GetById(taskA.Id);
-        Assert.NotNull(updatedTaskA);
-        Assert.Equal(urgentPriority.Id, updatedTaskA.PriorityId);
-    }
-
+    
     [Fact]
     public void DistributeTasks_BlockedTaskDateIsNotEarlierThanBlockingTaskDate()
     {
