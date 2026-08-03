@@ -66,8 +66,14 @@ public class PlannerService(ITaskRepository taskRepository) : IPlannerService
         // мутируем их на месте (Scenario B из спецификации).
         HandleRecurringBeforeDistribution(settings);
 
+        var allTasks = taskRepository.GetAll();
+        var allTasksById = allTasks.ToDictionary(t => t.Id);
+
+        // Перевод блокеров в AutoFixed выполняется СТРОГО при дефиците доступного времени до мануальной даты заблокированной задачи
+        ConvertDeficitBlockersToAutoFixed(allTasks, allTasksById, settings);
+
         // Задачи с AutoFlexible — кандидаты для авто-распределения
-        var tasks = taskRepository.GetAll()
+        var tasks = allTasks
             .Where(t => t.ParentTaskId == null) // Исключаем подзадачи
             .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
             // Только задачи, которые плановик может свободно перемещать
@@ -76,23 +82,28 @@ public class PlannerService(ITaskRepository taskRepository) : IPlannerService
             .Where(t => t is { IsRecurring: false, RecurrenceSourceId: null })
             .ToList();
 
-        // Сортировка по релевантности
-        var sortedTasks = tasks
-            .OrderBy(GetEffectivePriorityOrder)
-            .ThenBy(t => t.TotalEstimatedMinutes <= AppConfig.ShortTaskThreshold ? 0 : 1) // Короткие первые
-            .ThenByDescending(t => t.Interest ?? 0)
-            .ToList();
+        var candidateTasksById = tasks.ToDictionary(t => t.Id);
+
+        // Сортировка по релевантности с учетом топологического порядка (блокирующие перед заблокированными)
+        var sortedTasks = TopologicalSortTasks(tasks, candidateTasksById);
 
         var today = TodoDay.Today;
         var tomorrow = today.AddDays(1);
 
         // Собираем все задачи (Manual / AutoFixed), у которых уже зафиксирована дата
-        var fixedTasks = taskRepository.GetAll()
+        var fixedTasks = allTasks
             .Where(t => t.ParentTaskId == null)
             .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
             .Where(t => t.DateSource == DateSource.Manual || t.DateSource == DateSource.AutoFixed)
             .Where(t => t.ScheduledDate.HasValue)
             .ToList();
+
+        // Карта вируальных рассчитанных дней плановика (для предотвращения ложного сброса в null при выходе блокера за tomorrow)
+        var calculatedDayByTaskId = new Dictionary<int, TodoDay>();
+        foreach (var ft in fixedTasks)
+        {
+            calculatedDayByTaskId[ft.Id] = new TodoDay(ft.ScheduledDate!.Value);
+        }
 
         // Заполняем стартовую статистику на сегодня и на завтра на основе фиксированных задач
         DailyStats todayStats = new();
@@ -114,12 +125,48 @@ public class PlannerService(ITaskRepository taskRepository) : IPlannerService
             }
         }
 
-        var currentDate = today;
-        DailyStats dailyStats = todayStats;
-
         foreach (var task in sortedTasks)
         {
+            // Находим активных блокеров текущей задачи через единый словарь в памяти
+            var activeBlockers = task.InverseRelations
+                .Where(r => r.Type == RelationType.Blocks)
+                .Select(r => allTasksById.GetValueOrDefault(r.SourceTaskId))
+                .Where(b => b != null && b.Status != TaskStatus.Completed && b.Status != TaskStatus.Irrelevant)
+                .ToList();
+
+            // Задачи без блокировок не участвуют в ограничении даты
+            TodoDay minAllowedDay = today;
+            bool cannotBeScheduled = false;
+
+            if (activeBlockers.Count > 0)
+            {
+                // Проверяем, был ли каждый активный блокер рассчитан/назначен на какой-либо день (даже выходящий за пределы tomorrow).
+                // Если блокер не был рассчитан вовсе, то заблокированная задача не может быть назначена.
+                if (activeBlockers.Any(b => !calculatedDayByTaskId.ContainsKey(b!.Id)))
+                {
+                    cannotBeScheduled = true;
+                }
+                else
+                {
+                    var maxBlockerDay = activeBlockers.Max(b => calculatedDayByTaskId[b!.Id]);
+                    if (maxBlockerDay > minAllowedDay)
+                    {
+                        minAllowedDay = maxBlockerDay;
+                    }
+                }
+            }
+
+            if (cannotBeScheduled)
+            {
+                task.ScheduledDate = null;
+                taskRepository.UpdateTaskSchedule(task.Id, null, saveChanges: false);
+                Console.WriteLine($"Planner: task {task.Id} '{task.Title}' blocked by unassigned blocker, clearing ScheduledDate");
+                continue;
+            }
+
             var isLargeTask = IsLargeTask(task, settings);
+            var currentDate = minAllowedDay;
+            DailyStats dailyStats = currentDate == today ? todayStats : (currentDate == tomorrow ? tomorrowStats : new DailyStats());
 
             // Проверяем лимиты для текущего дня. Если превышен, пытаемся перейти на следующий день.
             while (!CanAddToDay(task, dailyStats, settings, isLargeTask))
@@ -128,15 +175,20 @@ public class PlannerService(ITaskRepository taskRepository) : IPlannerService
                 dailyStats = currentDate == tomorrow ? tomorrowStats : new DailyStats();
             }
 
+            // Фиксируем рассчитанный виртуальный день плановика
+            calculatedDayByTaskId[task.Id] = currentDate;
+
             // Детальный просчёт только для "сегодня" и "завтра"
             if (currentDate <= tomorrow)
             {
-                taskRepository.UpdateTaskSchedule(task.Id, currentDate.ToDateTime(), saveChanges: false);
+                task.ScheduledDate = currentDate.ToDateTime();
+                taskRepository.UpdateTaskSchedule(task.Id, task.ScheduledDate, saveChanges: false);
                 Console.WriteLine($"Planner: assigned non-recurring task {task.Id} '{task.Title}' -> {currentDate}");
             }
             else
             {
                 // Остальные задачи не имеют даты назначения
+                task.ScheduledDate = null;
                 taskRepository.UpdateTaskSchedule(task.Id, null, saveChanges: false);
                 Console.WriteLine($"Planner: task {task.Id} '{task.Title}' beyond tomorrow, clearing ScheduledDate");
             }
@@ -219,6 +271,175 @@ public class PlannerService(ITaskRepository taskRepository) : IPlannerService
         if (stats.TotalMinutes + task.TotalEstimatedMinutes > settings.DailyTimeLimit) return false;
 
         return true;
+    }
+
+    /// <summary>
+    /// Переводит блокеров в AutoFixed СТРОГО в случае дефицита доступной емкости до даты заблокированной задачи.
+    /// Если блокеры свободно помещаются в лимиты до этой даты, они остаются AutoFlexible.
+    /// </summary>
+    private void ConvertDeficitBlockersToAutoFixed(List<TaskItem> allTasks, Dictionary<int, TaskItem> allTasksById, UserSettings settings)
+    {
+        var today = TodoDay.Today.ToDateTime();
+
+        var fixedBlockedTasks = allTasks
+            .Where(t => t.ParentTaskId == null)
+            .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
+            .Where(t => t.DateSource == DateSource.Manual || t.DateSource == DateSource.AutoFixed)
+            .Where(t => t.ScheduledDate.HasValue)
+            .Where(t => t.InverseRelations.Any(r => r.Type == RelationType.Blocks))
+            .ToList();
+
+        if (fixedBlockedTasks.Count == 0) return;
+
+        var dailyLimit = Math.Max(1, settings.DailyTimeLimit);
+
+        // Фиксированные задачи для расчёта задействованной емкости
+        var fixedTasks = allTasks
+            .Where(t => t.ParentTaskId == null)
+            .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
+            .Where(t => t.DateSource == DateSource.Manual || t.DateSource == DateSource.AutoFixed)
+            .Where(t => t.ScheduledDate.HasValue)
+            .ToList();
+
+        var fixedMinutesPerDay = fixedTasks
+            .GroupBy(t => t.ScheduledDate!.Value.Date)
+            .ToDictionary(g => g.Key, g => g.Sum(t => t.TotalEstimatedMinutes));
+
+        foreach (var blockedTask in fixedBlockedTasks)
+        {
+            var targetDate = blockedTask.ScheduledDate!.Value.Date;
+            if (targetDate < today) targetDate = today;
+
+            var autoFlexibleBlockers = GetActiveBlockersRecursive(blockedTask, allTasksById)
+                .Where(b => b.DateSource == DateSource.AutoFlexible)
+                .ToList();
+
+            if (autoFlexibleBlockers.Count == 0) continue;
+
+            // Расчет доступной емкости до targetDate включительно
+            int availableCapacity = 0;
+            for (var d = today.Date; d <= targetDate; d = d.AddDays(1))
+            {
+                int used = fixedMinutesPerDay.GetValueOrDefault(d, 0);
+                availableCapacity += Math.Max(0, dailyLimit - used);
+            }
+
+            int totalBlockerMinutes = autoFlexibleBlockers.Sum(b => b.TotalEstimatedMinutes);
+            int deficit = totalBlockerMinutes - availableCapacity;
+
+            // Если дефицита нет, задачи остаются AutoFlexible и планируются в обычном потоке
+            if (deficit <= 0) continue;
+
+            int convertedMinutes = 0;
+            foreach (var blocker in autoFlexibleBlockers)
+            {
+                blocker.ScheduledDate = targetDate;
+                blocker.DateSource = DateSource.AutoFixed;
+                taskRepository.UpdateTaskSchedule(blocker.Id, targetDate, DateSource.AutoFixed, saveChanges: false);
+
+                // Обновляем карту фиксированных минут для targetDate, чтобы последующие фиксированные задачи учитывали эту нагрузку
+                fixedMinutesPerDay[targetDate] = fixedMinutesPerDay.GetValueOrDefault(targetDate, 0) + blocker.TotalEstimatedMinutes;
+
+                convertedMinutes += Math.Max(1, blocker.TotalEstimatedMinutes);
+                if (convertedMinutes >= deficit)
+                    break;
+            }
+        }
+    }
+
+    private List<TaskItem> GetActiveBlockersRecursive(TaskItem task, Dictionary<int, TaskItem> allTasksById)
+    {
+        var visited = new HashSet<int>();
+        var result = new List<TaskItem>();
+        var queue = new Queue<TaskItem>();
+        queue.Enqueue(task);
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            var activeBlockerRelations = current.InverseRelations
+                .Where(r => r.Type == RelationType.Blocks)
+                .ToList();
+
+            foreach (var rel in activeBlockerRelations)
+            {
+                if (allTasksById.TryGetValue(rel.SourceTaskId, out var blocker))
+                {
+                    if (blocker.Status != TaskStatus.Completed && blocker.Status != TaskStatus.Irrelevant)
+                    {
+                        if (visited.Add(blocker.Id))
+                        {
+                            result.Add(blocker);
+                            queue.Enqueue(blocker);
+                        }
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private List<TaskItem> TopologicalSortTasks(List<TaskItem> tasks, Dictionary<int, TaskItem> candidateTasksById)
+    {
+        var candidateIds = tasks.Select(t => t.Id).ToHashSet();
+        var inDegree = tasks.ToDictionary(t => t.Id, _ => 0);
+        var dependents = tasks.ToDictionary(t => t.Id, _ => new List<int>());
+
+        foreach (var task in tasks)
+        {
+            var blockerIds = task.InverseRelations
+                .Where(r => r.Type == RelationType.Blocks)
+                .Select(r => r.SourceTaskId)
+                .Where(id => candidateIds.Contains(id))
+                .Distinct();
+
+            foreach (var blockerId in blockerIds)
+            {
+                inDegree[task.Id]++;
+                if (!dependents.ContainsKey(blockerId))
+                    dependents[blockerId] = [];
+                dependents[blockerId].Add(task.Id);
+            }
+        }
+
+        var result = new List<TaskItem>();
+        var available = tasks.Where(t => inDegree[t.Id] == 0).ToList();
+
+        while (available.Count > 0)
+        {
+            var best = available
+                .OrderBy(GetEffectivePriorityOrder)
+                .ThenBy(t => t.TotalEstimatedMinutes <= AppConfig.ShortTaskThreshold ? 0 : 1)
+                .ThenByDescending(t => t.Interest ?? 0)
+                .First();
+
+            available.Remove(best);
+            result.Add(best);
+
+            if (dependents.TryGetValue(best.Id, out var childIds))
+            {
+                foreach (var childId in childIds)
+                {
+                    inDegree[childId]--;
+                    if (inDegree[childId] == 0 && candidateTasksById.TryGetValue(childId, out var childTask))
+                    {
+                        available.Add(childTask);
+                    }
+                }
+            }
+        }
+
+        if (result.Count < tasks.Count)
+        {
+            var remaining = tasks.Where(t => !result.Contains(t))
+                .OrderBy(GetEffectivePriorityOrder)
+                .ThenBy(t => t.TotalEstimatedMinutes <= AppConfig.ShortTaskThreshold ? 0 : 1)
+                .ThenByDescending(t => t.Interest ?? 0);
+            result.AddRange(remaining);
+        }
+
+        return result;
     }
 
     /// <summary>

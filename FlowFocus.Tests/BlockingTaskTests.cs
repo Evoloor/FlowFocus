@@ -27,8 +27,8 @@ public class BlockingTaskTests
     {
         using var context = CreateInMemoryContext();
         var priorities = context.Priorities.OrderBy(p => p.Order).ToList();
-        var urgentPriority = priorities.First(); // lowest Order = highest priority
-        var lowPriority = priorities.Last();   // highest Order = lowest priority
+        var urgentPriority = priorities.First();
+        var lowPriority = priorities.Last();
 
         var taskA = new TaskItem { Id = 101, Title = "Blocking Task A", PriorityId = lowPriority.Id, Status = TaskStatus.Planned };
         var taskB = new TaskItem { Id = 102, Title = "Blocked Task B", PriorityId = urgentPriority.Id, Status = TaskStatus.Planned };
@@ -79,14 +79,14 @@ public class BlockingTaskTests
     }
 
     [Fact]
-    public void ApproachingDeadline_ConvertsBlockersToAutoFixedWhenBufferExhausted()
+    public void DistributeTasks_LeavesBlockerAutoFlexibleWhenNoDeficit()
     {
         using var context = CreateInMemoryContext();
         var today = TodoDay.Today.ToDateTime();
         var tomorrow = today.AddDays(1);
 
-        var taskA = new TaskItem { Id = 301, Title = "Blocking Task A", DateSource = DateSource.AutoFlexible, Status = TaskStatus.Planned, EstimatedMinutes = 300 };
-        var taskB = new TaskItem { Id = 302, Title = "Blocked Task B with Manual Date", ScheduledDate = tomorrow, DateSource = DateSource.Manual, Status = TaskStatus.Planned, EstimatedMinutes = 300 };
+        var taskA = new TaskItem { Id = 301, Title = "Blocking Task A", DateSource = DateSource.AutoFlexible, Status = TaskStatus.Planned, EstimatedMinutes = 60 };
+        var taskB = new TaskItem { Id = 302, Title = "Blocked Task B with Manual Date", ScheduledDate = tomorrow, DateSource = DateSource.Manual, Status = TaskStatus.Planned, EstimatedMinutes = 60 };
         context.Tasks.AddRange(taskA, taskB);
 
         var relation = new TaskRelation { Id = 3001, SourceTaskId = taskA.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks };
@@ -97,14 +97,43 @@ public class BlockingTaskTests
         var taskRepo = new TaskRepository(context, notificationService);
         var plannerService = new PlannerService(taskRepo);
 
-        // Daily limit 300 mins. Total time A+B = 600 mins -> required days = 2.
-        // Start date = tomorrow - 1 day = Today. Since start date <= Today, deadline is approaching!
-        var settings = new UserSettings { DailyTimeLimit = 300, DailyComplexityLimit = 100, DailyTaskLimit = 10 };
+        // Limit 480 mins/day. Blocker takes 60 mins. Capacity is plenty -> NO deficit!
+        var settings = new UserSettings { DailyTimeLimit = 480, DailyComplexityLimit = 100, DailyTaskLimit = 10 };
+        plannerService.DistributeTasks(settings);
+
+        var updatedTaskA = taskRepo.GetById(taskA.Id);
+        Assert.NotNull(updatedTaskA);
+        Assert.Equal(DateSource.AutoFlexible, updatedTaskA.DateSource);
+    }
+
+    [Fact]
+    public void DistributeTasks_ConvertsBlockerToAutoFixedWhenTimeDeficitExists()
+    {
+        using var context = CreateInMemoryContext();
+        var today = TodoDay.Today.ToDateTime();
+
+        // Fixed task taking up most of today's limit
+        var fixedTaskToday = new TaskItem { Id = 400, Title = "Heavy Today", ScheduledDate = today, DateSource = DateSource.Manual, Status = TaskStatus.Planned, EstimatedMinutes = 450 };
+        var taskA = new TaskItem { Id = 401, Title = "Blocking Task A", DateSource = DateSource.AutoFlexible, Status = TaskStatus.Planned, EstimatedMinutes = 100 };
+        var taskB = new TaskItem { Id = 402, Title = "Blocked Task B with Manual Today", ScheduledDate = today, DateSource = DateSource.Manual, Status = TaskStatus.Planned, EstimatedMinutes = 50 };
+        context.Tasks.AddRange(fixedTaskToday, taskA, taskB);
+
+        var relation = new TaskRelation { Id = 4001, SourceTaskId = taskA.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks };
+        context.TaskRelations.Add(relation);
+        context.SaveChanges();
+
+        var notificationService = new NotificationService();
+        var taskRepo = new TaskRepository(context, notificationService);
+        var plannerService = new PlannerService(taskRepo);
+
+        // Daily limit 480 mins. Today used by fixedTaskToday = 450 mins. Available capacity today = 30 mins.
+        // Task A needs 100 mins. 100 > 30 -> DEFICIT!
+        var settings = new UserSettings { DailyTimeLimit = 480, DailyComplexityLimit = 100, DailyTaskLimit = 10 };
         plannerService.DistributeTasks(settings);
 
         var updatedTaskA = taskRepo.GetById(taskA.Id);
         Assert.NotNull(updatedTaskA);
         Assert.Equal(DateSource.AutoFixed, updatedTaskA.DateSource);
-        Assert.Equal(tomorrow, updatedTaskA.ScheduledDate);
+        Assert.Equal(today, updatedTaskA.ScheduledDate);
     }
 }
