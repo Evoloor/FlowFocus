@@ -11,7 +11,6 @@ namespace FlowFocus.Tests;
 [Collection("StaticState")]
 public class SubtasksEngineTests
 {
-
     public class Aggregation
     {
         [Fact]
@@ -91,5 +90,51 @@ public class SubtasksEngineTests
             subtask.ScheduledDate.Should().BeNull();
         }
     }
-   
+
+    [Fact]
+    public void SubtaskPriority_ExceedingParentPriority_ThrowsValidationError()
+    {
+        // Arrange: В FlowFocus свойство Order задаёт вес приоритета (меньше значение = выше приоритет).
+        // Medium (Order = 3), High (Order = 2 — выше приоритета родителя).
+        var parentPriority = PriorityLevelBuilder.Medium;
+        var subtaskPriority = PriorityLevelBuilder.High;
+        var parentTask = new TaskItemBuilder()
+            .WithId(10)
+            .WithPriority(parentPriority)
+            .Build();
+        var subtask = new TaskItemBuilder()
+            .WithId(11)
+            .WithPriority(subtaskPriority)
+            .WithParentTask(parentTask)
+            .Build();
+        // Act: Вызов валидатора иерархии подзадач
+        // TODO: убедиться, что нужна эта валидация в этом методе и в SubtaskDates_MismatchingParent_ThrowsValidationError
+        var act = () => TaskHierarchyValidator.ValidateSubtaskParent(parentTask, subtask);
+        // Assert
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*приоритет не может быть выше приоритета родительской*");
+    }
+
+    [Fact]
+    public void SubtaskDates_MismatchingParent_ThrowsValidationError()
+    {
+        // Arrange: В FlowFocus используется единая дата ScheduledDate.
+        // Дата подзадачи не должна быть позже или отличаться от даты родительской задачи.
+        var parentDate = new DateTime(2026, 8, 10);
+
+        var parentTask = new TaskItemBuilder()
+            .WithId(20)
+            .WithScheduledDate(parentDate)
+            .Build();
+        var subtask = new TaskItemBuilder()
+            .WithId(21)
+            .WithScheduledDate(new DateTime(2026, 8, 11)) // Дата позже parentDate
+            .WithParentTask(parentTask)
+            .Build();
+        // Act
+        var act = () => TaskHierarchyValidator.ValidateSubtaskParent(parentTask, subtask);
+        // Assert
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*даты назначения должны совпадать, а дата не может быть позже*");
+    }
 }

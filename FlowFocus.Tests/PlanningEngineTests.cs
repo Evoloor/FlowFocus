@@ -16,7 +16,6 @@ namespace FlowFocus.Tests;
 [Collection("StaticState")]
 public class PlanningEngineTests
 {
-
     public class SortingRules
     {
         [Fact]
@@ -507,5 +506,68 @@ public class PlanningEngineTests
             date1AfterSecond.Should().Be(date1AfterFirst);
             date2AfterSecond.Should().Be(date2AfterFirst);
         }
+    }
+
+    [Fact]
+    public void InactiveTasks_CompletedOrIrrelevantToday_ConsumeDailyLimitsForAutoFlexible()
+    {
+        // Arrange: Неактивные сегодняшние задачи (Completed и Irrelevant) учитываются в лимитах
+        using var context = TestDbContextFactory.CreateInMemoryContext();
+        var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+        var plannerService = new PlannerService(taskRepo);
+
+        var completedToday = new TaskItemBuilder()
+            .WithId(101).WithEstimatedMinutes(60)
+            .WithScheduledDate(TodoDay.Today.ToDateTime(), DateSource.Manual)
+            .WithCompletedDate(TodoDay.Today.ToDateTime()).WithStatus(TaskStatus.Completed).Build();
+
+        var irrelevantToday = new TaskItemBuilder()
+            .WithId(102).WithEstimatedMinutes(60)
+            .WithScheduledDate(TodoDay.Today.ToDateTime(), DateSource.Manual)
+            .WithCompletedDate(TodoDay.Today.ToDateTime()).WithStatus(TaskStatus.Irrelevant).Build();
+
+        var newFlexibleTask = new TaskItemBuilder()
+            .WithId(103).WithEstimatedMinutes(60)
+            .WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
+
+        taskRepo.Add(completedToday);
+        taskRepo.Add(irrelevantToday);
+        taskRepo.Add(newFlexibleTask);
+
+        // Лимит 150 минут. Неактивные задачи уже забрали 120 минут (60 + 60).
+        // Осталось 30. Новая задача требует 60.
+        var settings = new UserSettingsBuilder().WithDailyTimeLimit(150).Build();
+
+        // Act
+        plannerService.DistributeTasks(settings);
+
+        // Assert: Задача 103 не помещается и должна быть перенесена на завтра
+        var savedNewTask = taskRepo.GetById(103);
+        savedNewTask!.ScheduledDate.Should().Be(TodoDay.Today.Tomorrow.ToDateTime());
+    }
+
+    [Fact]
+    public void SeverelyOverdueRecurringTask_WhenCompleted_SkipsToNextActualFutureDate()
+    {
+        // Arrange: Создавать повторки только на актуальные даты, пропуская сильно просроченные
+        using var context = TestDbContextFactory.CreateInMemoryContext();
+        var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+
+        // Задача должна была выполняться ежедневно, но просрочена на 10 дней
+        var tenDaysAgo = TodoDay.Today.ToDateTime().AddDays(-10);
+        var overdueTask = new TaskItemBuilder()
+            .WithId(301).WithRecurrence(RecurrenceType.Daily)
+            .WithScheduledDate(tenDaysAgo, DateSource.AutoFixed)
+            .WithStatus(TaskStatus.Planned).Build();
+
+        taskRepo.Add(overdueTask);
+
+        // Act: Завершаем её сегодня
+        taskRepo.CompleteTask(overdueTask.Id);
+
+        // Assert: Новая копия должна быть на завтра, а не на 9 дней назад
+        var newCopy = taskRepo.GetAll().FirstOrDefault(t => t.RecurrenceSourceId == overdueTask.Id);
+        newCopy.Should().NotBeNull();
+        newCopy!.ScheduledDate.Should().Be(TodoDay.Today.Tomorrow.ToDateTime());
     }
 }

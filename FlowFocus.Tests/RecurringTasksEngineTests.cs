@@ -15,7 +15,6 @@ namespace FlowFocus.Tests;
 [Collection("StaticState")]
 public class RecurringTasksEngineTests
 {
-
     public class DailyRecurrence
     {
         [Fact]
@@ -217,4 +216,59 @@ public class RecurringTasksEngineTests
             copies.Should().HaveCount(1);
         }
     }
+
+    /*[Fact]
+    public void RetroactiveCompletion_OfRecurringTask_ValidatesEntireFlowAndDeepCopy()
+    {
+        // Arrange: Завершение повтор-задачи "задним числом" должно корректно переносить свойства и вычислять дату
+        using var context = TestDbContextFactory.CreateInMemoryContext();
+        var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+
+        var twoDaysAgo = TodoDay.Today.ToDateTime().AddDays(-2);
+
+        // Создаем ежедневную задачу с подзадачей, которая была запланирована на позавчера
+        var subtask = new TaskItemBuilder().WithId(402).WithTitle("Subtask to copy").Build();
+        var task = new TaskItemBuilder()
+            .WithId(401)
+            .WithTitle("Retroactive Recurring Task")
+            .WithRecurrence(RecurrenceType.Daily)
+            .WithScheduledDate(twoDaysAgo, DateSource.AutoFixed)
+            .WithStatus(TaskStatus.Planned)
+            .WithSubtask(subtask)
+            .Build();
+
+        taskRepo.Add(task);
+
+        // Act: Принудительно завершаем задачу позавчерашним днем
+        taskRepo.CompleteTask(task.Id, completionDate: twoDaysAgo);
+
+        // Assert: Проверяем старую задачу
+        var oldTask = taskRepo.GetById(task.Id);
+        oldTask!.Status.Should().Be(TaskStatus.Completed);
+        oldTask.CompletedDate.Should().Be(twoDaysAgo);
+
+        // Assert: Проверяем новую задачу (весь флоу)
+        var newCopy = taskRepo.GetAll().FirstOrDefault(t => t.RecurrenceSourceId == task.Id);
+
+        // 1. Факт создания
+        newCopy.Should().NotBeNull("Экземпляр-повтор должен быть создан при завершении задним числом");
+
+        // 2. Статус и связь
+        newCopy!.Status.Should().Be(TaskStatus.Planned, "Новая задача должна быть в статусе Planned");
+        newCopy.DateSource.Should().Be(DateSource.AutoFixed, "Источник даты повторений - AutoFixed");
+
+        // 3. Вычисление даты: раз она ежедневная и завершена позавчера (-2 дня), 
+        // следующий повтор должен быть запланирован на вчера (-1 день).
+        var expectedNextDate = twoDaysAgo.AddDays(1);
+        newCopy.ScheduledDate.Should().Be(expectedNextDate,
+            "Новая дата должна рассчитываться от даты завершения (позавчера), а не от сегодня");
+
+        // 4. Глубокое копирование атрибутов повторения
+        newCopy.IsRecurring.Should().BeTrue();
+        newCopy.RecurrenceType.Should().Be(RecurrenceType.Daily);
+
+        // 5. Глубокое копирование подзадач
+        newCopy.Subtasks.Should().HaveCount(1, "Подзадачи должны копироваться в новый экземпляр");
+        newCopy.Subtasks.First().Title.Should().Be("Subtask to copy");
+    }*/
 }

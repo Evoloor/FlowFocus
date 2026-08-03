@@ -92,6 +92,73 @@ public class BlockingTaskTests
         Assert.Equal(DateSource.AutoFixed, updatedTaskA.DateSource);
         Assert.Equal(tomorrow, updatedTaskA.ScheduledDate);
     }
+    
+    [Fact]
+    public void NotConfiguredTask_WhenSavedWithActiveBlocker_TransitionsToBlockedStatus()
+    {
+        // Arrange: Ненастроенная задача сохраняет статус при получении связи, но меняет его на Blocked при настройке
+        using var context = TestDbContextFactory.CreateInMemoryContext();
+        var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+
+        var blocker = new TaskItemBuilder().WithId(201).WithStatus(TaskStatus.Planned).Build();
+    
+        // Задача изначально не настроена
+        var notConfiguredTask = new TaskItemBuilder().WithId(202).WithStatus(TaskStatus.NotConfigured).Build();
+    
+        context.Tasks.AddRange(blocker, notConfiguredTask);
+        context.TaskRelations.Add(new TaskRelation { SourceTaskId = blocker.Id, TargetTaskId = notConfiguredTask.Id, Type = RelationType.Blocks });
+        context.SaveChanges();
+
+        // Act 1: Проверяем, что связь не изменила статус автоматически
+        var taskBeforeEdit = taskRepo.GetById(notConfiguredTask.Id);
+        taskBeforeEdit!.Status.Should().Be(TaskStatus.NotConfigured);
+
+        // Act 2: Пользователь открыл диалог, настроил задачу и сохранил (стандартный флоу переводит в Planned)
+        taskBeforeEdit.Title = "Настроенное название";
+        taskBeforeEdit.Status = TaskStatus.Planned; // Имитация прихода DTO с формы
+    
+        taskRepo.Update(taskBeforeEdit);
+
+        // Assert: Репозиторий/Сервис должен перехватить сохранение и форсировать статус Blocked
+        var savedTask = taskRepo.GetById(notConfiguredTask.Id);
+        savedTask!.Status.Should().Be(TaskStatus.Blocked);
+    }
+    
+    [Fact]
+    public void AutoEscalation_OfBlockedTask_ForcesCascadePriorityIncreaseOnBlockers()
+    {
+        // Arrange: Форсирование приоритета блокеров при авто-повышении заблокированной
+        using var context = TestDbContextFactory.CreateInMemoryContext();
+        var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+        var plannerService = new PlannerService(taskRepo);
+
+        var priorities = context.Priorities.OrderBy(p => p.Order).ToList();
+        var critical = priorities[0];
+        var low = priorities[3];
+
+        // Блокер имеет низкий приоритет
+        var blocker = new TaskItemBuilder().WithId(501).WithPriorityId(low.Id).WithStatus(TaskStatus.Planned).Build();
+    
+        // Заблокированная задача тоже имеет низкий, но у неё есть правило повышения до критического сегодня
+        var blocked = new TaskItemBuilder().WithId(502).WithPriorityId(low.Id).WithStatus(TaskStatus.Planned).Build();
+        blocked.PriorityEscalations.Add(new PriorityEscalation { TargetPriorityId = critical.Id, EscalationDate = TodoDay.Today.ToDateTime() });
+
+        context.Tasks.AddRange(blocker, blocked);
+        context.TaskRelations.Add(new TaskRelation { SourceTaskId = blocker.Id, TargetTaskId = blocked.Id, Type = RelationType.Blocks });
+        context.SaveChanges();
+
+        // Act: Запускаем цикл актуализации приоритетов (который должен включать нормализацию связей)
+        plannerService.ActualizePriorities();
+        // TODO: ИИ хотела написать: plannerService.NormalizeBlockerPriorities(); // Каскадное форсирование
+        taskRepo.SaveChanges();
+
+        // Assert: Блокер должен подтянуться до критического приоритета вслед за заблокированной
+        var updatedBlocker = taskRepo.GetById(blocker.Id);
+        var updatedBlocked = taskRepo.GetById(blocked.Id);
+
+        updatedBlocked!.PriorityId.Should().Be(critical.Id);
+        updatedBlocker!.PriorityId.Should().Be(critical.Id);
+    }
 }
 
 [Collection("StaticState")]
