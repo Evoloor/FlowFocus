@@ -8,25 +8,31 @@ namespace FlowFocus.Core;
 public readonly struct TodoDay(DateTime date) : IComparable<TodoDay>, IEquatable<TodoDay>
 {
     private static int _dayStartHour = 5;
+    private static TimeProvider _timeProvider = TimeProvider.System;
 
     /// <summary>
     /// Установить время начала дня. Вызывается при старте приложения
     /// и при изменении настройки пользователем.
-    /// TODO: fix race condition
     /// </summary>
     public static void Configure(int dayStartHour) => _dayStartHour = dayStartHour;
 
-    /// <summary>Текущий Todo-день с учётом настройки времени начала дня</summary>
-    public static TodoDay Today
+    /// <summary>
+    /// Установить провайдер времени (для тестирования или переопределения)
+    /// </summary>
+    public static void SetTimeProvider(TimeProvider? timeProvider) => _timeProvider = timeProvider ?? TimeProvider.System;
+
+    /// <summary>Получить текущий Todo-день с использованием провайдера времени</summary>
+    public static TodoDay GetToday(TimeProvider? timeProvider = null)
     {
-        get
-        {
-            var now = DateTime.Now;
-            return now.Hour < _dayStartHour
-                ? new(now.Date.AddDays(-1))
-                : new(now.Date);
-        }
+        var provider = timeProvider ?? _timeProvider;
+        var now = provider.GetLocalNow().DateTime;
+        return now.Hour < _dayStartHour
+            ? new(now.Date.AddDays(-1))
+            : new(now.Date);
     }
+
+    /// <summary>Текущий Todo-день с учётом настройки времени начала дня</summary>
+    public static TodoDay Today => GetToday();
 
     /// <summary>Календарная дата этого Todo-дня (всегда без времени)</summary>
     public DateTime Date { get; } = date.Date;

@@ -1,0 +1,210 @@
+using FluentAssertions;
+using FlowFocus.Core;
+using FlowFocus.Core.Enums;
+using FlowFocus.Core.Models;
+using FlowFocus.Core.Services;
+using FlowFocus.Data;
+using FlowFocus.Data.Repositories;
+using FlowFocus.Data.Services;
+using FlowFocus.Tests.Builders;
+using Microsoft.EntityFrameworkCore;
+using NSubstitute;
+using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
+
+namespace FlowFocus.Tests;
+
+[Trait("Category", "Recurrence")]
+public class RecurringTasksEngineTests
+{
+    private static StorageContext CreateInMemoryContext()
+    {
+        var options = new DbContextOptionsBuilder<StorageContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        var context = new StorageContext(options);
+        context.Database.EnsureCreated();
+        return context;
+    }
+
+    public class DailyRecurrence
+    {
+        [Fact]
+        public void CompleteDailyTask_CreatesNewCopyForTomorrowInRepository()
+        {
+            // Arrange
+            using var context = CreateInMemoryContext();
+            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+
+            var today = TodoDay.Today.ToDateTime();
+            var task = new TaskItemBuilder()
+                .WithId(100)
+                .WithTitle("Daily Task")
+                .WithScheduledDate(today, DateSource.AutoFixed)
+                .WithRecurrence(RecurrenceType.Daily)
+                .WithStatus(TaskStatus.Planned)
+                .Build();
+
+            taskRepo.Add(task);
+
+            // Act: Call real application service method
+            taskRepo.CompleteTask(task.Id);
+
+            var allTasks = taskRepo.GetAll();
+            var completedTask = taskRepo.GetById(task.Id);
+            var newCopy = allTasks.FirstOrDefault(t => t.RecurrenceSourceId == task.Id);
+
+            // Assert: Verify persistent repository state
+            completedTask!.Status.Should().Be(TaskStatus.Completed);
+            newCopy.Should().NotBeNull();
+            newCopy.Title.Should().Be("Daily Task");
+            newCopy.ScheduledDate.Should().Be(today.AddDays(1));
+            newCopy.DateSource.Should().Be(DateSource.AutoFixed);
+            newCopy.Status.Should().Be(TaskStatus.Planned);
+        }
+    }
+
+    public class OverdueCompletion
+    {
+        [Fact]
+        public void CompleteOverdueTask_CalculatesNextDateFromActualCompletionDate()
+        {
+            // Arrange
+            using var context = CreateInMemoryContext();
+            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+
+            var overdueDate = TodoDay.Today.Yesterday.AddDays(-2).ToDateTime(); // 3 days ago
+            var task = new TaskItemBuilder()
+                .WithId(200)
+                .WithTitle("Overdue Daily Task")
+                .WithScheduledDate(overdueDate, DateSource.AutoFixed)
+                .WithRecurrence(RecurrenceType.Daily)
+                .WithStatus(TaskStatus.Planned)
+                .Build();
+
+            taskRepo.Add(task);
+
+            // Act: Call application service method to complete today
+            taskRepo.CompleteTask(task.Id);
+
+            var allTasks = taskRepo.GetAll();
+            var newCopy = allTasks.FirstOrDefault(t => t.RecurrenceSourceId == task.Id);
+
+            // Assert: Scheduled date calculated from actual completion day (Today + 1 day)
+            newCopy.Should().NotBeNull();
+            newCopy.ScheduledDate.Should().Be(TodoDay.Today.Tomorrow.ToDateTime());
+        }
+    }
+
+    public class MonthlyYearly
+    {
+        [Fact]
+        public void CompleteMonthlyTask_CreatesCopyNextMonth()
+        {
+            // Arrange
+            var recurrenceService = new TaskRecurrenceService();
+            var aug3 = new DateTime(2026, 8, 3);
+
+            var task = new TaskItemBuilder()
+                .WithId(300)
+                .WithRecurrence(RecurrenceType.Monthly)
+                .WithCompletedDate(aug3)
+                .Build();
+
+            // Act: Call real recurrence service
+            var nextDate = recurrenceService.CalculateNextRecurrenceDate(task);
+
+            // Assert
+            nextDate.Should().Be(new DateTime(2026, 9, 3));
+        }
+
+        [Fact]
+        public void CompleteJan31MonthlyTask_CalculatesFeb28WithoutInvalidDateError()
+        {
+            // Arrange
+            var recurrenceService = new TaskRecurrenceService();
+            var jan31 = new DateTime(2026, 1, 31);
+
+            var task = new TaskItemBuilder()
+                .WithId(301)
+                .WithRecurrence(RecurrenceType.Monthly)
+                .WithScheduledDate(jan31)
+                .WithCompletedDate(jan31)
+                .Build();
+
+            // Act: Call real recurrence service
+            var nextDate = recurrenceService.CalculateNextRecurrenceDate(task);
+
+            // Assert: Handles month end boundary safely
+            nextDate.Should().Be(new DateTime(2026, 2, 28));
+        }
+    }
+
+    public class CascadeSubtaskCopy
+    {
+        [Fact]
+        public void CompleteRecurringTask_CascadesSubtasksToNewCopyInRepository()
+        {
+            // Arrange
+            using var context = CreateInMemoryContext();
+            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+
+            var sub1 = new TaskItem { Title = "Subtask 1" };
+            var sub2 = new TaskItem { Title = "Subtask 2" };
+
+            var parent = new TaskItem
+            {
+                Title = "Parent Recurring Task",
+                IsRecurring = true,
+                RecurrenceType = RecurrenceType.Daily,
+                ScheduledDate = TodoDay.Today.ToDateTime(),
+                Status = TaskStatus.Planned,
+                Subtasks = [sub1, sub2]
+            };
+
+            taskRepo.Add(parent);
+            context.ChangeTracker.Clear();
+
+            // Act: Call application service method
+            taskRepo.CompleteTask(parent.Id);
+
+            var allTasks = taskRepo.GetAll();
+            var newCopy = allTasks.FirstOrDefault(t => t.RecurrenceSourceId == parent.Id);
+
+            // Assert: Subtasks copied and attached to new parent copy in DB
+            newCopy.Should().NotBeNull();
+            newCopy.Subtasks.Should().HaveCount(2);
+            newCopy.Subtasks.Select(s => s.Title).Should().ContainInConsecutiveOrder("Subtask 1", "Subtask 2");
+        }
+    }
+
+    public class RapidClicksIdempotency
+    {
+        [Fact]
+        public void RapidClicksOnCompletion_GeneratesOnlySingleCopy()
+        {
+            // Arrange
+            using var context = CreateInMemoryContext();
+            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+
+            var task = new TaskItemBuilder()
+                .WithId(500)
+                .WithTitle("Rapid Click Task")
+                .WithRecurrence(RecurrenceType.Daily)
+                .WithScheduledDate(TodoDay.Today.ToDateTime())
+                .WithStatus(TaskStatus.Planned)
+                .Build();
+
+            taskRepo.Add(task);
+
+            // Act: Rapid double click on complete task
+            taskRepo.CompleteTask(task.Id);
+            taskRepo.CompleteTask(task.Id);
+
+            var copies = taskRepo.GetAll().Where(t => t.RecurrenceSourceId == task.Id).ToList();
+
+            // Assert: Only single recurring copy generated in repository
+            copies.Should().HaveCount(1);
+        }
+    }
+}
