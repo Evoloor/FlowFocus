@@ -388,6 +388,9 @@ public class TaskRepository(
     public void UpdateTaskStatus(int taskId, TaskStatus status, bool saveChanges = true) =>
         UpdatePartial(taskId, t => t.Status = status, saveChanges);
 
+    public void UpdateTaskPriority(int taskId, int priorityId, bool saveChanges = true) =>
+        UpdatePartial(taskId, t => t.PriorityId = priorityId, saveChanges);
+
     public void MutateRecurringTaskInPlace(int taskId, DateTime assignedDate) =>
         UpdatePartial(taskId, t =>
         {

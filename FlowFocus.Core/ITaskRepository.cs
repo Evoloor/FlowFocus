@@ -64,6 +64,9 @@ public interface ITaskRepository : IRepository<TaskItem>
     /// <summary>Обновить статус задачи</summary>
     void UpdateTaskStatus(int taskId, FlowFocus.Core.Enums.TaskStatus status, bool saveChanges = true);
 
+    /// <summary>Обновить приоритет задачи</summary>
+    void UpdateTaskPriority(int taskId, int priorityId, bool saveChanges = true);
+
     /// <summary>Получить повторяющиеся задачи-кандидаты для обработки планировщиком</summary>
     List<TaskItem> GetRecurringCandidatesForPlanner();
 
