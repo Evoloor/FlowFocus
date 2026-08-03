@@ -7,25 +7,15 @@ using FlowFocus.Core.Validation;
 using FlowFocus.Data;
 using FlowFocus.Data.Repositories;
 using FlowFocus.Tests.Builders;
-using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Tests;
 
 [Trait("Category", "Planning")]
+[Collection("StaticState")]
 public class PlanningEngineTests
 {
-    private static StorageContext CreateInMemoryContext()
-    {
-        var options = new DbContextOptionsBuilder<StorageContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-
-        var context = new StorageContext(options);
-        context.Database.EnsureCreated();
-        return context;
-    }
 
     public class SortingRules
     {
@@ -33,7 +23,7 @@ public class PlanningEngineTests
         public void DistributeTasks_SchedulesTasksInOrderOfRelevance()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
             var plannerService = new PlannerService(taskRepo);
 
@@ -77,7 +67,7 @@ public class PlanningEngineTests
         public void DistributeTasks_SplitsTasksByDailyTimeLimit()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
             var plannerService = new PlannerService(taskRepo);
 
@@ -110,7 +100,7 @@ public class PlanningEngineTests
         public void LargeTask_Exceeding70PercentLimit_ScheduledOnCurrentDayExceedingLimit()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
             var plannerService = new PlannerService(taskRepo);
 
@@ -139,7 +129,7 @@ public class PlanningEngineTests
         public void Priority0Or1Task_ForciblyScheduledTodayDespiteFullLimits()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
             var plannerService = new PlannerService(taskRepo);
 
@@ -166,7 +156,7 @@ public class PlanningEngineTests
         public void TaskWithNullFields_UsesSafeDefaultsWithoutException()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
 
             var task = new TaskItemBuilder()
@@ -191,7 +181,7 @@ public class PlanningEngineTests
         public void DistributeTasks_ExcludesSubtasksFromDailyTaskLimits()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
             var plannerService = new PlannerService(taskRepo);
 
@@ -225,7 +215,7 @@ public class PlanningEngineTests
         public void ZeroDailyLimit_DoesNotCauseInfiniteLoop()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
             var plannerService = new PlannerService(taskRepo);
 
@@ -247,7 +237,7 @@ public class PlanningEngineTests
         public void CompletedTasks_CountAgainstDailyLimits()
         {
             // Arrange: Проверка, что завершённые сегодня дела учитываются при подсчёте лимита[cite: 1]
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
             var plannerService = new PlannerService(taskRepo);
 
@@ -285,7 +275,7 @@ public class PlanningEngineTests
         public void DailyTaskLimit_StopsDistributionWhenLimitReached()
         {
             // Arrange: Проверка лимита количества задач на день[cite: 3]
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
             var plannerService = new PlannerService(taskRepo);
 
@@ -312,7 +302,7 @@ public class PlanningEngineTests
         public void DailyTaskLimit_ExcludesSubtasksFromCount()
         {
             // Arrange: Подзадачи не учитываются при сравнении с лимитом задач на день[cite: 3]
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
             var plannerService = new PlannerService(taskRepo);
 
@@ -349,7 +339,7 @@ public class PlanningEngineTests
         public void DailyComplexityLimit_StopsDistributionWhenLimitReached()
         {
             // Arrange: Проверка лимита по сложности[cite: 3]
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
             var plannerService = new PlannerService(taskRepo);
 
@@ -376,7 +366,7 @@ public class PlanningEngineTests
         public void LargeTaskRule_OnlyAppliesToTimeLimit_NotComplexity()
         {
             // Arrange: Крупным делом можно превышать ТОЛЬКО лимит часов, сложность превышать нельзя[cite: 1]
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
             var plannerService = new PlannerService(taskRepo);
 
@@ -405,7 +395,7 @@ public class PlanningEngineTests
         public void OverdueTasks_ProcessedBeforeNormalTasks_CanExceedLimits()
         {
             // Arrange: Перенесённая просрочка заполняет день раньше обычных дел и может превышать лимиты[cite: 1]
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
             var plannerService = new PlannerService(taskRepo);
 
@@ -449,7 +439,7 @@ public class PlanningEngineTests
         public void BlockedTaskWithFixedDate_WhenChainExceedsCapacity_ForcesAutoFixedDatesForBlockers()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
             var plannerService = new PlannerService(taskRepo);
 
@@ -490,7 +480,7 @@ public class PlanningEngineTests
         public void ReRunningPlanningAlgorithm_IsIdempotentAndProducesIdenticalDates()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
             var plannerService = new PlannerService(taskRepo);
 

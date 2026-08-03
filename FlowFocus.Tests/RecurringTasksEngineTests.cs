@@ -3,29 +3,18 @@ using FlowFocus.Core;
 using FlowFocus.Core.Enums;
 using FlowFocus.Core.Models;
 using FlowFocus.Core.Services;
-using FlowFocus.Data;
 using FlowFocus.Data.Repositories;
 using FlowFocus.Data.Services;
 using FlowFocus.Tests.Builders;
-using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Tests;
 
 [Trait("Category", "Recurrence")]
+[Collection("StaticState")]
 public class RecurringTasksEngineTests
 {
-    private static StorageContext CreateInMemoryContext()
-    {
-        var options = new DbContextOptionsBuilder<StorageContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-
-        var context = new StorageContext(options);
-        context.Database.EnsureCreated();
-        return context;
-    }
 
     public class DailyRecurrence
     {
@@ -33,7 +22,7 @@ public class RecurringTasksEngineTests
         public void CompleteDailyTask_CreatesNewCopyForTomorrowInRepository()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
 
             var today = TodoDay.Today.ToDateTime();
@@ -70,7 +59,7 @@ public class RecurringTasksEngineTests
         public void CompleteOverdueTask_CalculatesNextDateFromActualCompletionDate()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
 
             var overdueDate = TodoDay.Today.Yesterday.AddDays(-2).ToDateTime(); // 3 days ago
@@ -167,7 +156,7 @@ public class RecurringTasksEngineTests
         public void CompleteRecurringTask_CascadesSubtasksToNewCopyInRepository()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
 
             var sub1 = new TaskItem { Title = "Subtask 1" };
@@ -205,7 +194,7 @@ public class RecurringTasksEngineTests
         public void RapidClicksOnCompletion_GeneratesOnlySingleCopy()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
 
             var task = new TaskItemBuilder()

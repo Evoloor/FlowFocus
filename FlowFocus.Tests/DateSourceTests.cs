@@ -6,25 +6,15 @@ using FlowFocus.Core.Validation;
 using FlowFocus.Data;
 using FlowFocus.Data.Repositories;
 using FlowFocus.Tests.Builders;
-using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Tests;
 
 [Trait("Category", "Domain")]
+[Collection("StaticState")]
 public class DateSourceTests
 {
-    private static StorageContext CreateInMemoryContext()
-    {
-        var options = new DbContextOptionsBuilder<StorageContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-
-        var context = new StorageContext(options);
-        context.Database.EnsureCreated();
-        return context;
-    }
 
     public class ManualDate
     {
@@ -32,7 +22,7 @@ public class DateSourceTests
         public void SelectDateViaDatePicker_SetsSourceTypeToManualInRepository()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
             var task = new TaskItemBuilder().WithId(101).WithTitle("Manual Task").Build();
             taskRepo.Add(task);
@@ -56,7 +46,7 @@ public class DateSourceTests
         public void SaveTaskWithoutDate_SetsSourceTypeToAutoFlexible()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
             var task = new TaskItemBuilder().WithId(102).WithTitle("No Date Task").WithScheduledDate(null, DateSource.AutoFlexible).Build();
 
@@ -77,7 +67,7 @@ public class DateSourceTests
         public void ManuallyEditAutoFixedDate_ChangesSourceTypeToManual()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
             var task = new TaskItemBuilder().WithId(103).WithScheduledDate(new DateTime(2026, 8, 5), DateSource.AutoFixed).Build();
             taskRepo.Add(task);
@@ -101,7 +91,7 @@ public class DateSourceTests
         public void OverdueManualTask_DuringRedistribution_ChangesSourceTypeToAutoFlexible()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
             var plannerService = new PlannerService(taskRepo);
 
@@ -153,7 +143,7 @@ public class DateSourceTests
         public void HideFixedFilter_ExcludesOverdueManualTasksFromQueryResults()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
 
             var yesterday = TodoDay.Today.Yesterday.ToDateTime();

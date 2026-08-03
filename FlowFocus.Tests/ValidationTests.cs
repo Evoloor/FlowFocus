@@ -2,6 +2,7 @@ using FluentAssertions;
 using FlowFocus.Core.Enums;
 using FlowFocus.Core.Validation;
 using FlowFocus.Tests.Builders;
+using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Tests;
 
@@ -121,6 +122,25 @@ public class ValidationTests
 
             // Assert
             result.Should().Be(expected);
+        }
+    }
+    public class RelationTargetStatusValidation
+    {
+        [Theory]
+        [InlineData(TaskStatus.Completed)]
+        [InlineData(TaskStatus.Irrelevant)]
+        public void CreateRelationWithInactiveTask_ThrowsValidationError(TaskStatus inactiveStatus)
+        {
+            // Arrange: Запрет связей с завершенными или неактуальными задачами[cite: 1]
+            var activeTask = new TaskItemBuilder().WithId(1).WithStatus(TaskStatus.Planned).Build();
+            var inactiveTask = new TaskItemBuilder().WithId(2).WithStatus(inactiveStatus).Build();
+
+            // Act: Попытка добавить связь к неактуальной задаче
+            var act = () => TaskRelationValidator.ValidateNewRelation(activeTask, inactiveTask, RelationType.RelatedTo);
+
+            // Assert
+            act.Should().Throw<InvalidOperationException>()
+                .WithMessage("*ссылаться можно только на актуальные задачи*");
         }
     }
 }

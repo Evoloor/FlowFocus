@@ -2,28 +2,17 @@ using FluentAssertions;
 using FlowFocus.Core;
 using FlowFocus.Core.Models;
 using FlowFocus.Core.Services;
-using FlowFocus.Data;
 using FlowFocus.Data.Repositories;
 using FlowFocus.Tests.Builders;
-using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Tests;
 
 [Trait("Category", "UI")]
+[Collection("StaticState")]
 public class UiAndUxEngineTests
 {
-    private static StorageContext CreateInMemoryContext()
-    {
-        var options = new DbContextOptionsBuilder<StorageContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-
-        var context = new StorageContext(options);
-        context.Database.EnsureCreated();
-        return context;
-    }
 
     public class TaskCardStyles
     {
@@ -64,7 +53,7 @@ public class UiAndUxEngineTests
         public void QuickAddCheckmark_CreatesUnconfiguredTaskInRepository()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
             var inputText = "Купить хлеб";
 
@@ -122,7 +111,7 @@ public class UiAndUxEngineTests
         public void HasOverdueTasksInRepository_ReturnsOverdueTasks()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
 
             var overdueDate = TodoDay.Today.Yesterday.ToDateTime();
@@ -140,7 +129,7 @@ public class UiAndUxEngineTests
         public void EmptyOverdueListInRepository_ReturnsEmptyList()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
 
             // Act: Call real repository query method
@@ -157,7 +146,7 @@ public class UiAndUxEngineTests
         public void DeleteTag_SafelyUnlinksFromTasksInRepository()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var notificationService = Substitute.For<INotificationService>();
             var taskRepo = new TaskRepository(context, notificationService);
             var tagRepo = new TagRepository(context, notificationService);
@@ -188,7 +177,7 @@ public class UiAndUxEngineTests
         public void SaveTaskWithAttachedTags_DoesNotThrowEntityTrackingException()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var notificationService = Substitute.For<INotificationService>();
             var taskRepo = new TaskRepository(context, notificationService);
 
@@ -216,7 +205,7 @@ public class UiAndUxEngineTests
         public void GetSuggestedTags_ReturnsLastUsedSessionTagAndTopPopularTags()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var notificationService = Substitute.For<INotificationService>();
             var tagRepo = new TagRepository(context, notificationService);
 

@@ -1,27 +1,16 @@
 using FluentAssertions;
 using FlowFocus.Core.Models;
 using FlowFocus.Core.Services;
-using FlowFocus.Data;
 using FlowFocus.Data.Repositories;
 using FlowFocus.Tests.Builders;
-using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 
 namespace FlowFocus.Tests;
 
 [Trait("Category", "Domain")]
+[Collection("StaticState")]
 public class PrioritySystemTests
 {
-    private static StorageContext CreateInMemoryContext()
-    {
-        var options = new DbContextOptionsBuilder<StorageContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-
-        var context = new StorageContext(options);
-        context.Database.EnsureCreated();
-        return context;
-    }
 
     public class DefaultConfiguration
     {
@@ -29,7 +18,7 @@ public class PrioritySystemTests
         public void LoadDefaultConfiguration_ReturnsStrictlyFiveBasePriorities()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var repository = new PriorityRepository(context, Substitute.For<INotificationService>());
 
             // Act
@@ -50,7 +39,7 @@ public class PrioritySystemTests
         public void UpdatePriorityProperties_ReturnsUpdatedNameAndColorFromRepository()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var repository = new PriorityRepository(context, Substitute.For<INotificationService>());
             var priority = repository.GetAllOrdered().First();
 
@@ -79,7 +68,7 @@ public class PrioritySystemTests
         public void DragAndDropReorder_RecalculatesOrderIndicesAndComparisons()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var repository = new PriorityRepository(context, Substitute.For<INotificationService>());
             var initialPriorities = repository.GetAllOrdered();
 
@@ -108,7 +97,7 @@ public class PrioritySystemTests
         public void AddingMoreThan20Priorities_BlocksOperationAtLimit()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var repository = new PriorityRepository(context, Substitute.For<INotificationService>());
 
             for (var i = 6; i <= 20; i++)
@@ -131,7 +120,7 @@ public class PrioritySystemTests
         public void CreateNewTask_AssignsDefaultPriorityFromUserSettings()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
             var userSettings = new UserSettingsBuilder().WithDefaultPriorityId(2).Build();
 

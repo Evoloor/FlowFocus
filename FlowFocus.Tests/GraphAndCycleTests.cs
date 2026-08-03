@@ -2,30 +2,15 @@ using FluentAssertions;
 using FlowFocus.Core.Enums;
 using FlowFocus.Core.Exceptions;
 using FlowFocus.Core.Models;
-using FlowFocus.Core.Services;
 using FlowFocus.Core.Validation;
-using FlowFocus.Data;
-using FlowFocus.Data.Repositories;
 using FlowFocus.Tests.Builders;
-using Microsoft.EntityFrameworkCore;
-using NSubstitute;
-using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Tests;
 
 [Trait("Category", "Graph")]
+[Collection("StaticState")]
 public class GraphAndCycleTests
 {
-    private static StorageContext CreateInMemoryContext()
-    {
-        var options = new DbContextOptionsBuilder<StorageContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-
-        var context = new StorageContext(options);
-        context.Database.EnsureCreated();
-        return context;
-    }
 
     public class CircularBlockages
     {
@@ -76,7 +61,7 @@ public class GraphAndCycleTests
         public void CyclicGraphInDb_NormalizeBlockerPriorities_SafelyTerminatesWithoutStackOverflow()
         {
             // Arrange: Artificially create cyclic relation in DB (A -> B -> C -> A)
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskA = new TaskItem { Id = 1, Title = "Task A", Status = TaskStatus.Planned };
             var taskB = new TaskItem { Id = 2, Title = "Task B", Status = TaskStatus.Planned };
             var taskC = new TaskItem { Id = 3, Title = "Task C", Status = TaskStatus.Planned };

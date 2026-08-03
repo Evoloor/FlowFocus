@@ -6,24 +6,14 @@ using FlowFocus.Core.Validation;
 using FlowFocus.Data;
 using FlowFocus.Data.Repositories;
 using FlowFocus.Tests.Builders;
-using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 
 namespace FlowFocus.Tests;
 
 [Trait("Category", "Domain")]
+[Collection("StaticState")]
 public class PriorityEscalationTests
 {
-    private static StorageContext CreateInMemoryContext()
-    {
-        var options = new DbContextOptionsBuilder<StorageContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-
-        var context = new StorageContext(options);
-        context.Database.EnsureCreated();
-        return context;
-    }
 
     public class RuleValidation
     {
@@ -49,7 +39,7 @@ public class PriorityEscalationTests
         public void ManuallyElevatePriority_RemovesRedundantLowerEscalationRulesInRepository()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
 
             var priorities = context.Priorities.OrderBy(p => p.Order).ToList();
@@ -86,7 +76,7 @@ public class PriorityEscalationTests
         public void ActualizePriorities_ElevatesPriorityWhenEscalationDateReached()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var priorities = context.Priorities.OrderBy(p => p.Order).ToList();
             var criticalPriority = priorities[0];
             var lowPriority = priorities[3];
@@ -130,14 +120,21 @@ public class PriorityEscalationTests
         public void StartOfDayAt4AM_SystemTime230AM_EvaluatesPreviousLogicalDate()
         {
             // Arrange
-            TodoDay.Configure(4);
-            var systemTime = new DateTime(2026, 8, 4, 2, 30, 0); // 02:30 AM
+            try
+            {
+                TodoDay.Configure(4);
+                var systemTime = new DateTime(2026, 8, 4, 2, 30, 0); // 02:30 AM
 
-            // Act: Call application TodoDay logic
-            var logicalDate = systemTime.Hour < 4 ? systemTime.Date.AddDays(-1) : systemTime.Date;
+                // Act: Call application TodoDay logic
+                var logicalDate = systemTime.Hour < 4 ? systemTime.Date.AddDays(-1) : systemTime.Date;
 
-            // Assert
-            logicalDate.Should().Be(new DateTime(2026, 8, 3));
+                // Assert
+                logicalDate.Should().Be(new DateTime(2026, 8, 3));
+            }
+            finally
+            {
+                TodoDay.Configure(5);
+            }
         }
     }
 }

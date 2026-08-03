@@ -1,27 +1,16 @@
 using FluentAssertions;
-using FlowFocus.Core.Models;
 using FlowFocus.Core.Services;
-using FlowFocus.Data;
+using FlowFocus.Core.Validation;
 using FlowFocus.Data.Repositories;
 using FlowFocus.Tests.Builders;
-using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 
 namespace FlowFocus.Tests;
 
 [Trait("Category", "Domain")]
+[Collection("StaticState")]
 public class SubtasksEngineTests
 {
-    private static StorageContext CreateInMemoryContext()
-    {
-        var options = new DbContextOptionsBuilder<StorageContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-
-        var context = new StorageContext(options);
-        context.Database.EnsureCreated();
-        return context;
-    }
 
     public class Aggregation
     {
@@ -29,7 +18,7 @@ public class SubtasksEngineTests
         public void CalculateTotalMinutesAndComplexity_AggregatesParentAndSubtasksFromRepository()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
 
             var subtask1 = new TaskItemBuilder().WithId(101).WithEstimatedMinutes(15).WithComplexity(5).Build();
@@ -60,7 +49,7 @@ public class SubtasksEngineTests
         public void RepositoryRootQuery_ExcludesSubtasksWithNonNullParentId()
         {
             // Arrange
-            using var context = CreateInMemoryContext();
+            using var context = TestDbContextFactory.CreateInMemoryContext();
             var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
 
             var subtask = new TaskItemBuilder().WithId(201).WithTitle("Subtask").WithParentTaskId(200).Build();
@@ -102,4 +91,5 @@ public class SubtasksEngineTests
             subtask.ScheduledDate.Should().BeNull();
         }
     }
+   
 }
