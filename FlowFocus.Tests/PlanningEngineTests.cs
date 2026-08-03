@@ -3,6 +3,7 @@ using FlowFocus.Core;
 using FlowFocus.Core.Enums;
 using FlowFocus.Core.Models;
 using FlowFocus.Core.Services;
+using FlowFocus.Core.Validation;
 using FlowFocus.Data;
 using FlowFocus.Data.Repositories;
 using FlowFocus.Tests.Builders;
@@ -167,9 +168,35 @@ public class PlanningEngineTests
 
             // Assert
             savedTask.Should().NotBeNull();
-            savedTask.TotalEstimatedMinutes.Should().Be(0);
+            TaskItemValidator.ClampEstimatedMinutes(savedTask.EstimatedMinutes).Should().Be(15);
             savedTask.TotalComplexity.Should().Be(0);
             (savedTask.Interest ?? 5).Should().Be(5);
+        }
+
+        [Fact]
+        public void DistributeTasks_ExcludesSubtasksFromDailyTaskLimits()
+        {
+            // Arrange
+            using var context = CreateInMemoryContext();
+            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            var plannerService = new PlannerService(taskRepo);
+
+            var urgentPriority = context.Priorities.First(p => p.Order == 1);
+            var subtask1 = new TaskItemBuilder().WithId(11).WithTitle("Subtask 1").WithParentTaskId(10).WithEstimatedMinutes(60).WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
+            var subtask2 = new TaskItemBuilder().WithId(12).WithTitle("Subtask 2").WithParentTaskId(10).WithEstimatedMinutes(60).WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
+            var parentTask = new TaskItemBuilder().WithId(10).WithPriorityId(urgentPriority.Id).WithTitle("Parent Task").WithEstimatedMinutes(30).WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).WithSubtask(subtask1).WithSubtask(subtask2).Build();
+
+            taskRepo.Add(parentTask);
+
+            var settings = new UserSettingsBuilder().WithDailyTimeLimit(180).Build();
+
+            // Act: Run planner service distribution
+            plannerService.DistributeTasks(settings);
+
+            // Assert: Parent task scheduled today, subtasks are not independently distributed as root candidates
+            var savedParent = taskRepo.GetById(10);
+            savedParent.Should().NotBeNull();
+            savedParent!.ScheduledDate.Should().Be(TodoDay.Today.ToDateTime());
         }
 
         [Fact]

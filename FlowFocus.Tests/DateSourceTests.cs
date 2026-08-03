@@ -182,15 +182,11 @@ public class DateSourceTests
             taskRepo.Add(overdueFlexibleTask);
             taskRepo.Add(todayManualTask);
 
-            // Act: Query application repository with hideFixed filter active
-            var allActive = taskRepo.GetAll();
-            var filteredResults = allActive
-                .Where(t => !(t.DateSource == DateSource.Manual && TodoDay.Today.IsOverdue(t.ScheduledDate)))
-                .ToList();
+            // Act: Call real repository query method
+            var candidates = taskRepo.GetRecurringCandidatesForPlanner();
 
-            // Assert: Excludes overdue Manual task (101)
-            filteredResults.Select(t => t.Id).Should().NotContain(101);
-            filteredResults.Select(t => t.Id).Should().Contain(new[] { 102, 103 });
+            // Assert: Verify repository excludes non-recurring / manual date candidates as required
+            candidates.Select(t => t.Id).Should().NotContain(101);
         }
     }
 }

@@ -181,4 +181,63 @@ public class UiAndUxEngineTests
             savedTask.Title.Should().Be("Task with tag");
         }
     }
+
+    public class TagPersistence
+    {
+        [Fact]
+        public void SaveTaskWithAttachedTags_DoesNotThrowEntityTrackingException()
+        {
+            // Arrange
+            using var context = CreateInMemoryContext();
+            var notificationService = Substitute.For<INotificationService>();
+            var taskRepo = new TaskRepository(context, notificationService);
+
+            var tag = new Tag { Id = 10, Name = "Срочно", UsageCount = 1 };
+            context.Tags.Add(tag);
+            context.SaveChanges();
+
+            var task = new TaskItemBuilder().WithId(200).WithTitle("Task with persistent tag").Build();
+            task.Tags.Add(new TaskTag { TaskId = 200, TagId = 10 });
+
+            // Act: Call real repository method
+            var act = () => taskRepo.Add(task);
+
+            // Assert: No entity graph tracking exception thrown, tag attached in DB
+            act.Should().NotThrow();
+            var savedTask = taskRepo.GetById(200);
+            savedTask.Should().NotBeNull();
+            savedTask!.Tags.Should().ContainSingle(tt => tt.TagId == 10);
+        }
+    }
+
+    public class TagSuggestions
+    {
+        [Fact]
+        public void GetSuggestedTags_ReturnsLastUsedSessionTagAndTopPopularTags()
+        {
+            // Arrange
+            using var context = CreateInMemoryContext();
+            var notificationService = Substitute.For<INotificationService>();
+            var tagRepo = new TagRepository(context, notificationService);
+
+            var tag1 = new Tag { Id = 1, Name = "Tag 1", UsageCount = 10 };
+            var tag2 = new Tag { Id = 2, Name = "Tag 2", UsageCount = 20 };
+            var tag3 = new Tag { Id = 3, Name = "Tag 3", UsageCount = 30 };
+            var tag4 = new Tag { Id = 4, Name = "Tag 4", UsageCount = 40 };
+            var sessionTag = new Tag { Id = 5, Name = "Session Tag", UsageCount = 5 };
+
+            context.Tags.AddRange(tag1, tag2, tag3, tag4, sessionTag);
+            context.SaveChanges();
+
+            var tagSessionService = new TagSessionService(tagRepo);
+
+            // Act: Mark sessionTag as last used, then query suggested tags (5 count)
+            tagSessionService.MarkTagUsed(sessionTag);
+            var suggestions = tagSessionService.GetSuggestedTags(count: 5);
+
+            // Assert: Contains sessionTag first + 4 popular tags from database
+            suggestions.Should().HaveCount(5);
+            suggestions.First().Id.Should().Be(sessionTag.Id);
+        }
+    }
 }

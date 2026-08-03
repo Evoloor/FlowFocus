@@ -210,4 +210,31 @@ public class RelationsEngineTests
             updatedA1.ScheduledDate.Should().Be(targetDate);
         }
     }
+
+    public class RelationGraphPersistence
+    {
+        [Fact]
+        public void SaveTaskWithAttachedRelations_DoesNotThrowEntityTrackingException()
+        {
+            // Arrange
+            using var context = CreateInMemoryContext();
+            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+
+            var taskB = new TaskItem { Id = 602, Title = "Target B", Status = TaskStatus.Planned };
+            context.Tasks.Add(taskB);
+            context.SaveChanges();
+
+            var taskA = new TaskItemBuilder().WithId(601).WithTitle("Source A").Build();
+            taskA.Relations.Add(new TaskRelation { SourceTaskId = 601, TargetTaskId = 602, Type = RelationType.Blocks });
+
+            // Act: Call real repository Add method
+            var act = () => taskRepo.Add(taskA);
+
+            // Assert: No entity graph tracking exception, relation correctly persisted
+            act.Should().NotThrow();
+            var savedA = taskRepo.GetById(601);
+            savedA.Should().NotBeNull();
+            savedA!.Relations.Should().ContainSingle(r => r.TargetTaskId == 602 && r.Type == RelationType.Blocks);
+        }
+    }
 }

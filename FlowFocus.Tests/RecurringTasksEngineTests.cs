@@ -138,6 +138,27 @@ public class RecurringTasksEngineTests
             // Assert: Handles month end boundary safely
             nextDate.Should().Be(new DateTime(2026, 2, 28));
         }
+
+        [Fact]
+        public void CompleteYearlyTask_CreatesCopyNextYear()
+        {
+            // Arrange
+            var recurrenceService = new TaskRecurrenceService();
+            var aug3 = new DateTime(2026, 8, 3);
+
+            var task = new TaskItemBuilder()
+                .WithId(302)
+                .WithRecurrence(RecurrenceType.Yearly)
+                .WithScheduledDate(aug3)
+                .WithCompletedDate(aug3)
+                .Build();
+
+            // Act: Call real recurrence service
+            var nextDate = recurrenceService.CalculateNextRecurrenceDate(task);
+
+            // Assert: Date set to same day next year (2027-08-03)
+            nextDate.Should().Be(new DateTime(2027, 8, 3));
+        }
     }
 
     public class CascadeSubtaskCopy
