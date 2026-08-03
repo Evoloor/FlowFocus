@@ -188,15 +188,17 @@ public class PlanningEngineTests
 
             taskRepo.Add(parentTask);
 
-            var settings = new UserSettingsBuilder().WithDailyTimeLimit(180).Build();
+            // DailyTaskLimit = 1 (Count limit = 1 task/day). DailyTimeLimit = 480 min.
+            var settings = new UserSettingsBuilder().WithDailyTaskLimit(1).WithDailyTimeLimit(480).Build();
 
             // Act: Run planner service distribution
             plannerService.DistributeTasks(settings);
 
-            // Assert: Parent task scheduled today, subtasks are not independently distributed as root candidates
+            // Assert: Parent task with subtasks is scheduled today (subtasks excluded from task count limit) & subtask time is aggregated
             var savedParent = taskRepo.GetById(10);
             savedParent.Should().NotBeNull();
-            savedParent!.ScheduledDate.Should().Be(TodoDay.Today.ToDateTime());
+            savedParent.ScheduledDate.Should().Be(TodoDay.Today.ToDateTime());
+            savedParent.TotalEstimatedMinutes.Should().Be(150);
         }
 
         [Fact]

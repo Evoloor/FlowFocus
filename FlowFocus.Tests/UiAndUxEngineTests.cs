@@ -206,7 +206,7 @@ public class UiAndUxEngineTests
             act.Should().NotThrow();
             var savedTask = taskRepo.GetById(200);
             savedTask.Should().NotBeNull();
-            savedTask!.Tags.Should().ContainSingle(tt => tt.TagId == 10);
+            savedTask.Tags.Should().ContainSingle(tt => tt.TagId == 10);
         }
     }
 

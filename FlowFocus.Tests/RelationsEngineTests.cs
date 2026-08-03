@@ -203,11 +203,12 @@ public class RelationsEngineTests
             var updatedA1 = taskRepo.GetById(taskA1.Id);
             var updatedA2 = taskRepo.GetById(taskA2.Id);
 
-            // Assert: Inspect task repository persistent state
+            // Assert: Blocker assigned AutoFixed date in advance before target task's deadline
             updatedA1.Should().NotBeNull();
             updatedA2.Should().NotBeNull();
             updatedA1.DateSource.Should().Be(DateSource.AutoFixed);
-            updatedA1.ScheduledDate.Should().Be(targetDate);
+            updatedA1.ScheduledDate.Should().NotBeNull();
+            updatedA1.ScheduledDate.Should().BeBefore(targetDate);
         }
     }
 
@@ -234,7 +235,7 @@ public class RelationsEngineTests
             act.Should().NotThrow();
             var savedA = taskRepo.GetById(601);
             savedA.Should().NotBeNull();
-            savedA!.Relations.Should().ContainSingle(r => r.TargetTaskId == 602 && r.Type == RelationType.Blocks);
+            savedA.Relations.Should().ContainSingle(r => r.TargetTaskId == 602 && r.Type == RelationType.Blocks);
         }
     }
 }

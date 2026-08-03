@@ -19,7 +19,7 @@ public class TaskItemBuilder
     private DateTime? _scheduledDate;
     private DateSource _dateSource = DateSource.AutoFlexible;
     private DateTime? _completedDate;
-    private DateTime _createdDate = DateTime.UtcNow;
+    private readonly DateTime _createdDate = DateTime.UtcNow;
     private bool _isRecurring;
     private RecurrenceType _recurrenceType = RecurrenceType.None;
     private int? _recurrenceInterval;

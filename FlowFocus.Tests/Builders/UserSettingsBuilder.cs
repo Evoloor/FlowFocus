@@ -9,8 +9,8 @@ public class UserSettingsBuilder
     private int _dailyComplexityLimit = 100;
     private int _dailyTimeLimit = 480;
     private int _dailyTaskLimit = 10;
-    private bool _autoDistributeEnabled = true;
-    private bool _isDarkMode = true;
+    private const bool AutoDistributeEnabled = true;
+    private const bool IsDarkMode = true;
     private int _defaultPriorityId = 3;
 
     public UserSettingsBuilder WithId(int id)
@@ -58,8 +58,8 @@ public class UserSettingsBuilder
             DailyComplexityLimit = _dailyComplexityLimit,
             DailyTimeLimit = _dailyTimeLimit,
             DailyTaskLimit = _dailyTaskLimit,
-            AutoDistributeEnabled = _autoDistributeEnabled,
-            IsDarkMode = _isDarkMode,
+            AutoDistributeEnabled = AutoDistributeEnabled,
+            IsDarkMode = IsDarkMode,
             DefaultPriorityId = _defaultPriorityId
         };
     }

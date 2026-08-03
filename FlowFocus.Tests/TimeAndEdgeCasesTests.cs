@@ -51,7 +51,7 @@ public class TimeAndEdgeCasesTests
 
             // Assert: Task status is Completed and CompletedDate is populated in task repository
             savedTask.Should().NotBeNull();
-            savedTask!.Status.Should().Be(TaskStatus.Completed);
+            savedTask.Status.Should().Be(TaskStatus.Completed);
             savedTask.CompletedDate.Should().NotBeNull();
         }
     }
