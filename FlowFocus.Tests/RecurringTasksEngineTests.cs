@@ -3,6 +3,7 @@ using FlowFocus.Core;
 using FlowFocus.Core.Enums;
 using FlowFocus.Core.Models;
 using FlowFocus.Core.Services;
+using FlowFocus.Core.Validation;
 using FlowFocus.Data.Repositories;
 using FlowFocus.Data.Services;
 using FlowFocus.Tests.Builders;
@@ -266,5 +267,26 @@ public class RecurringTasksEngineTests
             // Assert: Only single recurring copy generated in repository
             copies.Should().HaveCount(expected: 1);
         }
+    }
+    
+    [Fact]
+    public void RecurringTasks_CannotBeAssigned_AutoFlexibleDateSource()
+    {
+        // Arrange: Повторяющаяся задача по определению не может быть автоматически гибкой
+        var recurringTask = new TaskItemBuilder()
+            .WithRecurrence(RecurrenceType.Daily)
+            .WithScheduledDate(DateTime.UtcNow, DateSource.AutoFixed)
+            .Build();
+
+        // Act: Имитируем баг, когда кто-то пытается применить гибкую дату
+        var act = () => 
+        {
+            recurringTask.DateSource = DateSource.AutoFlexible;
+            TaskItemValidator.ValidateRecurringTaskCreation(recurringTask);
+        };
+
+        // Assert
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*не может быть автоматически гибкой*");
     }
 }

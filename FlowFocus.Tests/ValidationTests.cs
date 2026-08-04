@@ -1,8 +1,11 @@
 using FluentAssertions;
 using FlowFocus.Core.Enums;
+using FlowFocus.Core.Services;
 using FlowFocus.Core.Validation;
+using FlowFocus.Data.Repositories;
 using FlowFocus.Tests.Builders;
 using JetBrains.Annotations;
+using NSubstitute;
 
 namespace FlowFocus.Tests;
 
@@ -173,5 +176,33 @@ public class ValidationTests
             // Assert
             result.Should().Be(expected: expected);
         }
+    }
+    
+    [Fact]
+    public void UpdateSubtask_WithForbiddenFields_IgnoresChangesOrThrows()
+    {
+        // Arrange: К подзадачам не относится функционал помимо базовых полей[cite: 1]
+        using var context = TestDbContextFactory.CreateInMemoryContext();
+        var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+
+        var parentTask = new TaskItemBuilder().WithId(7000).WithScheduledDate(new DateTime(2026, 1, 1)).Build();
+        var subtask = new TaskItemBuilder().WithId(7001).WithParentTask(parentTask).Build();
+    
+        taskRepo.Add(parentTask);
+        taskRepo.Add(subtask);
+        context.ChangeTracker.Clear();
+
+        // Act: Попытка обновить запрещенные для подзадачи поля (рекурсия, независимая дата)
+        var updatedSubtask = taskRepo.GetById(7001);
+        updatedSubtask!.IsRecurring = true;
+        updatedSubtask.RecurrenceType = RecurrenceType.Daily;
+        updatedSubtask.ScheduledDate = new DateTime(2027, 1, 1);
+    
+        // Вызываем общий метод сохранения
+        var act = () => taskRepo.Update(updatedSubtask);
+
+        // Assert: Система должна либо отклонить такую транзакцию, либо проигнорировать запрещенные поля
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*подзадачи не поддерживают независимые даты или повторения*");
     }
 }
