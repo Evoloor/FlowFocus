@@ -23,11 +23,11 @@ public class DateSourceTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
             var task = new TaskItemBuilder().WithId(101).WithTitle("Manual Task").Build();
             taskRepo.Add(task);
 
-            var selectedDate = new DateTime(2026, 8, 10);
+            DateTime selectedDate = new(2026, 8, 10);
 
             // Act: Application updates task schedule with manual date
             taskRepo.UpdateTaskSchedule(task.Id, selectedDate, DateSource.Manual);
@@ -47,7 +47,7 @@ public class DateSourceTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
             var task = new TaskItemBuilder().WithId(102).WithTitle("No Date Task").WithScheduledDate(null, DateSource.AutoFlexible).Build();
 
             // Act
@@ -68,11 +68,11 @@ public class DateSourceTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
             var task = new TaskItemBuilder().WithId(103).WithScheduledDate(new DateTime(2026, 8, 5), DateSource.AutoFixed).Build();
             taskRepo.Add(task);
 
-            var newManualDate = new DateTime(2026, 8, 12);
+            DateTime newManualDate = new(2026, 8, 12);
 
             // Act
             taskRepo.UpdateTaskSchedule(task.Id, newManualDate, DateSource.Manual);
@@ -92,8 +92,8 @@ public class DateSourceTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
-            var plannerService = new PlannerService(taskRepo);
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepo);
 
             var overdueDate = TodoDay.Today.Yesterday.ToDateTime();
             var task = new TaskItemBuilder()
@@ -144,7 +144,7 @@ public class DateSourceTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
 
             var yesterday = TodoDay.Today.Yesterday.ToDateTime();
             var overdueManualTask = new TaskItemBuilder()

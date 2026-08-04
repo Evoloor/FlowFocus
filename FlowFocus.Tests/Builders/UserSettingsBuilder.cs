@@ -51,7 +51,7 @@ public class UserSettingsBuilder
 
     public UserSettings Build()
     {
-        return new UserSettings
+        return new()
         {
             Id = _id,
             DayStartHour = _dayStartHour,

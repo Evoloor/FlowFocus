@@ -23,8 +23,8 @@ public class PlanningEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
-            var plannerService = new PlannerService(taskRepo);
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepo);
 
             var priorities = context.Priorities.OrderBy(p => p.Order).ToList();
             var urgentPriority = priorities[0]; // Order 1
@@ -67,8 +67,8 @@ public class PlanningEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
-            var plannerService = new PlannerService(taskRepo);
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepo);
 
             var taskA = new TaskItemBuilder().WithId(101).WithEstimatedMinutes(60)
                 .WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
@@ -100,8 +100,8 @@ public class PlanningEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
-            var plannerService = new PlannerService(taskRepo);
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepo);
 
             var existingTask = new TaskItemBuilder().WithId(201).WithEstimatedMinutes(70)
                 .WithScheduledDate(TodoDay.Today.ToDateTime(), DateSource.Manual).WithStatus(TaskStatus.Planned)
@@ -129,8 +129,8 @@ public class PlanningEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
-            var plannerService = new PlannerService(taskRepo);
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepo);
 
             var urgentPriority = context.Priorities.First(p => p.Order == 1);
             var urgentTask = new TaskItemBuilder().WithId(301).WithPriorityId(urgentPriority.Id)
@@ -156,7 +156,7 @@ public class PlanningEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
 
             var task = new TaskItemBuilder()
                 .WithId(400)
@@ -181,8 +181,8 @@ public class PlanningEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
-            var plannerService = new PlannerService(taskRepo);
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepo);
 
             var urgentPriority = context.Priorities.First(p => p.Order == 1);
             var subtask1 = new TaskItemBuilder().WithId(11).WithTitle("Subtask 1").WithParentTaskId(10)
@@ -215,8 +215,8 @@ public class PlanningEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
-            var plannerService = new PlannerService(taskRepo);
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepo);
 
             var task = new TaskItemBuilder().WithId(401).WithEstimatedMinutes(60)
                 .WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
@@ -237,8 +237,8 @@ public class PlanningEngineTests
         {
             // Arrange: Проверка, что завершённые сегодня дела учитываются при подсчёте лимита[cite: 1]
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
-            var plannerService = new PlannerService(taskRepo);
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepo);
 
             var completedToday = new TaskItemBuilder()
                 .WithId(701)
@@ -275,8 +275,8 @@ public class PlanningEngineTests
         {
             // Arrange: Проверка лимита количества задач на день[cite: 3]
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
-            var plannerService = new PlannerService(taskRepo);
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepo);
 
             var task1 = new TaskItemBuilder().WithId(801).WithDateSource(DateSource.AutoFlexible)
                 .WithStatus(TaskStatus.Planned).Build();
@@ -302,8 +302,8 @@ public class PlanningEngineTests
         {
             // Arrange: Подзадачи не учитываются при сравнении с лимитом задач на день[cite: 3]
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
-            var plannerService = new PlannerService(taskRepo);
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepo);
 
             var subtask1 = new TaskItemBuilder().WithId(901).WithTitle("Subtask 1").Build();
             var subtask2 = new TaskItemBuilder().WithId(902).WithTitle("Subtask 2").Build();
@@ -339,8 +339,8 @@ public class PlanningEngineTests
         {
             // Arrange: Проверка лимита по сложности[cite: 3]
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
-            var plannerService = new PlannerService(taskRepo);
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepo);
 
             var task1 = new TaskItemBuilder().WithId(1001).WithComplexity(60).WithDateSource(DateSource.AutoFlexible)
                 .WithStatus(TaskStatus.Planned).Build();
@@ -366,8 +366,8 @@ public class PlanningEngineTests
         {
             // Arrange: Крупным делом можно превышать ТОЛЬКО лимит часов, сложность превышать нельзя[cite: 1]
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
-            var plannerService = new PlannerService(taskRepo);
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepo);
 
             var existingTask = new TaskItemBuilder().WithId(1101).WithComplexity(50)
                 .WithScheduledDate(TodoDay.Today.ToDateTime(), DateSource.Manual).WithStatus(TaskStatus.Planned)
@@ -395,8 +395,8 @@ public class PlanningEngineTests
         {
             // Arrange: Перенесённая просрочка заполняет день раньше обычных дел и может превышать лимиты[cite: 1]
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
-            var plannerService = new PlannerService(taskRepo);
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepo);
 
             var overdueDate = TodoDay.Today.Yesterday.ToDateTime();
 
@@ -439,26 +439,25 @@ public class PlanningEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
-            var plannerService = new PlannerService(taskRepo);
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepo);
 
             var today = TodoDay.Today.ToDateTime();
             var targetDate = today.AddDays(3);
 
-            var blockerA = new TaskItem
+            TaskItem blockerA = new()
             {
                 Id = 601, Title = "Blocker A", DateSource = DateSource.AutoFlexible, Status = TaskStatus.Planned,
                 EstimatedMinutes = 300
             };
-            var blockedB = new TaskItem
+            TaskItem blockedB = new()
             {
                 Id = 602, Title = "Blocked B", ScheduledDate = targetDate, DateSource = DateSource.Manual,
                 Status = TaskStatus.Planned, EstimatedMinutes = 300
             };
             context.Tasks.AddRange(blockerA, blockedB);
 
-            context.TaskRelations.Add(new TaskRelation
-                { Id = 6001, SourceTaskId = blockerA.Id, TargetTaskId = blockedB.Id, Type = RelationType.Blocks });
+            context.TaskRelations.Add(new() { Id = 6001, SourceTaskId = blockerA.Id, TargetTaskId = blockedB.Id, Type = RelationType.Blocks });
             context.SaveChanges();
 
             // Act: Daily limit 200 mins. Total A+B = 600 mins -> capacity deficit!
@@ -480,8 +479,8 @@ public class PlanningEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
-            var plannerService = new PlannerService(taskRepo);
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepo);
 
             var task1 = new TaskItemBuilder().WithId(501).WithEstimatedMinutes(60)
                 .WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
@@ -513,8 +512,8 @@ public class PlanningEngineTests
     {
         // Arrange: Неактивные сегодняшние задачи (Completed и Irrelevant) учитываются в лимитах
         using var context = TestDbContextFactory.CreateInMemoryContext();
-        var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
-        var plannerService = new PlannerService(taskRepo);
+        TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
+        PlannerService plannerService = new(taskRepo);
 
         var completedToday = new TaskItemBuilder()
             .WithId(101).WithEstimatedMinutes(60)
@@ -551,7 +550,7 @@ public class PlanningEngineTests
     {
         // Arrange: Создавать повторки только на актуальные даты, пропуская сильно просроченные
         using var context = TestDbContextFactory.CreateInMemoryContext();
-        var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+        TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
 
         // Задача должна была выполняться ежедневно, но просрочена на 10 дней
         var tenDaysAgo = TodoDay.Today.ToDateTime().AddDays(-10);

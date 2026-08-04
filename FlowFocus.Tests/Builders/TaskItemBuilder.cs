@@ -152,7 +152,7 @@ public class TaskItemBuilder
 
     public TaskItemBuilder WithRelation(TaskItem target, RelationType type = RelationType.Blocks)
     {
-        _relations.Add(new TaskRelation
+        _relations.Add(new()
         {
             SourceTaskId = _id,
             TargetTaskId = target.Id,
@@ -164,7 +164,7 @@ public class TaskItemBuilder
 
     public TaskItemBuilder WithInverseRelation(TaskItem source, RelationType type = RelationType.Blocks)
     {
-        _inverseRelations.Add(new TaskRelation
+        _inverseRelations.Add(new()
         {
             SourceTaskId = source.Id,
             SourceTask = source,
@@ -176,7 +176,7 @@ public class TaskItemBuilder
 
     public TaskItemBuilder WithEscalation(int targetPriorityId, DateTime escalationDate)
     {
-        _priorityEscalations.Add(new PriorityEscalation
+        _priorityEscalations.Add(new()
         {
             TaskId = _id,
             TargetPriorityId = targetPriorityId,
@@ -188,7 +188,7 @@ public class TaskItemBuilder
 
     public TaskItem Build()
     {
-        var item = new TaskItem
+        TaskItem item = new()
         {
             Id = _id,
             Title = _title,

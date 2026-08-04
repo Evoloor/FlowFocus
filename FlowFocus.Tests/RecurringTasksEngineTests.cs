@@ -22,7 +22,7 @@ public class RecurringTasksEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
 
             var today = TodoDay.Today.ToDateTime();
             var task = new TaskItemBuilder()
@@ -59,7 +59,7 @@ public class RecurringTasksEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
 
             var overdueDate = TodoDay.Today.Yesterday.AddDays(-2).ToDateTime(); // 3 days ago
             var task = new TaskItemBuilder()
@@ -90,8 +90,8 @@ public class RecurringTasksEngineTests
         public void CompleteMonthlyTask_CreatesCopyNextMonth()
         {
             // Arrange
-            var recurrenceService = new TaskRecurrenceService();
-            var aug3 = new DateTime(2026, 8, 3);
+            TaskRecurrenceService recurrenceService = new();
+            DateTime aug3 = new(2026, 8, 3);
 
             var task = new TaskItemBuilder()
                 .WithId(300)
@@ -103,15 +103,15 @@ public class RecurringTasksEngineTests
             var nextDate = recurrenceService.CalculateNextRecurrenceDate(task);
 
             // Assert
-            nextDate.Should().Be(new DateTime(2026, 9, 3));
+            nextDate.Should().Be(new(2026, 9, 3));
         }
 
         [Fact]
         public void CompleteJan31MonthlyTask_CalculatesFeb28WithoutInvalidDateError()
         {
             // Arrange
-            var recurrenceService = new TaskRecurrenceService();
-            var jan31 = new DateTime(2026, 1, 31);
+            TaskRecurrenceService recurrenceService = new();
+            DateTime jan31 = new(2026, 1, 31);
 
             var task = new TaskItemBuilder()
                 .WithId(301)
@@ -124,15 +124,15 @@ public class RecurringTasksEngineTests
             var nextDate = recurrenceService.CalculateNextRecurrenceDate(task);
 
             // Assert: Handles month end boundary safely
-            nextDate.Should().Be(new DateTime(2026, 2, 28));
+            nextDate.Should().Be(new(2026, 2, 28));
         }
 
         [Fact]
         public void CompleteYearlyTask_CreatesCopyNextYear()
         {
             // Arrange
-            var recurrenceService = new TaskRecurrenceService();
-            var aug3 = new DateTime(2026, 8, 3);
+            TaskRecurrenceService recurrenceService = new();
+            DateTime aug3 = new(2026, 8, 3);
 
             var task = new TaskItemBuilder()
                 .WithId(302)
@@ -145,7 +145,7 @@ public class RecurringTasksEngineTests
             var nextDate = recurrenceService.CalculateNextRecurrenceDate(task);
 
             // Assert: Date set to same day next year (2027-08-03)
-            nextDate.Should().Be(new DateTime(2027, 8, 3));
+            nextDate.Should().Be(new(2027, 8, 3));
         }
     }
 
@@ -156,12 +156,12 @@ public class RecurringTasksEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
 
-            var sub1 = new TaskItem { Title = "Subtask 1" };
-            var sub2 = new TaskItem { Title = "Subtask 2" };
+            TaskItem sub1 = new() { Title = "Subtask 1" };
+            TaskItem sub2 = new() { Title = "Subtask 2" };
 
-            var parent = new TaskItem
+            TaskItem parent = new()
             {
                 Title = "Parent Recurring Task",
                 IsRecurring = true,
@@ -194,7 +194,7 @@ public class RecurringTasksEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
 
             var task = new TaskItemBuilder()
                 .WithId(500)

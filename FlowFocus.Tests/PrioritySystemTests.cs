@@ -19,7 +19,7 @@ public class PrioritySystemTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var repository = new PriorityRepository(context, Substitute.For<INotificationService>());
+            PriorityRepository repository = new(context, Substitute.For<INotificationService>());
 
             // Act
             var priorities = repository.GetAllOrdered();
@@ -40,10 +40,10 @@ public class PrioritySystemTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var repository = new PriorityRepository(context, Substitute.For<INotificationService>());
+            PriorityRepository repository = new(context, Substitute.For<INotificationService>());
             var priority = repository.GetAllOrdered().First();
 
-            var updatedPriority = new PriorityLevel
+            PriorityLevel updatedPriority = new()
             {
                 Id = priority.Id,
                 Order = priority.Order,
@@ -69,17 +69,17 @@ public class PrioritySystemTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var repository = new PriorityRepository(context, Substitute.For<INotificationService>());
+            PriorityRepository repository = new(context, Substitute.For<INotificationService>());
             var initialPriorities = repository.GetAllOrdered();
 
-            var reorderedIds = new List<int>
-            {
+            List<int> reorderedIds =
+            [
                 initialPriorities[4].Id, // Move Background (5) to first
                 initialPriorities[0].Id,
                 initialPriorities[1].Id,
                 initialPriorities[2].Id,
                 initialPriorities[3].Id
-            };
+            ];
 
             // Act
             repository.Reorder(reorderedIds);
@@ -98,7 +98,7 @@ public class PrioritySystemTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var repository = new PriorityRepository(context, Substitute.For<INotificationService>());
+            PriorityRepository repository = new(context, Substitute.For<INotificationService>());
 
             for (var i = 6; i <= 20; i++)
             {
@@ -121,7 +121,7 @@ public class PrioritySystemTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
             var userSettings = new UserSettingsBuilder().WithDefaultPriorityId(2).Build();
 
             var newTask = new TaskItemBuilder()

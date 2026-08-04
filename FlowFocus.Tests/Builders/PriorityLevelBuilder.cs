@@ -35,7 +35,7 @@ public class PriorityLevelBuilder
 
     public PriorityLevel Build()
     {
-        return new PriorityLevel
+        return new()
         {
             Id = _id,
             Order = _order,

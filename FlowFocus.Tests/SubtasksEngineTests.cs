@@ -18,7 +18,7 @@ public class SubtasksEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
 
             var subtask1 = new TaskItemBuilder().WithId(101).WithEstimatedMinutes(15).WithComplexity(5).Build();
             var subtask2 = new TaskItemBuilder().WithId(102).WithEstimatedMinutes(45).WithComplexity(15).Build();
@@ -49,7 +49,7 @@ public class SubtasksEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
 
             var subtask = new TaskItemBuilder().WithId(201).WithTitle("Subtask").WithParentTaskId(200).Build();
             var mainTask = new TaskItemBuilder().WithId(200).WithTitle("Main Parent Task").WithSubtask(subtask).Build();
@@ -120,7 +120,7 @@ public class SubtasksEngineTests
     {
         // Arrange: В FlowFocus используется единая дата ScheduledDate.
         // Дата подзадачи не должна быть позже или отличаться от даты родительской задачи.
-        var parentDate = new DateTime(2026, 8, 10);
+        DateTime parentDate = new(2026, 8, 10);
 
         var parentTask = new TaskItemBuilder()
             .WithId(20)

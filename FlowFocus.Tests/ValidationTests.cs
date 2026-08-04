@@ -80,7 +80,7 @@ public class ValidationTests
             for (var i = 1; i <= 15; i++)
             {
                 var target = new TaskItemBuilder().WithId(i).Build();
-                taskA.Relations.Add(new Core.Models.TaskRelation { SourceTaskId = taskA.Id, TargetTaskId = target.Id, Type = RelationType.RelatedTo });
+                taskA.Relations.Add(new() { SourceTaskId = taskA.Id, TargetTaskId = target.Id, Type = RelationType.RelatedTo });
             }
 
             var extraTask = new TaskItemBuilder().WithId(101).Build();

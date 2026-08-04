@@ -22,11 +22,11 @@ public class GraphAndCycleTests
             var taskB = new TaskItemBuilder().WithId(2).WithTitle("Task B").Build();
             var taskC = new TaskItemBuilder().WithId(3).WithTitle("Task C").Build();
 
-            var graph = new List<TaskRelation>
-            {
-                new TaskRelation { SourceTaskId = 1, TargetTaskId = 2, Type = RelationType.Blocks },
-                new TaskRelation { SourceTaskId = 2, TargetTaskId = 3, Type = RelationType.Blocks }
-            };
+            List<TaskRelation> graph =
+            [
+                new() { SourceTaskId = 1, TargetTaskId = 2, Type = RelationType.Blocks },
+                new() { SourceTaskId = 2, TargetTaskId = 3, Type = RelationType.Blocks }
+            ];
 
             // Act: Call real domain validator to add "C blocks A"
             var act = () => TaskRelationValidator.ValidateNewRelation(taskC, taskA, RelationType.Blocks, graph);

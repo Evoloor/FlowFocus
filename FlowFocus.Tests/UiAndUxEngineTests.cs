@@ -54,7 +54,7 @@ public class UiAndUxEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
             var inputText = "Купить хлеб";
 
             var newTask = new TaskItemBuilder()
@@ -84,7 +84,7 @@ public class UiAndUxEngineTests
             var highInterestMediumPriority = new TaskItemBuilder().WithId(2).WithInterest(9).WithPriority(PriorityLevelBuilder.Medium).Build(); // Score = 9 - sqrt(3) ~ 7.27
             var highInterestHighPriority = new TaskItemBuilder().WithId(3).WithInterest(10).WithPriority(PriorityLevelBuilder.High).Build();   // Score = 10 - sqrt(2) ~ 8.58
 
-            var list = new List<TaskItem> { lowInterestHighPriority, highInterestMediumPriority, highInterestHighPriority };
+            List<TaskItem> list = [lowInterestHighPriority, highInterestMediumPriority, highInterestHighPriority];
 
             // Act: Call real ProcrastinationEngine service
             var ideal = ProcrastinationEngine.SelectIdealProcrastinationTask(list);
@@ -112,7 +112,7 @@ public class UiAndUxEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
 
             var overdueDate = TodoDay.Today.Yesterday.ToDateTime();
             var task = new TaskItemBuilder().WithId(1).WithScheduledDate(overdueDate).WithStatus(TaskStatus.Planned).Build();
@@ -130,7 +130,7 @@ public class UiAndUxEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
 
             // Act: Call real repository query method
             var overdueTasks = taskRepo.GetOverdueTasks();
@@ -148,16 +148,16 @@ public class UiAndUxEngineTests
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
             var notificationService = Substitute.For<INotificationService>();
-            var taskRepo = new TaskRepository(context, notificationService);
-            var tagRepo = new TagRepository(context, notificationService);
+            TaskRepository taskRepo = new(context, notificationService);
+            TagRepository tagRepo = new(context, notificationService);
 
-            var tag = new Tag { Id = 5, Name = "Работа", UsageCount = 1 };
+            Tag tag = new() { Id = 5, Name = "Работа", UsageCount = 1 };
             context.Tags.Add(tag);
 
             var task = new TaskItemBuilder().WithId(1).WithTitle("Task with tag").Build();
             taskRepo.Add(task);
 
-            context.TaskTags.Add(new TaskTag { TaskId = task.Id, TagId = tag.Id });
+            context.TaskTags.Add(new() { TaskId = task.Id, TagId = tag.Id });
             context.SaveChanges();
 
             // Act: Delete tag via application TagRepository
@@ -179,14 +179,14 @@ public class UiAndUxEngineTests
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
             var notificationService = Substitute.For<INotificationService>();
-            var taskRepo = new TaskRepository(context, notificationService);
+            TaskRepository taskRepo = new(context, notificationService);
 
-            var tag = new Tag { Id = 10, Name = "Срочно", UsageCount = 1 };
+            Tag tag = new() { Id = 10, Name = "Срочно", UsageCount = 1 };
             context.Tags.Add(tag);
             context.SaveChanges();
 
             var task = new TaskItemBuilder().WithId(200).WithTitle("Task with persistent tag").Build();
-            task.Tags.Add(new TaskTag { TaskId = 200, TagId = 10 });
+            task.Tags.Add(new() { TaskId = 200, TagId = 10 });
 
             // Act: Call real repository method
             var act = () => taskRepo.Add(task);
@@ -207,18 +207,18 @@ public class UiAndUxEngineTests
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
             var notificationService = Substitute.For<INotificationService>();
-            var tagRepo = new TagRepository(context, notificationService);
+            TagRepository tagRepo = new(context, notificationService);
 
-            var tag1 = new Tag { Id = 1, Name = "Tag 1", UsageCount = 10 };
-            var tag2 = new Tag { Id = 2, Name = "Tag 2", UsageCount = 20 };
-            var tag3 = new Tag { Id = 3, Name = "Tag 3", UsageCount = 30 };
-            var tag4 = new Tag { Id = 4, Name = "Tag 4", UsageCount = 40 };
-            var sessionTag = new Tag { Id = 5, Name = "Session Tag", UsageCount = 5 };
+            Tag tag1 = new() { Id = 1, Name = "Tag 1", UsageCount = 10 };
+            Tag tag2 = new() { Id = 2, Name = "Tag 2", UsageCount = 20 };
+            Tag tag3 = new() { Id = 3, Name = "Tag 3", UsageCount = 30 };
+            Tag tag4 = new() { Id = 4, Name = "Tag 4", UsageCount = 40 };
+            Tag sessionTag = new() { Id = 5, Name = "Session Tag", UsageCount = 5 };
 
             context.Tags.AddRange(tag1, tag2, tag3, tag4, sessionTag);
             context.SaveChanges();
 
-            var tagSessionService = new TagSessionService(tagRepo);
+            TagSessionService tagSessionService = new(tagRepo);
 
             // Act: Mark sessionTag as last used, then query suggested tags (5 count)
             tagSessionService.MarkTagUsed(sessionTag);

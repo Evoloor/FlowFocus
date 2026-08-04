@@ -40,7 +40,7 @@ public class PriorityEscalationTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
 
             var priorities = context.Priorities.OrderBy(p => p.Order).ToList();
             var criticalPriority = priorities[0]; // Id 1
@@ -52,8 +52,8 @@ public class PriorityEscalationTests
                 .WithPriorityId(mediumPriority.Id)
                 .Build();
 
-            task.PriorityEscalations.Add(new PriorityEscalation { TaskId = 500, TargetPriorityId = highPriority.Id, EscalationDate = DateTime.UtcNow.AddDays(1) });
-            task.PriorityEscalations.Add(new PriorityEscalation { TaskId = 500, TargetPriorityId = criticalPriority.Id, EscalationDate = DateTime.UtcNow.AddDays(5) });
+            task.PriorityEscalations.Add(new() { TaskId = 500, TargetPriorityId = highPriority.Id, EscalationDate = DateTime.UtcNow.AddDays(1) });
+            task.PriorityEscalations.Add(new() { TaskId = 500, TargetPriorityId = criticalPriority.Id, EscalationDate = DateTime.UtcNow.AddDays(5) });
 
             taskRepo.Add(task);
 
@@ -82,7 +82,7 @@ public class PriorityEscalationTests
             var lowPriority = priorities[3];
 
             var today = TodoDay.Today.ToDateTime();
-            var escalation = new PriorityEscalation
+            PriorityEscalation escalation = new()
             {
                 TaskId = 500,
                 TargetPriorityId = criticalPriority.Id,
@@ -100,8 +100,8 @@ public class PriorityEscalationTests
             context.Tasks.Add(task);
             context.SaveChanges();
 
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
-            var plannerService = new PlannerService(taskRepo);
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepo);
 
             // Act: Call application service method
             plannerService.ActualizePriorities();
@@ -123,13 +123,13 @@ public class PriorityEscalationTests
             try
             {
                 TodoDay.Configure(4);
-                var systemTime = new DateTime(2026, 8, 4, 2, 30, 0); // 02:30 AM
+                DateTime systemTime = new(2026, 8, 4, 2, 30, 0); // 02:30 AM
 
                 // Act: Call application TodoDay logic
                 var logicalDate = systemTime.Hour < 4 ? systemTime.Date.AddDays(-1) : systemTime.Date;
 
                 // Assert
-                logicalDate.Should().Be(new DateTime(2026, 8, 3));
+                logicalDate.Should().Be(new(2026, 8, 3));
             }
             finally
             {

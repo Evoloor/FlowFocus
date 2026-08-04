@@ -22,7 +22,7 @@ public class TimeAndEdgeCasesTests
             {
                 TodoDay.Configure(4);
                 using var context = TestDbContextFactory.CreateInMemoryContext();
-                var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+                TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
 
                 var task = new TaskItemBuilder()
                     .WithId(100)

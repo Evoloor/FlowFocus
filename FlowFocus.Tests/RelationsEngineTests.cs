@@ -93,14 +93,14 @@ public class RelationsEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskA = new TaskItem { Id = 101, Title = "Blocker A", Status = TaskStatus.Planned };
-            var taskB = new TaskItem { Id = 102, Title = "Blocked B", Status = TaskStatus.Planned };
+            TaskItem taskA = new() { Id = 101, Title = "Blocker A", Status = TaskStatus.Planned };
+            TaskItem taskB = new() { Id = 102, Title = "Blocked B", Status = TaskStatus.Planned };
             context.Tasks.AddRange(taskA, taskB);
 
-            context.TaskRelations.Add(new TaskRelation { Id = 1001, SourceTaskId = taskA.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
+            context.TaskRelations.Add(new() { Id = 1001, SourceTaskId = taskA.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
             context.SaveChanges();
 
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
 
             // Act: Call real application service method
             taskRepo.CompleteTask(taskA.Id);
@@ -116,16 +116,16 @@ public class RelationsEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskA = new TaskItem { Id = 201, Title = "Blocker A", Status = TaskStatus.Planned };
-            var taskC = new TaskItem { Id = 203, Title = "Blocker C", Status = TaskStatus.Planned };
-            var taskB = new TaskItem { Id = 202, Title = "Blocked B", Status = TaskStatus.Planned };
+            TaskItem taskA = new() { Id = 201, Title = "Blocker A", Status = TaskStatus.Planned };
+            TaskItem taskC = new() { Id = 203, Title = "Blocker C", Status = TaskStatus.Planned };
+            TaskItem taskB = new() { Id = 202, Title = "Blocked B", Status = TaskStatus.Planned };
             context.Tasks.AddRange(taskA, taskC, taskB);
 
-            context.TaskRelations.Add(new TaskRelation { Id = 2001, SourceTaskId = taskA.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
-            context.TaskRelations.Add(new TaskRelation { Id = 2002, SourceTaskId = taskC.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
+            context.TaskRelations.Add(new() { Id = 2001, SourceTaskId = taskA.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
+            context.TaskRelations.Add(new() { Id = 2002, SourceTaskId = taskC.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
             context.SaveChanges();
 
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
 
             // Act: Call real application service method
             taskRepo.CompleteTask(taskA.Id);
@@ -144,14 +144,14 @@ public class RelationsEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskA = new TaskItem { Id = 301, Title = "Task A", Status = TaskStatus.Planned };
-            var taskB = new TaskItem { Id = 302, Title = "Task B", Status = TaskStatus.Planned };
+            TaskItem taskA = new() { Id = 301, Title = "Task A", Status = TaskStatus.Planned };
+            TaskItem taskB = new() { Id = 302, Title = "Task B", Status = TaskStatus.Planned };
             context.Tasks.AddRange(taskA, taskB);
 
-            context.TaskRelations.Add(new TaskRelation { Id = 3001, SourceTaskId = taskA.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
+            context.TaskRelations.Add(new() { Id = 3001, SourceTaskId = taskA.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
             context.SaveChanges();
 
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
 
             // Act: Query repository
             var fetchedA = taskRepo.GetById(taskA.Id);
@@ -170,19 +170,19 @@ public class RelationsEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
-            var plannerService = new PlannerService(taskRepo);
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepo);
 
             var today = TodoDay.Today.ToDateTime();
             var targetDate = today.AddDays(4);
 
-            var taskB = new TaskItem { Id = 502, Title = "Blocked B", ScheduledDate = targetDate, DateSource = DateSource.Manual, Status = TaskStatus.Planned, EstimatedMinutes = 180 };
-            var taskA1 = new TaskItem { Id = 501, Title = "Blocker A1", DateSource = DateSource.AutoFlexible, Status = TaskStatus.Planned, EstimatedMinutes = 300 };
-            var taskA2 = new TaskItem { Id = 503, Title = "Blocker A2", DateSource = DateSource.AutoFlexible, Status = TaskStatus.Planned, EstimatedMinutes = 300 };
+            TaskItem taskB = new() { Id = 502, Title = "Blocked B", ScheduledDate = targetDate, DateSource = DateSource.Manual, Status = TaskStatus.Planned, EstimatedMinutes = 180 };
+            TaskItem taskA1 = new() { Id = 501, Title = "Blocker A1", DateSource = DateSource.AutoFlexible, Status = TaskStatus.Planned, EstimatedMinutes = 300 };
+            TaskItem taskA2 = new() { Id = 503, Title = "Blocker A2", DateSource = DateSource.AutoFlexible, Status = TaskStatus.Planned, EstimatedMinutes = 300 };
 
             context.Tasks.AddRange(taskA1, taskB, taskA2);
-            context.TaskRelations.Add(new TaskRelation { Id = 5001, SourceTaskId = taskA1.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
-            context.TaskRelations.Add(new TaskRelation { Id = 5002, SourceTaskId = taskA2.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
+            context.TaskRelations.Add(new() { Id = 5001, SourceTaskId = taskA1.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
+            context.TaskRelations.Add(new() { Id = 5002, SourceTaskId = taskA2.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
             context.SaveChanges();
 
             var settings = new UserSettingsBuilder().WithDailyTimeLimit(240).Build();
@@ -209,14 +209,14 @@ public class RelationsEngineTests
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
 
-            var taskB = new TaskItem { Id = 602, Title = "Target B", Status = TaskStatus.Planned };
+            TaskItem taskB = new() { Id = 602, Title = "Target B", Status = TaskStatus.Planned };
             context.Tasks.Add(taskB);
             context.SaveChanges();
 
             var taskA = new TaskItemBuilder().WithId(601).WithTitle("Source A").Build();
-            taskA.Relations.Add(new TaskRelation { SourceTaskId = 601, TargetTaskId = 602, Type = RelationType.Blocks });
+            taskA.Relations.Add(new() { SourceTaskId = 601, TargetTaskId = 602, Type = RelationType.Blocks });
 
             // Act: Call real repository Add method
             var act = () => taskRepo.Add(taskA);
