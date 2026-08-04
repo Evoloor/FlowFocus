@@ -28,6 +28,55 @@ public class RelationsEngineTests
     [Trait(name: "Category", value: "Relations")]
     public class BlockerPriority
     {
+        /// <summary>
+        /// Verifies that when a blocked task's priority escalates to critical (Priority 1),
+        /// its blocker cascades to critical priority and legitimately bypasses daily limits to be scheduled today.
+        /// </summary>
+        [Fact]
+        public void EscalatedBlockerChain_LegitimatelyBypassesLimits_AsCriticalPriority()
+        {
+            // Arrange: Проверка цепной реакции - эскалация -> каскад на блокера -> игнор лимитов при распределении
+            using var context = TestDbContextFactory.CreateInMemoryContext();
+            var taskRepo = new TaskRepository(context, Substitute.For<INotificationService>());
+            var plannerService = new PlannerService(taskRepo);
+
+            var priorities = context.Priorities.OrderBy(p => p.Order).ToList();
+            var critical = priorities[0];
+            var low = priorities[3];
+
+            // Забиваем день "мусорной" задачей, чтобы лимит был исчерпан
+            var fillerTask = new TaskItemBuilder().WithId(10).WithPriorityId(low.Id)
+                .WithEstimatedMinutes(240).WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
+
+            // Блокер (низкий приоритет)
+            var blocker = new TaskItemBuilder().WithId(11).WithPriorityId(low.Id)
+                .WithEstimatedMinutes(120).WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
+            
+            // Заблокированная (низкий приоритет, но с правилом повышения СЕГОДНЯ)
+            var blocked = new TaskItemBuilder().WithId(12).WithPriorityId(low.Id)
+                .WithEstimatedMinutes(120).WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
+            blocked.PriorityEscalations.Add(new PriorityEscalation { TargetPriorityId = critical.Id, EscalationDate = TodoDay.Today.ToDateTime() });
+
+            context.Tasks.AddRange(fillerTask, blocker, blocked);
+            context.TaskRelations.Add(new TaskRelation { SourceTaskId = 11, TargetTaskId = 12, Type = RelationType.Blocks });
+            context.SaveChanges();
+
+            var settings = new UserSettingsBuilder().WithDailyTimeLimit(240).Build();
+
+            // Act: Полный цикл планировщика (Актуализация -> Нормализация -> Распределение)
+            plannerService.ActualizePriorities();
+            plannerService.NormalizeBlockerPriorities();
+            plannerService.DistributeTasks(settings);
+
+            // Assert
+            var savedBlocker = taskRepo.GetById(11);
+            var savedBlocked = taskRepo.GetById(12);
+
+            // Обе задачи должны проигнорировать исчерпанный лимит (240 минут) и встать на сегодня, так как стали критическими
+            savedBlocker!.PriorityId.Should().Be(critical.Id, "Блокер должен каскадно повыситься");
+            savedBlocker.ScheduledDate.Should().Be(TodoDay.Today.ToDateTime(), "Критический блокер должен встать на сегодня в обход лимита");
+            savedBlocked!.ScheduledDate.Should().Be(TodoDay.Today.ToDateTime(), "Критическая заблокированная должна встать на сегодня в обход лимита");
+        }
     }
 
     /// <summary>

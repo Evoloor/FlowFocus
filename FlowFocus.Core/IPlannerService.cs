@@ -10,6 +10,9 @@ public interface IPlannerService
     /// <summary>Пересчитать приоритеты на основе таблиц повышения</summary>
     void ActualizePriorities();
 
+    /// <summary>Нормализовать приоритеты блокеров</summary>
+    void NormalizeBlockerPriorities();
+
     /// <summary>Распределить задачи по дням</summary>
     void DistributeTasks(UserSettings settings);
 

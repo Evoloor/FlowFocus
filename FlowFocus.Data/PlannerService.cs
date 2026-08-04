@@ -39,9 +39,57 @@ public class PlannerService(ITaskRepository taskRepository) : IPlannerService
                 task.Id,
                 highestEscalation.TargetPriorityId,
                 escalations.Select(e => e.Id),
-                saveChanges: false
+                saveChanges: true
             );
         }
+    }
+
+    /// <summary>
+    /// Нормализация приоритетов блокеров:
+    /// Если у заблокированной задачи приоритет выше (меньший Order), чем у её блокера,
+    /// блокер каскадно повышает свой приоритет до уровня заблокированной задачи.
+    /// </summary>
+    public void NormalizeBlockerPriorities()
+    {
+        var tasks = taskRepository.GetAll()
+            .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant)
+            .ToList();
+
+        var taskMap = tasks.ToDictionary(t => t.Id);
+
+        bool changed;
+        do
+        {
+            changed = false;
+            foreach (var task in tasks)
+            {
+                var targetOrder = GetEffectivePriorityOrder(task);
+                if (!task.PriorityId.HasValue) continue;
+
+                foreach (var relation in task.InverseRelations.Where(r => r.Type == RelationType.Blocks))
+                {
+                    if (!taskMap.TryGetValue(relation.SourceTaskId, out var blockerTask)) continue;
+                    if (blockerTask.Status is TaskStatus.Completed or TaskStatus.Irrelevant) continue;
+
+                    var blockerOrder = GetEffectivePriorityOrder(blockerTask);
+                    if (targetOrder < blockerOrder)
+                    {
+                        blockerTask.PriorityId = task.PriorityId.Value;
+                        taskRepository.Update(blockerTask);
+                        changed = true;
+                    }
+                }
+            }
+
+            if (changed)
+            {
+                taskRepository.SaveChanges();
+                tasks = taskRepository.GetAll()
+                    .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant)
+                    .ToList();
+                taskMap = tasks.ToDictionary(t => t.Id);
+            }
+        } while (changed);
     }
 
     /// <summary>
@@ -211,8 +259,9 @@ public class PlannerService(ITaskRepository taskRepository) : IPlannerService
 
     private bool CanAddToDay(TaskItem task, DailyStats stats, UserSettings settings, bool isLargeTask)
     {
-        // Крупные дела игнорируют лимит
-        if (isLargeTask) return true;
+        // Крупные дела и задачи с наивысшим (критическим) приоритетом (Order <= 1) игнорируют лимит
+        var isCriticalPriority = GetEffectivePriorityOrder(task) <= 1;
+        if (isCriticalPriority || isLargeTask) return true;
 
         if (stats.TaskCount >= settings.DailyTaskLimit) return false;
         if (stats.TotalComplexity + task.TotalComplexity > settings.DailyComplexityLimit) return false;
