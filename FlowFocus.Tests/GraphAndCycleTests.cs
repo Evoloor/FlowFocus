@@ -12,75 +12,50 @@ namespace FlowFocus.Tests;
 /// Unit tests for circular blockage graphs, subtask self-nesting cycles, and recursion safety.
 /// </summary>
 [UsedImplicitly]
-[Trait(name: "Category", value: "Graph")]
-[Collection(name: "StaticState")]
+[Trait("Category", "Graph")]
+[Collection("StaticState")]
 public class GraphAndCycleTests
 {
     /// <summary>
-    /// Tests verification of circular blockage graph validation.
+    /// Verifies that direct or indirect circular blockage cycles throw a CircularDependencyException.
     /// </summary>
-    [UsedImplicitly]
-    [Trait(name: "Category", value: "Graph")]
-    public class CircularBlockages
+    [Fact]
+    public void DirectOrIndirectCircularBlockage_ThrowsCircularDependencyException()
     {
-        /// <summary>
-        /// Verifies that direct or indirect circular blockage cycles throw a CircularDependencyException.
-        /// </summary>
-        [Fact]
-        public void DirectOrIndirectCircularBlockage_ThrowsCircularDependencyException()
-        {
-            // Arrange: A blocks B, B blocks C
-            var taskA = new TaskItemBuilder().WithId(id: 1).WithTitle(title: "Task A").Build();
-            _ = new TaskItemBuilder().WithId(id: 2).WithTitle(title: "Task B").Build();
-            var taskC = new TaskItemBuilder().WithId(id: 3).WithTitle(title: "Task C").Build();
+        // Arrange
+        var taskA = new TaskItemBuilder().WithId(1).WithTitle("Task A").Build();
+        _ = new TaskItemBuilder().WithId(2).WithTitle("Task B").Build();
+        var taskC = new TaskItemBuilder().WithId(3).WithTitle("Task C").Build();
 
-            List<TaskRelation> graph =
-            [
-                new() { SourceTaskId = 1, TargetTaskId = 2, Type = RelationType.Blocks },
-                new() { SourceTaskId = 2, TargetTaskId = 3, Type = RelationType.Blocks }
-            ];
+        List<TaskRelation> graph =
+        [
+            new() { SourceTaskId = 1, TargetTaskId = 2, Type = RelationType.Blocks },
+            new() { SourceTaskId = 2, TargetTaskId = 3, Type = RelationType.Blocks }
+        ];
 
-            // Act: Call real domain validator to add "C blocks A"
-            var act = () => TaskRelationValidator.ValidateNewRelation(sourceTask: taskC, targetTask: taskA, type: RelationType.Blocks, existingRelationsGraph: graph);
+        // Act
+        var act = () => TaskRelationValidator.ValidateNewRelation(sourceTask: taskC, targetTask: taskA, type: RelationType.Blocks, existingRelationsGraph: graph);
 
-            // Assert
-            act.Should().Throw<CircularDependencyException>()
-               .WithMessage(expectedWildcardPattern: "*циклический граф*");
-        }
+        // Assert
+        act.Should().Throw<CircularDependencyException>()
+           .WithMessage(expectedWildcardPattern: "*циклический граф*");
     }
 
     /// <summary>
-    /// Tests verification of subtask self-nesting validation.
+    /// Verifies that making a parent task a subtask of its own subtask throws a validation exception.
     /// </summary>
-    [UsedImplicitly]
-    [Trait(name: "Category", value: "Graph")]
-    public class SubtaskSelfNesting
+    [Fact]
+    public void MakeParentTaskSubtaskOfItsOwnSubtask_ThrowsValidationError()
     {
-        /// <summary>
-        /// Verifies that making a parent task a subtask of its own subtask throws a validation exception.
-        /// </summary>
-        [Fact]
-        public void MakeParentTaskSubtaskOfItsOwnSubtask_ThrowsValidationError()
-        {
-            // Arrange: Task A contains Subtask B
-            var taskB = new TaskItemBuilder().WithId(id: 20).WithTitle(title: "Child B").Build();
-            var taskA = new TaskItemBuilder().WithId(id: 10).WithTitle(title: "Parent A").WithSubtask(subtask: taskB).Build();
+        // Arrange
+        var taskB = new TaskItemBuilder().WithId(20).WithTitle("Child B").Build();
+        var taskA = new TaskItemBuilder().WithId(10).WithTitle("Parent A").WithSubtask(taskB).Build();
 
-            // Act: Call real domain validator to attempt making "A" a subtask of B
-            var act = () => TaskHierarchyValidator.ValidateSubtaskParent(parentTask: taskB, childTask: taskA);
+        // Act
+        var act = () => TaskHierarchyValidator.ValidateSubtaskParent(parentTask: taskB, childTask: taskA);
 
-            // Assert
-            act.Should().Throw<InvalidOperationException>()
-               .WithMessage(expectedWildcardPattern: "*Запрещена циклическая вложенность*");
-        }
-    }
-
-    /// <summary>
-    /// Tests verification of stack overflow protection during graph traversal.
-    /// </summary>
-    [UsedImplicitly]
-    [Trait(name: "Category", value: "Graph")]
-    public class StackOverflowProtection
-    {
+        // Assert
+        act.Should().Throw<InvalidOperationException>()
+           .WithMessage(expectedWildcardPattern: "*Запрещена циклическая вложенность*");
     }
 }

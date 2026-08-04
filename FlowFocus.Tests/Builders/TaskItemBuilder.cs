@@ -4,9 +4,8 @@ using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Tests.Builders;
 
-public class TaskItemBuilder
+public class TaskItemBuilder : EntityBuilder<TaskItem, TaskItemBuilder>
 {
-    private int _id = 1;
     private string _title = "Test Task";
     private string? _description;
     private TaskStatus _status = TaskStatus.Planned;
@@ -27,6 +26,10 @@ public class TaskItemBuilder
     private int? _recurrenceSourceId;
     private int? _parentTaskId;
     private TaskItem? _parentTask;
+    private readonly List<TaskItem> _subtasks = [];
+    private readonly List<TaskRelation> _relations = [];
+    private readonly List<TaskRelation> _inverseRelations = [];
+    private readonly List<PriorityEscalation> _priorityEscalations = [];
 
     public TaskItemBuilder WithDescription(string? description)
     {
@@ -50,16 +53,6 @@ public class TaskItemBuilder
     {
         _parentTask = parentTask;
         _parentTaskId = parentTask?.Id;
-        return this;
-    }
-    private readonly List<TaskItem> _subtasks = [];
-    private readonly List<TaskRelation> _relations = [];
-    private readonly List<TaskRelation> _inverseRelations = [];
-    private readonly List<PriorityEscalation> _priorityEscalations = [];
-
-    public TaskItemBuilder WithId(int id)
-    {
-        _id = id;
         return this;
     }
 
@@ -154,7 +147,7 @@ public class TaskItemBuilder
     {
         _relations.Add(item: new()
         {
-            SourceTaskId = _id,
+            SourceTaskId = Id,
             TargetTaskId = target.Id,
             TargetTask = target,
             Type = type
@@ -168,7 +161,7 @@ public class TaskItemBuilder
         {
             SourceTaskId = source.Id,
             SourceTask = source,
-            TargetTaskId = _id,
+            TargetTaskId = Id,
             Type = type
         });
         return this;
@@ -178,7 +171,7 @@ public class TaskItemBuilder
     {
         _priorityEscalations.Add(item: new()
         {
-            TaskId = _id,
+            TaskId = Id,
             TargetPriorityId = targetPriorityId,
             EscalationDate = escalationDate,
             IsApplied = false
@@ -186,11 +179,11 @@ public class TaskItemBuilder
         return this;
     }
 
-    public TaskItem Build()
+    public override TaskItem Build()
     {
         TaskItem item = new()
         {
-            Id = _id,
+            Id = Id,
             Title = _title,
             Description = _description,
             Status = _status,
@@ -225,4 +218,34 @@ public class TaskItemBuilder
 
         return item;
     }
+
+    #region Object Mother / Test Data Factory Presets
+
+    /// <summary>
+    /// Preset Object Mother factory: Creates a blocker task and a blocked task graph.
+    /// </summary>
+    public static (TaskItem Blocker, TaskItem Blocked) CreateBlockedChain(int blockerId = 1, int blockedId = 2)
+    {
+        var blocker = new TaskItemBuilder().WithId(blockerId).WithTitle("Blocker Task").Build();
+        var blocked = new TaskItemBuilder().WithId(blockedId).WithTitle("Blocked Task").WithInverseRelation(blocker, RelationType.Blocks).Build();
+        return (blocker, blocked);
+    }
+
+    /// <summary>
+    /// Preset Object Mother factory: Creates a parent task with specified number of subtasks.
+    /// </summary>
+    public static (TaskItem Parent, List<TaskItem> Subtasks) CreateParentWithSubtasks(int subtaskCount, int parentId = 1)
+    {
+        var parentBuilder = new TaskItemBuilder().WithId(parentId).WithTitle("Parent Task");
+        var subtasks = new List<TaskItem>();
+        for (int i = 1; i <= subtaskCount; i++)
+        {
+            var subtask = new TaskItemBuilder().WithId(parentId * 100 + i).WithTitle($"Subtask {i}").WithParentTaskId(parentId).Build();
+            subtasks.Add(subtask);
+            parentBuilder.WithSubtask(subtask);
+        }
+        return (parentBuilder.Build(), subtasks);
+    }
+
+    #endregion
 }

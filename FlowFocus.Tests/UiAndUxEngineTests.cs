@@ -3,9 +3,9 @@ using FlowFocus.Core;
 using FlowFocus.Core.Models;
 using FlowFocus.Core.Services;
 using FlowFocus.Data.Repositories;
+using FlowFocus.Data.Services;
 using FlowFocus.Tests.Builders;
 using JetBrains.Annotations;
-using NSubstitute;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Tests;
@@ -14,288 +14,210 @@ namespace FlowFocus.Tests;
 /// Unit tests for UI decision engines, card status flags, procrastination selection math, tag suggestions, and overlay queries.
 /// </summary>
 [UsedImplicitly]
-[Trait(name: "Category", value: "UI")]
-[Collection(name: "StaticState")]
-public class UiAndUxEngineTests
+[Trait("Category", "UI")]
+[Collection("StaticState")]
+public class UiAndUxEngineTests : IntegrationTestBase
 {
     /// <summary>
-    /// Tests verification of card state flags and overdue properties.
+    /// Verifies that card state flags match task status properties.
     /// </summary>
-    [UsedImplicitly]
-    [Trait(name: "Category", value: "UI")]
-    public class TaskCardStyles
+    [Fact]
+    public void CardStateFlags_MatchTaskStatusAndConditions()
     {
-        /// <summary>
-        /// Verifies that card state flags match task status properties.
-        /// </summary>
-        [Fact]
-        public void CardStateFlags_MatchTaskStatusAndConditions()
-        {
-            // Arrange & Act
-            var planned = new TaskItemBuilder().WithStatus(status: TaskStatus.Planned).Build();
-            var completed = new TaskItemBuilder().WithStatus(status: TaskStatus.Completed).Build();
-            var notActual = new TaskItemBuilder().WithStatus(status: TaskStatus.Irrelevant).Build();
-            var unconfigured = new TaskItemBuilder().WithStatus(status: TaskStatus.NotConfigured).Build();
+        // Arrange & Act
+        var planned = new TaskItemBuilder().WithStatus(TaskStatus.Planned).Build();
+        var completed = new TaskItemBuilder().WithStatus(TaskStatus.Completed).Build();
+        var notActual = new TaskItemBuilder().WithStatus(TaskStatus.Irrelevant).Build();
+        var unconfigured = new TaskItemBuilder().WithStatus(TaskStatus.NotConfigured).Build();
 
-            // Assert
-            planned.Status.Should().Be(expected: TaskStatus.Planned);
-            completed.Status.Should().Be(expected: TaskStatus.Completed);
-            notActual.Status.Should().Be(expected: TaskStatus.Irrelevant);
-            unconfigured.Status.Should().Be(expected: TaskStatus.NotConfigured);
-        }
-
-        /// <summary>
-        /// Verifies that overdue task helper evaluates to true for yesterday's scheduled date.
-        /// </summary>
-        [Fact]
-        public void OverdueTask_ReturnsIsOverdueTrue()
-        {
-            // Arrange
-            var yesterday = TodoDay.Today.Yesterday.ToDateTime();
-            var task = new TaskItemBuilder().WithScheduledDate(date: yesterday).Build();
-
-            // Act: Call application TodoDay logic
-            var isOverdue = TodoDay.Today.IsOverdue(taskDate: task.ScheduledDate);
-
-            // Assert
-            isOverdue.Should().BeTrue();
-        }
+        // Assert
+        planned.Status.Should().Be(TaskStatus.Planned);
+        completed.Status.Should().Be(TaskStatus.Completed);
+        notActual.Status.Should().Be(TaskStatus.Irrelevant);
+        unconfigured.Status.Should().Be(TaskStatus.NotConfigured);
     }
 
     /// <summary>
-    /// Tests verification of quick-add bar creation mechanics.
+    /// Verifies that overdue task helper evaluates to true for yesterday's scheduled date.
     /// </summary>
-    [UsedImplicitly]
-    [Trait(name: "Category", value: "UI")]
-    public class QuickAddBar
+    [Fact]
+    public void OverdueTask_ReturnsIsOverdueTrue()
     {
-        /// <summary>
-        /// Verifies that quick add checkmark creates an unconfigured task in repository.
-        /// </summary>
-        [Fact]
-        public void QuickAddCheckmark_CreatesUnconfiguredTaskInRepository()
-        {
-            // Arrange
-            using var context = TestDbContextFactory.CreateInMemoryContext();
-            TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
-            var inputText = "Купить хлеб";
+        // Arrange
+        var yesterday = TodoDay.Today.Yesterday.ToDateTime();
+        var task = new TaskItemBuilder().WithScheduledDate(yesterday).Build();
 
-            var newTask = new TaskItemBuilder()
-                .WithId(id: 101)
-                .WithTitle(title: inputText)
-                .WithStatus(status: TaskStatus.NotConfigured)
-                .Build();
+        // Act
+        var isOverdue = TodoDay.Today.IsOverdue(task.ScheduledDate);
 
-            // Act: Call real repository method
-            taskRepo.Add(entity: newTask);
-            var savedTask = taskRepo.GetById(id: newTask.Id);
-
-            // Assert
-            savedTask.Should().NotBeNull();
-            savedTask.Title.Should().Be(expected: "Купить хлеб");
-            savedTask.Status.Should().Be(expected: TaskStatus.NotConfigured);
-        }
+        // Assert
+        isOverdue.Should().BeTrue();
     }
 
     /// <summary>
-    /// Tests verification of procrastination engine selection math and displacement criteria.
+    /// Verifies that quick add checkmark creates an unconfigured task in repository.
     /// </summary>
-    [UsedImplicitly]
-    [Trait(name: "Category", value: "UI")]
-    public class ProcrastinationEngineTests
+    [Fact]
+    public void QuickAddCheckmark_CreatesUnconfiguredTaskInRepository()
     {
-        /// <summary>
-        /// Verifies that SelectIdealProcrastinationTask returns task with the highest score having interest > 7.
-        /// </summary>
-        [Fact]
-        public void SelectIdealTask_CallsProcrastinationEngine_ReturnsHighestScoreWithInterestGreaterThan7()
-        {
-            // Arrange
-            var lowInterestHighPriority = new TaskItemBuilder().WithId(id: 1).WithInterest(interest: 5).WithPriority(priority: PriorityLevelBuilder.Critical).Build(); // Interest <= 7
-            var highInterestMediumPriority = new TaskItemBuilder().WithId(id: 2).WithInterest(interest: 9).WithPriority(priority: PriorityLevelBuilder.Medium).Build(); // Score = 9 - sqrt(3) ~ 7.27
-            var highInterestHighPriority = new TaskItemBuilder().WithId(id: 3).WithInterest(interest: 10).WithPriority(priority: PriorityLevelBuilder.High).Build();   // Score = 10 - sqrt(2) ~ 8.58
+        // Arrange
+        var inputText = "Купить хлеб";
 
-            List<TaskItem> list = [lowInterestHighPriority, highInterestMediumPriority, highInterestHighPriority];
+        var newTask = new TaskItemBuilder()
+            .WithId(101)
+            .WithTitle(inputText)
+            .WithStatus(TaskStatus.NotConfigured)
+            .Build();
 
-            // Act: Call real ProcrastinationEngine service
-            var ideal = ProcrastinationEngine.SelectIdealProcrastinationTask(tasks: list);
+        // Act
+        TaskRepo.Add(newTask);
+        var savedTask = TaskRepo.GetById(newTask.Id);
 
-            // Assert
-            ideal.Should().NotBeNull();
-            ideal.Id.Should().Be(expected: 3);
-        }
-
-        /// <summary>
-        /// Verifies that RequiresDisplacement returns true when current scheduled minutes equals daily limit.
-        /// </summary>
-        [Fact]
-        public void DisplacementNeeded_WhenDailyLimitFull()
-        {
-            // Act: Call real ProcrastinationEngine service
-            var requiresDisplacement = ProcrastinationEngine.RequiresDisplacement(currentScheduledMinutes: 180, dailyTimeLimit: 180);
-
-            // Assert
-            requiresDisplacement.Should().BeTrue();
-        }
+        // Assert
+        savedTask.Should().NotBeNull();
+        savedTask!.Title.Should().Be("Купить хлеб");
+        savedTask.Status.Should().Be(TaskStatus.NotConfigured);
     }
 
     /// <summary>
-    /// Tests verification of overdue task modal queries.
+    /// Verifies that SelectIdealProcrastinationTask returns task with the highest score having interest > 7.
     /// </summary>
-    [UsedImplicitly]
-    [Trait(name: "Category", value: "UI")]
-    public class OverdueModal
+    [Fact]
+    public void SelectIdealTask_CallsProcrastinationEngine_ReturnsHighestScoreWithInterestGreaterThan7()
     {
-        /// <summary>
-        /// Verifies that repository query returns single overdue task when overdue tasks exist.
-        /// </summary>
-        [Fact]
-        public void HasOverdueTasksInRepository_ReturnsOverdueTasks()
-        {
-            // Arrange
-            using var context = TestDbContextFactory.CreateInMemoryContext();
-            TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
+        // Arrange
+        var lowInterestHighPriority = new TaskItemBuilder().WithId(1).WithInterest(5).WithPriority(PriorityLevelBuilder.Critical).Build();
+        var highInterestMediumPriority = new TaskItemBuilder().WithId(2).WithInterest(9).WithPriority(PriorityLevelBuilder.Medium).Build();
+        var highInterestHighPriority = new TaskItemBuilder().WithId(3).WithInterest(10).WithPriority(PriorityLevelBuilder.High).Build();
 
-            var overdueDate = TodoDay.Today.Yesterday.ToDateTime();
-            var task = new TaskItemBuilder().WithId(id: 1).WithScheduledDate(date: overdueDate).WithStatus(status: TaskStatus.Planned).Build();
-            taskRepo.Add(entity: task);
+        List<TaskItem> list = [lowInterestHighPriority, highInterestMediumPriority, highInterestHighPriority];
 
-            // Act: Call real repository query method
-            var overdueTasks = taskRepo.GetOverdueTasks();
+        // Act
+        var ideal = ProcrastinationEngine.SelectIdealProcrastinationTask(list);
 
-            // Assert
-            overdueTasks.Should().ContainSingle();
-        }
-
-        /// <summary>
-        /// Verifies that repository query returns empty list when no overdue tasks exist.
-        /// </summary>
-        [Fact]
-        public void EmptyOverdueListInRepository_ReturnsEmptyList()
-        {
-            // Arrange
-            using var context = TestDbContextFactory.CreateInMemoryContext();
-            TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
-
-            // Act: Call real repository query method
-            var overdueTasks = taskRepo.GetOverdueTasks();
-
-            // Assert
-            overdueTasks.Should().BeEmpty();
-        }
+        // Assert
+        ideal.Should().NotBeNull();
+        ideal!.Id.Should().Be(3);
     }
 
     /// <summary>
-    /// Tests verification of unlinking tags safely upon tag deletion.
+    /// Verifies that RequiresDisplacement returns true when current scheduled minutes equals daily limit.
     /// </summary>
-    [UsedImplicitly]
-    [Trait(name: "Category", value: "UI")]
-    public class TagDeletionSafety
+    [Fact]
+    public void DisplacementNeeded_WhenDailyLimitFull()
     {
-        /// <summary>
-        /// Verifies that deleting a tag unlinks references from tasks without deleting tasks.
-        /// </summary>
-        [Fact]
-        public void DeleteTag_SafelyUnlinksFromTasksInRepository()
-        {
-            // Arrange
-            using var context = TestDbContextFactory.CreateInMemoryContext();
-            var notificationService = Substitute.For<INotificationService>();
-            TaskRepository taskRepo = new(context: context, notificationService: notificationService);
-            TagRepository tagRepo = new(context: context, notificationService: notificationService);
+        // Act
+        var requiresDisplacement = ProcrastinationEngine.RequiresDisplacement(currentScheduledMinutes: 180, dailyTimeLimit: 180);
 
-            Tag tag = new() { Id = 5, Name = "Работа", UsageCount = 1 };
-            context.Tags.Add(entity: tag);
-
-            var task = new TaskItemBuilder().WithId(id: 1).WithTitle(title: "Task with tag").Build();
-            taskRepo.Add(entity: task);
-
-            context.TaskTags.Add(entity: new() { TaskId = task.Id, TagId = tag.Id });
-            context.SaveChanges();
-
-            // Act: Delete tag via application TagRepository
-            tagRepo.Delete(id: tag.Id);
-            var savedTask = taskRepo.GetById(id: task.Id);
-
-            // Assert: Tag reference safely unlinked in repository
-            savedTask.Should().NotBeNull();
-            savedTask.Tags.Should().BeEmpty();
-            savedTask.Title.Should().Be(expected: "Task with tag");
-        }
+        // Assert
+        requiresDisplacement.Should().BeTrue();
     }
 
     /// <summary>
-    /// Tests verification of tag attachment persistence.
+    /// Verifies that repository query returns single overdue task when overdue tasks exist.
     /// </summary>
-    [UsedImplicitly]
-    [Trait(name: "Category", value: "UI")]
-    public class TagPersistence
+    [Fact]
+    public void HasOverdueTasksInRepository_ReturnsOverdueTasks()
     {
-        /// <summary>
-        /// Verifies that saving a task with attached tags does not throw entity tracking exceptions.
-        /// </summary>
-        [Fact]
-        public void SaveTaskWithAttachedTags_DoesNotThrowEntityTrackingException()
-        {
-            // Arrange
-            using var context = TestDbContextFactory.CreateInMemoryContext();
-            var notificationService = Substitute.For<INotificationService>();
-            TaskRepository taskRepo = new(context: context, notificationService: notificationService);
+        // Arrange
+        var overdueDate = TodoDay.Today.Yesterday.ToDateTime();
+        var task = new TaskItemBuilder().WithId(1).WithScheduledDate(overdueDate).WithStatus(TaskStatus.Planned).Build();
+        TaskRepo.Add(task);
 
-            Tag tag = new() { Id = 10, Name = "Срочно", UsageCount = 1 };
-            context.Tags.Add(entity: tag);
-            context.SaveChanges();
+        // Act
+        var overdueTasks = TaskRepo.GetOverdueTasks();
 
-            var task = new TaskItemBuilder().WithId(id: 200).WithTitle(title: "Task with persistent tag").Build();
-            task.Tags.Add(item: new() { TaskId = 200, TagId = 10 });
-
-            // Act: Call real repository method
-            var act = () => taskRepo.Add(entity: task);
-
-            // Assert: No entity graph tracking exception thrown, tag attached in DB
-            act.Should().NotThrow();
-            var savedTask = taskRepo.GetById(id: 200);
-            savedTask.Should().NotBeNull();
-            savedTask.Tags.Should().ContainSingle(predicate: tt => tt.TagId == 10);
-        }
+        // Assert
+        overdueTasks.Should().ContainSingle();
     }
 
     /// <summary>
-    /// Tests verification of tag suggestion algorithms.
+    /// Verifies that repository query returns empty list when no overdue tasks exist.
     /// </summary>
-    [UsedImplicitly]
-    [Trait(name: "Category", value: "UI")]
-    public class TagSuggestions
+    [Fact]
+    public void EmptyOverdueListInRepository_ReturnsEmptyList()
     {
-        /// <summary>
-        /// Verifies that GetSuggestedTags returns 1 last used session tag followed by top popular tags from DB.
-        /// </summary>
-        [Fact]
-        public void GetSuggestedTags_ReturnsLastUsedSessionTagAndTopPopularTags()
-        {
-            // Arrange
-            using var context = TestDbContextFactory.CreateInMemoryContext();
-            var notificationService = Substitute.For<INotificationService>();
-            TagRepository tagRepo = new(context: context, notificationService: notificationService);
+        // Act
+        var overdueTasks = TaskRepo.GetOverdueTasks();
 
-            Tag tag1 = new() { Id = 1, Name = "Tag 1", UsageCount = 10 };
-            Tag tag2 = new() { Id = 2, Name = "Tag 2", UsageCount = 20 };
-            Tag tag3 = new() { Id = 3, Name = "Tag 3", UsageCount = 30 };
-            Tag tag4 = new() { Id = 4, Name = "Tag 4", UsageCount = 40 };
-            Tag sessionTag = new() { Id = 5, Name = "Session Tag", UsageCount = 5 };
+        // Assert
+        overdueTasks.Should().BeEmpty();
+    }
 
-            context.Tags.AddRange(entities: [tag1, tag2, tag3, tag4, sessionTag]);
-            context.SaveChanges();
+    /// <summary>
+    /// Verifies that deleting a tag unlinks references from tasks without deleting tasks.
+    /// </summary>
+    [Fact]
+    public void DeleteTag_SafelyUnlinksFromTasksInRepository()
+    {
+        // Arrange
+        Tag tag = new() { Id = 5, Name = "Работа", UsageCount = 1 };
+        Context.Tags.Add(tag);
 
-            TagSessionService tagSessionService = new(tagRepository: tagRepo);
+        var task = new TaskItemBuilder().WithId(1).WithTitle("Task with tag").Build();
+        TaskRepo.Add(task);
 
-            // Act: Mark sessionTag as last used, then query suggested tags (5 count)
-            tagSessionService.MarkTagUsed(tag: sessionTag);
-            var suggestions = tagSessionService.GetSuggestedTags(count: 5);
+        Context.TaskTags.Add(new() { TaskId = task.Id, TagId = tag.Id });
+        Context.SaveChanges();
 
-            // Assert: Contains sessionTag first + 4 popular tags from database
-            suggestions.Should().HaveCount(expected: 5);
-            suggestions.First().Id.Should().Be(expected: sessionTag.Id);
-        }
+        // Act
+        TagRepo.Delete(tag.Id);
+        var savedTask = TaskRepo.GetById(task.Id);
+
+        // Assert
+        savedTask.Should().NotBeNull();
+        savedTask!.Tags.Should().BeEmpty();
+        savedTask.Title.Should().Be("Task with tag");
+    }
+
+    /// <summary>
+    /// Verifies that saving a task with attached tags does not throw entity tracking exceptions.
+    /// </summary>
+    [Fact]
+    public void SaveTaskWithAttachedTags_DoesNotThrowEntityTrackingException()
+    {
+        // Arrange
+        Tag tag = new() { Id = 10, Name = "Срочно", UsageCount = 1 };
+        Context.Tags.Add(tag);
+        Context.SaveChanges();
+
+        var task = new TaskItemBuilder().WithId(200).WithTitle("Task with persistent tag").Build();
+        task.Tags.Add(new() { TaskId = 200, TagId = 10 });
+
+        // Act
+        var act = () => TaskRepo.Add(task);
+
+        // Assert
+        act.Should().NotThrow();
+        var savedTask = TaskRepo.GetById(200);
+        savedTask.Should().NotBeNull();
+        savedTask!.Tags.Should().ContainSingle(tt => tt.TagId == 10);
+    }
+
+    /// <summary>
+    /// Verifies that GetSuggestedTags returns 1 last used session tag followed by top popular tags from DB.
+    /// </summary>
+    [Fact]
+    public void GetSuggestedTags_ReturnsLastUsedSessionTagAndTopPopularTags()
+    {
+        // Arrange
+        Tag tag1 = new() { Id = 1, Name = "Tag 1", UsageCount = 10 };
+        Tag tag2 = new() { Id = 2, Name = "Tag 2", UsageCount = 20 };
+        Tag tag3 = new() { Id = 3, Name = "Tag 3", UsageCount = 30 };
+        Tag tag4 = new() { Id = 4, Name = "Tag 4", UsageCount = 40 };
+        Tag sessionTag = new() { Id = 5, Name = "Session Tag", UsageCount = 5 };
+
+        Context.Tags.AddRange(tag1, tag2, tag3, tag4, sessionTag);
+        Context.SaveChanges();
+
+        TagSessionService tagSessionService = new(TagRepo);
+
+        // Act
+        tagSessionService.MarkTagUsed(sessionTag);
+        var suggestions = tagSessionService.GetSuggestedTags(5);
+
+        // Assert
+        suggestions.Should().HaveCount(5);
+        suggestions.First().Id.Should().Be(sessionTag.Id);
     }
 }

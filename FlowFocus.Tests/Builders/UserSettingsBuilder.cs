@@ -2,9 +2,8 @@ using FlowFocus.Core.Models;
 
 namespace FlowFocus.Tests.Builders;
 
-public class UserSettingsBuilder
+public class UserSettingsBuilder : EntityBuilder<UserSettings, UserSettingsBuilder>
 {
-    private int _id = 1;
     private int _dayStartHour = 5;
     private int _dailyComplexityLimit = 100;
     private int _dailyTimeLimit = 480;
@@ -12,12 +11,6 @@ public class UserSettingsBuilder
     private const bool AutoDistributeEnabled = true;
     private const bool IsDarkMode = true;
     private int _defaultPriorityId = 3;
-
-    public UserSettingsBuilder WithId(int id)
-    {
-        _id = id;
-        return this;
-    }
 
     public UserSettingsBuilder WithDayStartHour(int hour)
     {
@@ -49,11 +42,11 @@ public class UserSettingsBuilder
         return this;
     }
 
-    public UserSettings Build()
+    public override UserSettings Build()
     {
         return new()
         {
-            Id = _id,
+            Id = Id,
             DayStartHour = _dayStartHour,
             DailyComplexityLimit = _dailyComplexityLimit,
             DailyTimeLimit = _dailyTimeLimit,

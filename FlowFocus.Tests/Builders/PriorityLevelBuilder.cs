@@ -2,18 +2,11 @@ using FlowFocus.Core.Models;
 
 namespace FlowFocus.Tests.Builders;
 
-public class PriorityLevelBuilder
+public class PriorityLevelBuilder : EntityBuilder<PriorityLevel, PriorityLevelBuilder>
 {
-    private int _id = 1;
     private int _order = 3;
     private string _name = "Medium";
     private string _color = "#FFD700";
-
-    public PriorityLevelBuilder WithId(int id)
-    {
-        _id = id;
-        return this;
-    }
 
     public PriorityLevelBuilder WithOrder(int order)
     {
@@ -33,11 +26,11 @@ public class PriorityLevelBuilder
         return this;
     }
 
-    public PriorityLevel Build()
+    public override PriorityLevel Build()
     {
         return new()
         {
-            Id = _id,
+            Id = Id,
             Order = _order,
             Name = _name,
             Color = _color,
