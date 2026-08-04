@@ -32,7 +32,7 @@ public static class TaskItemValidator
 
     public static void ValidateRecurringTaskCreation(TaskItem task)
     {
-        if (task.IsRecurring && !task.ScheduledDate.HasValue)
+        if (task is { IsRecurring: true, ScheduledDate: null })
         {
             throw new InvalidOperationException("Повторяющаяся задача при первом создании обязана иметь ручную дату.");
         }

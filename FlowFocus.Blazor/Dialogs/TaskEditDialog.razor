@@ -1,4 +1,5 @@
 @using FlowFocus.Blazor.EditDialogContents
+@using FlowFocus.Blazor.EditDialogContents.Validators
 @using SubtaskDto = FlowFocus.Blazor.EditDialogContents.SubtaskDto
 @inject ITaskRepository TaskRepo
 @inject ISettingsRepository SettingsRepo
@@ -675,6 +676,15 @@
         // При создании новой повторяющейся задачи дата обязательна
         if (_task.IsRecurring && !IsEdit && _task.ScheduledDate == null)
             errors.Add("Для повторяющейся задачи необходимо указать дату начала");
+
+        var escalationValidation = TaskEditValidator.ValidateEscalations(_escalations, _task, _priorities);
+        if (!escalationValidation.IsValid) errors.AddRange(escalationValidation.Errors);
+
+        var relationValidation = TaskEditValidator.ValidateRelations(_relations, _task, _priorities);
+        if (!relationValidation.IsValid) errors.AddRange(relationValidation.Errors);
+
+        var subtaskValidation = TaskEditValidator.ValidateSubtasks(_task, _subtasks, _priorities, TaskRepo);
+        if (!subtaskValidation.IsValid) errors.AddRange(subtaskValidation.Errors);
 
         return errors;
     }

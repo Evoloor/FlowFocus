@@ -1,4 +1,5 @@
 using FlowFocus.Core.Models;
+using FlowFocus.Core.Validation;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Data.Repositories.Helpers;
@@ -15,6 +16,7 @@ public static class TaskGraphSyncHelper
         foreach (var subtask in entity.Subtasks)
         {
             subtask.ParentTaskId ??= entity.Id;
+            TaskHierarchyValidator.ValidateSubtaskParent(entity, subtask);
             if (subtask.CreatedDate == default)
             {
                 subtask.CreatedDate = DateTime.UtcNow;
@@ -106,6 +108,9 @@ public static class TaskGraphSyncHelper
 
         foreach (var sourceSubtask in source.Subtasks)
         {
+            sourceSubtask.ParentTaskId ??= tracked.Id;
+            TaskHierarchyValidator.ValidateSubtaskParent(tracked, sourceSubtask);
+
             if (sourceSubtask.Id > 0)
             {
                 var existing = tracked.Subtasks.FirstOrDefault(s => s.Id == sourceSubtask.Id);

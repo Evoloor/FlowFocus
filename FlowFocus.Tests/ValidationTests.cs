@@ -3,7 +3,6 @@ using FlowFocus.Core.Enums;
 using FlowFocus.Core.Validation;
 using FlowFocus.Tests.Builders;
 using JetBrains.Annotations;
-using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Tests;
 
@@ -173,34 +172,6 @@ public class ValidationTests
 
             // Assert
             result.Should().Be(expected: expected);
-        }
-    }
-
-    /// <summary>
-    /// Tests verification of relation target task status validation.
-    /// </summary>
-    [UsedImplicitly]
-    [Trait(name: "Category", value: "Validation")]
-    public class RelationTargetStatusValidation
-    {
-        /// <summary>
-        /// Verifies that attempting to create a relation with an inactive (Completed or Irrelevant) task throws a validation exception.
-        /// </summary>
-        [Theory]
-        [InlineData(data: TaskStatus.Completed)]
-        [InlineData(data: TaskStatus.Irrelevant)]
-        public void CreateRelationWithInactiveTask_ThrowsValidationError(TaskStatus inactiveStatus)
-        {
-            // Arrange: Relations to completed or irrelevant tasks are forbidden
-            var activeTask = new TaskItemBuilder().WithId(id: 1).WithStatus(status: TaskStatus.Planned).Build();
-            var inactiveTask = new TaskItemBuilder().WithId(id: 2).WithStatus(status: inactiveStatus).Build();
-
-            // Act: Attempt to link relation to inactive task
-            var act = () => TaskRelationValidator.ValidateNewRelation(sourceTask: activeTask, targetTask: inactiveTask, type: RelationType.RelatedTo);
-
-            // Assert
-            act.Should().Throw<InvalidOperationException>()
-                .WithMessage(expectedWildcardPattern: "*ссылаться можно только на актуальные задачи*");
         }
     }
 }

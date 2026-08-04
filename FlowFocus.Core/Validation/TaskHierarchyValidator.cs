@@ -37,6 +37,24 @@ public static class TaskHierarchyValidator
 
             currentParent = currentParent.ParentTask;
         }
+
+        // Проверка: приоритет подзадачи не может быть выше приоритета родительской задачи
+        if (parentTask.Priority != null && childTask.Priority != null)
+        {
+            if (childTask.Priority.Order < parentTask.Priority.Order)
+            {
+                throw new InvalidOperationException("Подзадача: приоритет не может быть выше приоритета родительской задачи.");
+            }
+        }
+
+        // Проверка: даты назначения должны совпадать, а дата подзадачи не может быть позже родительской задачи
+        if (parentTask.ScheduledDate.HasValue && childTask.ScheduledDate.HasValue)
+        {
+            if (childTask.ScheduledDate.Value.Date != parentTask.ScheduledDate.Value.Date || childTask.ScheduledDate.Value.Date > parentTask.ScheduledDate.Value.Date)
+            {
+                throw new InvalidOperationException("Подзадача: даты назначения должны совпадать, а дата не может быть позже родительской задачи.");
+            }
+        }
     }
 
     private static bool IsDescendant(TaskItem root, TaskItem target)

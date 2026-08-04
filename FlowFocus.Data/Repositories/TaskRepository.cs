@@ -326,7 +326,7 @@ public class TaskRepository(
             var allTasks = Context.Tasks.AsNoTracking().ToList();
 
             var lastCompletedDates = allTasks
-                .Where(t => t.Status == TaskStatus.Completed && t.CompletedDate.HasValue)
+                .Where(t => t is { Status: TaskStatus.Completed, CompletedDate: not null })
                 .GroupBy(t => t.RecurrenceSourceId ?? t.Id)
                 .ToDictionary(g => g.Key, g => g.Max(t => t.CompletedDate!.Value));
 

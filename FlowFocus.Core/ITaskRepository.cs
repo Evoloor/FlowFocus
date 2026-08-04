@@ -59,7 +59,7 @@ public interface ITaskRepository : IRepository<TaskItem>
     void NormalizeTaskDateSources(bool saveChanges = true);
 
     /// <summary>Обновить расписание и источник даты задачи</summary>
-    void UpdateTaskSchedule(int taskId, DateTime? scheduledDate, FlowFocus.Core.Enums.DateSource? dateSource = null, bool saveChanges = true);
+    void UpdateTaskSchedule(int taskId, DateTime? scheduledDate, Enums.DateSource? dateSource = null, bool saveChanges = true);
 
     /// <summary>Обновить статус задачи</summary>
     void UpdateTaskStatus(int taskId, FlowFocus.Core.Enums.TaskStatus status, bool saveChanges = true);
