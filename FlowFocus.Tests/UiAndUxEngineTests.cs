@@ -3,7 +3,6 @@ using FlowFocus.Core;
 using FlowFocus.Core.Models;
 using FlowFocus.Core.Services;
 using FlowFocus.Data.Repositories;
-using FlowFocus.Data.Services;
 using FlowFocus.Tests.Builders;
 using JetBrains.Annotations;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;

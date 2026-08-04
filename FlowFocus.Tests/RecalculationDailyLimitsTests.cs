@@ -1,7 +1,6 @@
 using FluentAssertions;
 using FlowFocus.Core;
 using FlowFocus.Core.Enums;
-using FlowFocus.Core.Models;
 using FlowFocus.Tests.Builders;
 using JetBrains.Annotations;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
@@ -21,163 +20,76 @@ public class RecalculationDailyLimitsTests : IntegrationTestBase
     private readonly DateTime _tomorrow = TodoDay.Today.Tomorrow.ToDateTime();
 
     /// <summary>
-    /// Проверяет, что если фиксированные задачи (Manual и recurring AutoFixed) превышают или достигают
-    /// любого из 3 дневных лимитов (время, сложность, количество задач),
-    /// то после пересчёта на сегодня не остаётся НИ ОДНОЙ AutoFlexible задачи.
+    /// Проверяет, что мануал и автофикс съедают лимиты, но не переносятся из-за них, 
+    /// вытесняя AutoFlexible задачи на следующие дни.
     /// </summary>
     [Theory]
-    [InlineData("TimeLimit")]
-    [InlineData("ComplexityLimit")]
-    [InlineData("TaskCountLimit")]
-    public void Recalculate_WhenFixedTasksExceedOrReachDailyLimit_RemovesAutoFlexibleTasksFromToday(string limitType)
+    //           [Лимиты дня: Время, Сложн, Кол-во] | [Мануал: Время, Сложн] | [Автофикс: Время, Сложн] | [Флекс: Время, Сложн]
+    // 1. Превышение по времени (70 + 60 = 130 > 120)
+    [InlineData(120, 1000, 10, 70, 10, 60, 10, 20, 10)]
+    // 2. Превышение по сложности (30 + 30 = 60 > 50)
+    [InlineData(1000, 50, 10, 10, 30, 10, 30, 20, 10)]
+    // 3. Превышение по количеству (2 фиксированные = лимиту в 2 задачи, 3-я не влезет)
+    [InlineData(1000, 1000, 2, 10, 10, 10, 10, 20, 10)]
+    public void FixedTasks_ConsumeLimitsButNeverMove_PushingFlexibleTasksToTomorrow(
+        int timeLimit, int compLimit, int countLimit,
+        int manTime, int manComp,
+        int fixTime, int fixComp,
+        int flexTime, int flexComp)
     {
-        // Arrange
-        UserSettings settings;
-        TaskItem manualTask;
-        TaskItem recurringAutoFixedTask;
-        TaskItem autoFlexibleTask;
-
-        switch (limitType)
-        {
-            case "TimeLimit":
-                // Лимит по времени: 120 минут. Фиксированные задачи суммарно = 130 минут (> 120)
-                settings = new UserSettingsBuilder().WithDailyTimeLimit(120).WithDailyComplexityLimit(1000).WithDailyTaskLimit(10).Build();
-                manualTask = new TaskItemBuilder().WithId(101).WithTitle("Manual Task").WithEstimatedMinutes(70).WithComplexity(10)
-                    .WithScheduledDate(_today, DateSource.Manual).WithStatus(TaskStatus.Planned).Build();
-                recurringAutoFixedTask = new TaskItemBuilder().WithId(102).WithTitle("AutoFixed Recurring Task").WithEstimatedMinutes(60).WithComplexity(10)
-                    .WithScheduledDate(_today, DateSource.AutoFixed).WithStatus(TaskStatus.Planned).Build();
-                break;
-
-            case "ComplexityLimit":
-                // Лимит по сложности: 50. Фиксированные задачи суммарно = 60 (> 50)
-                settings = new UserSettingsBuilder().WithDailyTimeLimit(1000).WithDailyComplexityLimit(50).WithDailyTaskLimit(10).Build();
-                manualTask = new TaskItemBuilder().WithId(101).WithTitle("Manual Task").WithEstimatedMinutes(10).WithComplexity(30)
-                    .WithScheduledDate(_today, DateSource.Manual).WithStatus(TaskStatus.Planned).Build();
-                recurringAutoFixedTask = new TaskItemBuilder().WithId(102).WithTitle("AutoFixed Recurring Task").WithEstimatedMinutes(10).WithComplexity(30)
-                    .WithScheduledDate(_today, DateSource.AutoFixed).WithStatus(TaskStatus.Planned).Build();
-                break;
-
-            case "TaskCountLimit":
-            default:
-                // Лимит по количеству: 2 задачи. Фиксированные задачи = 2 задачи (= лимиту)
-                settings = new UserSettingsBuilder().WithDailyTimeLimit(1000).WithDailyComplexityLimit(1000).WithDailyTaskLimit(2).Build();
-                manualTask = new TaskItemBuilder().WithId(101).WithTitle("Manual Task").WithEstimatedMinutes(10).WithComplexity(10)
-                    .WithScheduledDate(_today, DateSource.Manual).WithStatus(TaskStatus.Planned).Build();
-                recurringAutoFixedTask = new TaskItemBuilder().WithId(102).WithTitle("AutoFixed Recurring Task").WithEstimatedMinutes(10).WithComplexity(10)
-                    .WithScheduledDate(_today, DateSource.AutoFixed).WithStatus(TaskStatus.Planned).Build();
-                break;
-        }
-
-        // Авто-флекс задача, которая изначально была назначена на сегодня
-        autoFlexibleTask = new TaskItemBuilder().WithId(103).WithTitle("AutoFlexible Task").WithEstimatedMinutes(20).WithComplexity(10)
-            .WithScheduledDate(_today, DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
-
-        TaskRepo.Add(manualTask);
-        TaskRepo.Add(recurringAutoFixedTask);
-        TaskRepo.Add(autoFlexibleTask);
-
-        // Act
-        PlannerService.RecalculateAll(settings);
-
-        // Assert
-        var updatedManual = TaskRepo.GetById(101);
-        var updatedFixed = TaskRepo.GetById(102);
-        var updatedFlexible = TaskRepo.GetById(103);
-
-        // Фиксированные задачи остаются на сегодня
-        updatedManual!.ScheduledDate.Should().Be(_today);
-        updatedFixed!.ScheduledDate.Should().Be(_today);
-
-        // Ни одна автофлекс задача не остаётся на сегодня
-        updatedFlexible!.ScheduledDate.Should().Be(_tomorrow);
-    }
-
-    /// <summary>
-    /// Проверяет, что если дневной лимит не превышен фиксированными задачами,
-    /// то на сегодня назначится ровно столько автофлекс задач, сколько вмещается в лимиты.
-    /// </summary>
-    [Fact]
-    public void Recalculate_WhenLimitsNotExceeded_AssignsAsManyAutoFlexibleTasksAsFitInRemainingCapacity()
-    {
-        // Arrange
-        // Лимиты: Время = 180 мин, Сложность = 100, Задач = 4
+        // Arrange: Задаем лимиты из параметров InlineData
         var settings = new UserSettingsBuilder()
-            .WithDailyTimeLimit(180)
-            .WithDailyComplexityLimit(100)
-            .WithDailyTaskLimit(4)
-            .Build();
+            .WithDailyTimeLimit(timeLimit).WithDailyComplexityLimit(compLimit).WithDailyTaskLimit(countLimit).Build();
 
-        // Фиксированные задачи (Занимают 100 мин, 40 сложности, 2 задачи):
-        var manualTask = new TaskItemBuilder().WithId(201).WithTitle("Manual Task")
-            .WithEstimatedMinutes(60).WithComplexity(25)
-            .WithScheduledDate(_today, DateSource.Manual).WithStatus(TaskStatus.Planned).Build();
+        var manualTask = new TaskItemBuilder().WithId(101).WithScheduledDate(_today, DateSource.Manual)
+            .WithEstimatedMinutes(manTime).WithComplexity(manComp).WithStatus(TaskStatus.Planned).Build();
 
-        var autoFixedTask = new TaskItemBuilder().WithId(202).WithTitle("AutoFixed Task")
-            .WithEstimatedMinutes(40).WithComplexity(15)
-            .WithScheduledDate(_today, DateSource.AutoFixed).WithStatus(TaskStatus.Planned).Build();
+        var autoFixedTask = new TaskItemBuilder().WithId(102).WithScheduledDate(_today, DateSource.AutoFixed)
+            .WithEstimatedMinutes(fixTime).WithComplexity(fixComp).WithStatus(TaskStatus.Planned).Build();
 
-        // Кандидаты AutoFlexible:
-        // Задача 1: 30 мин, 20 слож -> Сумма 130 мин, 60 слож, 3 задачи (ВЛЕЗАЕТ)
-        var flexTask1 = new TaskItemBuilder().WithId(203).WithTitle("Flex 1")
-            .WithEstimatedMinutes(30).WithComplexity(20)
-            .WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
-
-        // Задача 2: 40 мин, 20 слож -> Сумма 170 мин, 80 слож, 4 задачи (ВЛЕЗАЕТ - ровно 4 задачи!)
-        var flexTask2 = new TaskItemBuilder().WithId(204).WithTitle("Flex 2")
-            .WithEstimatedMinutes(40).WithComplexity(20)
-            .WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
-
-        // Задача 3: 30 мин, 10 слож -> Сумма 200 мин > 180 мин И 5 задач > 4 (НЕ ВЛЕЗАЕТ)
-        var flexTask3 = new TaskItemBuilder().WithId(205).WithTitle("Flex 3")
-            .WithEstimatedMinutes(30).WithComplexity(10)
-            .WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
+        var flexTask = new TaskItemBuilder().WithId(103).WithDateSource(DateSource.AutoFlexible)
+            .WithEstimatedMinutes(flexTime).WithComplexity(flexComp).WithStatus(TaskStatus.Planned).Build();
 
         TaskRepo.Add(manualTask);
         TaskRepo.Add(autoFixedTask);
-        TaskRepo.Add(flexTask1);
-        TaskRepo.Add(flexTask2);
-        TaskRepo.Add(flexTask3);
+        TaskRepo.Add(flexTask);
 
         // Act
         PlannerService.RecalculateAll(settings);
 
-        // Assert
-        TaskRepo.GetById(201)!.ScheduledDate.Should().Be(_today);
-        TaskRepo.GetById(202)!.ScheduledDate.Should().Be(_today);
-        TaskRepo.GetById(203)!.ScheduledDate.Should().Be(_today);
-        TaskRepo.GetById(204)!.ScheduledDate.Should().Be(_today);
+        // Assert: Мануал и автофикс должны всё ещё съедать лимиты, просто не переноситься из-за них
+        TaskRepo.GetById(101)!.ScheduledDate.Should().Be(_today, "Manual задачи не сдвигаются алгоритмом");
+        TaskRepo.GetById(102)!.ScheduledDate.Should().Be(_today, "AutoFixed задачи не сдвигаются алгоритмом");
 
-        // Flex 3 вытеснена на завтра, так как лимит исчерпан
-        TaskRepo.GetById(205)!.ScheduledDate.Should().Be(_tomorrow);
+        TaskRepo.GetById(103)!.ScheduledDate.Should().Be(_tomorrow,
+            "AutoFlexible задача вытеснена, т.к. фиксированные задачи съели весь лимит");
     }
 
     /// <summary>
     /// Проверяет, что если новые/запланированные автофлекс задачи по сортировке приоритетнее
-    /// имеющихся низкоприоритетных, то при пересчёте новые задачи вытесняют старые в соответствии с лимитами.
+    /// имеющихся низкоприоритетных, то при пересчёте новые вытесняют старые в соответствии с лимитами.
     /// </summary>
     [Fact]
     public void Recalculate_WhenHighPriorityAutoFlexibleTasksExist_DisplacesLowPriorityTasksFromToday()
     {
         // Arrange
-        // Лимит по времени: 120 минут.
-        var settings = new UserSettingsBuilder().WithDailyTimeLimit(120).WithDailyTaskLimit(10).Build();
+        var settings = new UserSettingsBuilder().WithDailyTimeLimit(120).Build();
 
-        // В БД в системе 5 приоритетов: Id 2 (Высокий, Order 2), Id 4 (Низкий, Order 4).
         var highPriority = Context.Priorities.First(p => p.Order == 2);
         var lowPriority = Context.Priorities.First(p => p.Order == 4);
 
-        // На сегодня назначена мануальная (60 мин) и старая низкоприоритетная автофлекс (50 мин)
-        var manualTask = new TaskItemBuilder().WithId(301).WithTitle("Manual Task").WithEstimatedMinutes(60)
+        // Фиксированная задача съедает половину лимита (60 мин)
+        var manualTask = new TaskItemBuilder().WithId(301).WithEstimatedMinutes(60)
             .WithScheduledDate(_today, DateSource.Manual).WithStatus(TaskStatus.Planned).Build();
 
-        var existingLowPriorityFlex = new TaskItemBuilder().WithId(302).WithTitle("Low Priority Flex")
-            .WithPriorityId(lowPriority.Id).WithEstimatedMinutes(50)
-            .WithScheduledDate(_today, DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
+        // Старая задача низкого приоритета (50 мин)
+        var existingLowPriorityFlex = new TaskItemBuilder().WithId(302).WithPriorityId(lowPriority.Id)
+            .WithEstimatedMinutes(50).WithScheduledDate(_today, DateSource.AutoFlexible).WithStatus(TaskStatus.Planned)
+            .Build();
 
-        // Появилась новая высокоприоритетная автофлекс задача (50 мин), пока без даты (или с AutoFlexible)
-        var newHighPriorityFlex = new TaskItemBuilder().WithId(303).WithTitle("High Priority Flex")
-            .WithPriorityId(highPriority.Id).WithEstimatedMinutes(50)
-            .WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
+        // Новая задача высокого приоритета (50 мин)
+        var newHighPriorityFlex = new TaskItemBuilder().WithId(303).WithPriorityId(highPriority.Id)
+            .WithEstimatedMinutes(50).WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
 
         TaskRepo.Add(manualTask);
         TaskRepo.Add(existingLowPriorityFlex);
@@ -187,47 +99,36 @@ public class RecalculationDailyLimitsTests : IntegrationTestBase
         PlannerService.RecalculateAll(settings);
 
         // Assert
-        // Мануальная остаётся на сегодня (60 мин)
-        TaskRepo.GetById(301)!.ScheduledDate.Should().Be(_today);
-
-        // Высокоприоритетная вытесняет низкоприоритетную (60 + 50 = 110 <= 120 мин)
-        TaskRepo.GetById(303)!.ScheduledDate.Should().Be(_today);
-
-        // Низкоприоритетная вытеснена на завтра (110 + 50 = 160 > 120 мин)
-        TaskRepo.GetById(302)!.ScheduledDate.Should().Be(_tomorrow);
+        TaskRepo.GetById(301)!.ScheduledDate.Should().Be(_today, "Фиксированная задача остается на месте");
+        TaskRepo.GetById(303)!.ScheduledDate.Should().Be(_today, "Высокий приоритет занимает оставшиеся 60 минут");
+        TaskRepo.GetById(302)!.ScheduledDate.Should().Be(_tomorrow, "Низкий приоритет вытесняется на завтра");
     }
 
     /// <summary>
-    /// Проверяет, что если существуют автофлекс задачи, которые по алгоритму сортировки должны выполняться
-    /// ПОСЛЕ имеющихся низкоприоритетных задач, то они заполняются в соответствии с лимитами уже ПОСЛЕ них.
+    /// Проверяет, что автофлекс задачи с низким приоритетом заполняют расписание ПОСЛЕ 
+    /// более важных задач, переносясь на завтра при исчерпании лимита.
     /// </summary>
     [Fact]
     public void Recalculate_WhenLowerPriorityAutoFlexibleTasksExist_FillsScheduleAfterExistingTasks()
     {
         // Arrange
-        // Лимит времени: 160 минут
-        var settings = new UserSettingsBuilder().WithDailyTimeLimit(160).WithDailyTaskLimit(10).Build();
+        var settings = new UserSettingsBuilder().WithDailyTimeLimit(160).Build();
 
         var mediumPriority = Context.Priorities.First(p => p.Order == 3);
         var backgroundPriority = Context.Priorities.First(p => p.Order == 5);
 
-        // Мануальная задача (50 мин)
-        var manualTask = new TaskItemBuilder().WithId(401).WithTitle("Manual Task").WithEstimatedMinutes(50)
+        // Мануальная + Средняя Флекс = 100 минут (остается 60 минут лимита)
+        var manualTask = new TaskItemBuilder().WithId(401).WithEstimatedMinutes(50)
             .WithScheduledDate(_today, DateSource.Manual).WithStatus(TaskStatus.Planned).Build();
-
-        // Средняя автофлекс (50 мин)
-        var mediumFlex = new TaskItemBuilder().WithId(402).WithTitle("Medium Flex")
-            .WithPriorityId(mediumPriority.Id).WithEstimatedMinutes(50)
+        var mediumFlex = new TaskItemBuilder().WithId(402).WithPriorityId(mediumPriority.Id).WithEstimatedMinutes(50)
             .WithScheduledDate(_today, DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
 
-        // Низшая / фоновая автофлекс 1 (50 мин) -> (50 + 50 + 50 = 150 <= 160) - Влезает ПОСЛЕ средней
-        var lowerFlex1 = new TaskItemBuilder().WithId(403).WithTitle("Lower Flex 1")
-            .WithPriorityId(backgroundPriority.Id).WithEstimatedMinutes(50)
+        // Две фоновые задачи по 50 минут (влезет только первая)
+        var lowerFlex1 = new TaskItemBuilder().WithId(403).WithPriorityId(backgroundPriority.Id)
+            .WithEstimatedMinutes(50)
             .WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
-
-        // Низшая / фоновая автофлекс 2 (50 мин) -> (150 + 50 = 200 > 160) - НЕ влезает
-        var lowerFlex2 = new TaskItemBuilder().WithId(404).WithTitle("Lower Flex 2")
-            .WithPriorityId(backgroundPriority.Id).WithEstimatedMinutes(50)
+        var lowerFlex2 = new TaskItemBuilder().WithId(404).WithPriorityId(backgroundPriority.Id)
+            .WithEstimatedMinutes(50)
             .WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
 
         TaskRepo.Add(manualTask);
@@ -241,11 +142,7 @@ public class RecalculationDailyLimitsTests : IntegrationTestBase
         // Assert
         TaskRepo.GetById(401)!.ScheduledDate.Should().Be(_today);
         TaskRepo.GetById(402)!.ScheduledDate.Should().Be(_today);
-
-        // lowerFlex1 заполняется после mediumFlex на сегодня
-        TaskRepo.GetById(403)!.ScheduledDate.Should().Be(_today);
-
-        // lowerFlex2 превышает лимит и отправляется на завтра
-        TaskRepo.GetById(404)!.ScheduledDate.Should().Be(_tomorrow);
+        TaskRepo.GetById(403)!.ScheduledDate.Should().Be(_today, "Влезает в остаток лимита (150 <= 160)");
+        TaskRepo.GetById(404)!.ScheduledDate.Should().Be(_tomorrow, "Не влезает в лимит и переносится");
     }
 }

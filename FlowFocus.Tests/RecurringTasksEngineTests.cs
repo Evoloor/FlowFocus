@@ -1,7 +1,6 @@
 using FluentAssertions;
 using FlowFocus.Core;
 using FlowFocus.Core.Enums;
-using FlowFocus.Core.Models;
 using FlowFocus.Core.Validation;
 using FlowFocus.Data.Services;
 using FlowFocus.Tests.Builders;
