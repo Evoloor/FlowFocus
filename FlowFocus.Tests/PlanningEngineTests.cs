@@ -7,443 +7,510 @@ using FlowFocus.Core.Validation;
 using FlowFocus.Data;
 using FlowFocus.Data.Repositories;
 using FlowFocus.Tests.Builders;
+using JetBrains.Annotations;
 using NSubstitute;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Tests;
 
-[Trait("Category", "Planning")]
-[Collection("StaticState")]
+/// <summary>
+/// Unit tests for planning engine algorithms, distribution rules, limits, and idempotency.
+/// </summary>
+[UsedImplicitly]
+[Trait(name: "Category", value: "Planning")]
+[Collection(name: "StaticState")]
 public class PlanningEngineTests
 {
+    /// <summary>
+    /// Tests verification of relevance sorting rules in task distribution.
+    /// </summary>
+    [UsedImplicitly]
+    [Trait(name: "Category", value: "Planning")]
     public class SortingRules
     {
+        /// <summary>
+        /// Verifies that DistributeTasks schedules tasks in priority and relevance order.
+        /// </summary>
         [Fact]
         public void DistributeTasks_SchedulesTasksInOrderOfRelevance()
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
-            PlannerService plannerService = new(taskRepo);
+            TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepository: taskRepo);
 
-            var priorities = context.Priorities.OrderBy(p => p.Order).ToList();
-            var urgentPriority = priorities[0]; // Order 1
-            var lowPriority = priorities[3]; // Order 4
+            var priorities = context.Priorities.OrderBy(keySelector: p => p.Order).ToList();
+            var urgentPriority = priorities[index: 0]; // Order 1
+            var lowPriority = priorities[index: 3]; // Order 4
 
-            var taskLowPriorityShort = new TaskItemBuilder().WithId(101).WithPriorityId(lowPriority.Id)
-                .WithEstimatedMinutes(5).WithInterest(5).WithStatus(TaskStatus.Planned)
-                .WithDateSource(DateSource.AutoFlexible).Build();
-            var taskUrgentLong = new TaskItemBuilder().WithId(102).WithPriorityId(urgentPriority.Id)
-                .WithEstimatedMinutes(30).WithInterest(3).WithStatus(TaskStatus.Planned)
-                .WithDateSource(DateSource.AutoFlexible).Build();
-            var taskUrgentShortHighInterest = new TaskItemBuilder().WithId(103).WithPriorityId(urgentPriority.Id)
-                .WithEstimatedMinutes(5).WithInterest(9).WithStatus(TaskStatus.Planned)
-                .WithDateSource(DateSource.AutoFlexible).Build();
+            var taskLowPriorityShort = new TaskItemBuilder().WithId(id: 101).WithPriorityId(priorityId: lowPriority.Id)
+                .WithEstimatedMinutes(minutes: 5).WithInterest(interest: 5).WithStatus(status: TaskStatus.Planned)
+                .WithDateSource(source: DateSource.AutoFlexible).Build();
+            var taskUrgentLong = new TaskItemBuilder().WithId(id: 102).WithPriorityId(priorityId: urgentPriority.Id)
+                .WithEstimatedMinutes(minutes: 30).WithInterest(interest: 3).WithStatus(status: TaskStatus.Planned)
+                .WithDateSource(source: DateSource.AutoFlexible).Build();
+            var taskUrgentShortHighInterest = new TaskItemBuilder().WithId(id: 103).WithPriorityId(priorityId: urgentPriority.Id)
+                .WithEstimatedMinutes(minutes: 5).WithInterest(interest: 9).WithStatus(status: TaskStatus.Planned)
+                .WithDateSource(source: DateSource.AutoFlexible).Build();
 
-            taskRepo.Add(taskLowPriorityShort);
-            taskRepo.Add(taskUrgentLong);
-            taskRepo.Add(taskUrgentShortHighInterest);
+            taskRepo.Add(entity: taskLowPriorityShort);
+            taskRepo.Add(entity: taskUrgentLong);
+            taskRepo.Add(entity: taskUrgentShortHighInterest);
 
-            var settings = new UserSettingsBuilder().WithDailyTimeLimit(35).Build();
+            var settings = new UserSettingsBuilder().WithDailyTimeLimit(limit: 35).Build();
 
             // Act: Call real application planner service
-            plannerService.DistributeTasks(settings);
+            plannerService.DistributeTasks(settings: settings);
 
-            // Assert: Task 103 (Urgent, Short, High Interest) and Task 102 scheduled on today, Task 101 moved to tomorrow
-            var saved103 = taskRepo.GetById(103);
-            var saved102 = taskRepo.GetById(102);
-            var saved101 = taskRepo.GetById(101);
+            // Assert: Task 103 (Urgent, Short, High Interest) and Task 102 scheduled today, Task 101 moved to tomorrow
+            var saved103 = taskRepo.GetById(id: 103);
+            var saved102 = taskRepo.GetById(id: 102);
+            var saved101 = taskRepo.GetById(id: 101);
 
-            saved103!.ScheduledDate.Should().Be(TodoDay.Today.ToDateTime());
-            saved102!.ScheduledDate.Should().Be(TodoDay.Today.ToDateTime());
-            saved101!.ScheduledDate.Should().Be(TodoDay.Today.Tomorrow.ToDateTime());
+            saved103!.ScheduledDate.Should().Be(expected: TodoDay.Today.ToDateTime());
+            saved102!.ScheduledDate.Should().Be(expected: TodoDay.Today.ToDateTime());
+            saved101!.ScheduledDate.Should().Be(expected: TodoDay.Today.Tomorrow.ToDateTime());
         }
     }
 
+    /// <summary>
+    /// Tests verification of daily time limit allocation and large task handling.
+    /// </summary>
+    [UsedImplicitly]
+    [Trait(name: "Category", value: "Planning")]
     public class LimitAllocation
     {
+        /// <summary>
+        /// Verifies that DistributeTasks splits tasks according to daily time limit.
+        /// </summary>
         [Fact]
         public void DistributeTasks_SplitsTasksByDailyTimeLimit()
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
-            PlannerService plannerService = new(taskRepo);
+            TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepository: taskRepo);
 
-            var taskA = new TaskItemBuilder().WithId(101).WithEstimatedMinutes(60)
-                .WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
-            var taskB = new TaskItemBuilder().WithId(102).WithEstimatedMinutes(90)
-                .WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
-            var taskC = new TaskItemBuilder().WithId(103).WithEstimatedMinutes(60)
-                .WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
+            var taskA = new TaskItemBuilder().WithId(id: 101).WithEstimatedMinutes(minutes: 60)
+                .WithDateSource(source: DateSource.AutoFlexible).WithStatus(status: TaskStatus.Planned).Build();
+            var taskB = new TaskItemBuilder().WithId(id: 102).WithEstimatedMinutes(minutes: 90)
+                .WithDateSource(source: DateSource.AutoFlexible).WithStatus(status: TaskStatus.Planned).Build();
+            var taskC = new TaskItemBuilder().WithId(id: 103).WithEstimatedMinutes(minutes: 60)
+                .WithDateSource(source: DateSource.AutoFlexible).WithStatus(status: TaskStatus.Planned).Build();
 
-            taskRepo.Add(taskA);
-            taskRepo.Add(taskB);
-            taskRepo.Add(taskC);
+            taskRepo.Add(entity: taskA);
+            taskRepo.Add(entity: taskB);
+            taskRepo.Add(entity: taskC);
 
             // Act: Daily limit 180 min -> A (60) + B (90) = 150 min (Today), C (60) moves to Tomorrow
-            var settings = new UserSettingsBuilder().WithDailyTimeLimit(180).Build();
-            plannerService.DistributeTasks(settings);
+            var settings = new UserSettingsBuilder().WithDailyTimeLimit(limit: 180).Build();
+            plannerService.DistributeTasks(settings: settings);
 
             // Assert: Inspect persistent DB state
-            var updatedA = taskRepo.GetById(taskA.Id);
-            var updatedB = taskRepo.GetById(taskB.Id);
-            var updatedC = taskRepo.GetById(taskC.Id);
+            var updatedA = taskRepo.GetById(id: taskA.Id);
+            var updatedB = taskRepo.GetById(id: taskB.Id);
+            var updatedC = taskRepo.GetById(id: taskC.Id);
 
-            updatedA!.ScheduledDate.Should().Be(TodoDay.Today.ToDateTime());
-            updatedB!.ScheduledDate.Should().Be(TodoDay.Today.ToDateTime());
-            updatedC!.ScheduledDate.Should().Be(TodoDay.Today.Tomorrow.ToDateTime());
+            updatedA!.ScheduledDate.Should().Be(expected: TodoDay.Today.ToDateTime());
+            updatedB!.ScheduledDate.Should().Be(expected: TodoDay.Today.ToDateTime());
+            updatedC!.ScheduledDate.Should().Be(expected: TodoDay.Today.Tomorrow.ToDateTime());
         }
 
+        /// <summary>
+        /// Verifies that a large task exceeding 70% of daily limit is scheduled on current day exceeding limit.
+        /// </summary>
         [Fact]
         public void LargeTask_Exceeding70PercentLimit_ScheduledOnCurrentDayExceedingLimit()
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
-            PlannerService plannerService = new(taskRepo);
+            TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepository: taskRepo);
 
-            var existingTask = new TaskItemBuilder().WithId(201).WithEstimatedMinutes(70)
-                .WithScheduledDate(TodoDay.Today.ToDateTime(), DateSource.Manual).WithStatus(TaskStatus.Planned)
+            var existingTask = new TaskItemBuilder().WithId(id: 201).WithEstimatedMinutes(minutes: 70)
+                .WithScheduledDate(date: TodoDay.Today.ToDateTime(), dateSource: DateSource.Manual).WithStatus(status: TaskStatus.Planned)
                 .Build();
-            var largeTask = new TaskItemBuilder().WithId(202).WithEstimatedMinutes(75)
-                .WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
+            var largeTask = new TaskItemBuilder().WithId(id: 202).WithEstimatedMinutes(minutes: 75)
+                .WithDateSource(source: DateSource.AutoFlexible).WithStatus(status: TaskStatus.Planned).Build();
 
-            taskRepo.Add(existingTask);
-            taskRepo.Add(largeTask);
+            taskRepo.Add(entity: existingTask);
+            taskRepo.Add(entity: largeTask);
 
             // Act: Limit = 100 min. 70 min already occupied. Large task = 75 min (75% limit)
-            var settings = new UserSettingsBuilder().WithDailyTimeLimit(100).Build();
-            plannerService.DistributeTasks(settings);
+            var settings = new UserSettingsBuilder().WithDailyTimeLimit(limit: 100).Build();
+            plannerService.DistributeTasks(settings: settings);
 
             // Assert: Large task placed on current day exceeding limit
-            var updatedLarge = taskRepo.GetById(largeTask.Id);
-            updatedLarge!.ScheduledDate.Should().Be(TodoDay.Today.ToDateTime());
+            var updatedLarge = taskRepo.GetById(id: largeTask.Id);
+            updatedLarge!.ScheduledDate.Should().Be(expected: TodoDay.Today.ToDateTime());
         }
     }
 
+    /// <summary>
+    /// Tests verification of urgent priority bypass rules.
+    /// </summary>
+    [UsedImplicitly]
+    [Trait(name: "Category", value: "Planning")]
     public class PriorityBypass
     {
+        /// <summary>
+        /// Verifies that urgent (Priority 0 or 1) tasks are forcibly scheduled today despite full daily limits.
+        /// </summary>
         [Fact]
         public void Priority0Or1Task_ForciblyScheduledTodayDespiteFullLimits()
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
-            PlannerService plannerService = new(taskRepo);
+            TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepository: taskRepo);
 
-            var urgentPriority = context.Priorities.First(p => p.Order == 1);
-            var urgentTask = new TaskItemBuilder().WithId(301).WithPriorityId(urgentPriority.Id)
-                .WithDateSource(DateSource.AutoFlexible).WithEstimatedMinutes(100).WithStatus(TaskStatus.Planned)
+            var urgentPriority = context.Priorities.First(predicate: p => p.Order == 1);
+            var urgentTask = new TaskItemBuilder().WithId(id: 301).WithPriorityId(priorityId: urgentPriority.Id)
+                .WithDateSource(source: DateSource.AutoFlexible).WithEstimatedMinutes(minutes: 100).WithStatus(status: TaskStatus.Planned)
                 .Build();
 
-            taskRepo.Add(urgentTask);
+            taskRepo.Add(entity: urgentTask);
 
             // Act: Daily limit = 0 min (fully exhausted)
-            var settings = new UserSettingsBuilder().WithDailyTimeLimit(0).Build();
-            plannerService.DistributeTasks(settings);
+            var settings = new UserSettingsBuilder().WithDailyTimeLimit(limit: 0).Build();
+            plannerService.DistributeTasks(settings: settings);
 
             // Assert
-            var updatedUrgent = taskRepo.GetById(urgentTask.Id);
-            updatedUrgent!.ScheduledDate.Should().Be(TodoDay.Today.ToDateTime());
+            var updatedUrgent = taskRepo.GetById(id: urgentTask.Id);
+            updatedUrgent!.ScheduledDate.Should().Be(expected: TodoDay.Today.ToDateTime());
         }
     }
 
+    /// <summary>
+    /// Tests verification of edge cases in daily limits and default properties.
+    /// </summary>
+    [UsedImplicitly]
+    [Trait(name: "Category", value: "Planning")]
     public class EdgeCasesInLimits
     {
+        /// <summary>
+        /// Verifies that tasks with null fields utilize safe domain validator defaults.
+        /// </summary>
         [Fact]
         public void TaskWithNullFields_UsesSafeDefaultsWithoutException()
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
 
             var task = new TaskItemBuilder()
-                .WithId(400)
-                .WithEstimatedMinutes(null)
-                .WithComplexity(null)
-                .WithInterest(null)
+                .WithId(id: 400)
+                .WithEstimatedMinutes(minutes: null)
+                .WithComplexity(complexity: null)
+                .WithInterest(interest: null)
                 .Build();
 
             // Act
-            taskRepo.Add(task);
-            var savedTask = taskRepo.GetById(task.Id);
+            taskRepo.Add(entity: task);
+            var savedTask = taskRepo.GetById(id: task.Id);
 
             // Assert
             savedTask.Should().NotBeNull();
-            TaskItemValidator.ClampEstimatedMinutes(savedTask.EstimatedMinutes).Should().Be(15);
-            savedTask.TotalComplexity.Should().Be(0);
-            (savedTask.Interest ?? 5).Should().Be(5);
+            TaskItemValidator.ClampEstimatedMinutes(minutes: savedTask.EstimatedMinutes).Should().Be(expected: 15);
+            savedTask.TotalComplexity.Should().Be(expected: 0);
+            (savedTask.Interest ?? 5).Should().Be(expected: 5);
         }
 
+        /// <summary>
+        /// Verifies that subtasks are excluded from daily task count limits and subtask duration is aggregated.
+        /// </summary>
         [Fact]
         public void DistributeTasks_ExcludesSubtasksFromDailyTaskLimits()
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
-            PlannerService plannerService = new(taskRepo);
+            TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepository: taskRepo);
 
-            var urgentPriority = context.Priorities.First(p => p.Order == 1);
-            var subtask1 = new TaskItemBuilder().WithId(11).WithTitle("Subtask 1").WithParentTaskId(10)
-                .WithEstimatedMinutes(60).WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned)
+            var urgentPriority = context.Priorities.First(predicate: p => p.Order == 1);
+            var subtask1 = new TaskItemBuilder().WithId(id: 11).WithTitle(title: "Subtask 1").WithParentTaskId(parentId: 10)
+                .WithEstimatedMinutes(minutes: 60).WithDateSource(source: DateSource.AutoFlexible).WithStatus(status: TaskStatus.Planned)
                 .Build();
-            var subtask2 = new TaskItemBuilder().WithId(12).WithTitle("Subtask 2").WithParentTaskId(10)
-                .WithEstimatedMinutes(60).WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned)
+            var subtask2 = new TaskItemBuilder().WithId(id: 12).WithTitle(title: "Subtask 2").WithParentTaskId(parentId: 10)
+                .WithEstimatedMinutes(minutes: 60).WithDateSource(source: DateSource.AutoFlexible).WithStatus(status: TaskStatus.Planned)
                 .Build();
-            var parentTask = new TaskItemBuilder().WithId(10).WithPriorityId(urgentPriority.Id).WithTitle("Parent Task")
-                .WithEstimatedMinutes(30).WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned)
-                .WithSubtask(subtask1).WithSubtask(subtask2).Build();
+            var parentTask = new TaskItemBuilder().WithId(id: 10).WithPriorityId(priorityId: urgentPriority.Id).WithTitle(title: "Parent Task")
+                .WithEstimatedMinutes(minutes: 30).WithDateSource(source: DateSource.AutoFlexible).WithStatus(status: TaskStatus.Planned)
+                .WithSubtask(subtask: subtask1).WithSubtask(subtask: subtask2).Build();
 
-            taskRepo.Add(parentTask);
+            taskRepo.Add(entity: parentTask);
 
             // DailyTaskLimit = 1 (Count limit = 1 task/day). DailyTimeLimit = 480 min.
-            var settings = new UserSettingsBuilder().WithDailyTaskLimit(1).WithDailyTimeLimit(480).Build();
+            var settings = new UserSettingsBuilder().WithDailyTaskLimit(limit: 1).WithDailyTimeLimit(limit: 480).Build();
 
             // Act: Run planner service distribution
-            plannerService.DistributeTasks(settings);
+            plannerService.DistributeTasks(settings: settings);
 
             // Assert: Parent task with subtasks is scheduled today (subtasks excluded from task count limit) & subtask time is aggregated
-            var savedParent = taskRepo.GetById(10);
+            var savedParent = taskRepo.GetById(id: 10);
             savedParent.Should().NotBeNull();
-            savedParent.ScheduledDate.Should().Be(TodoDay.Today.ToDateTime());
-            savedParent.TotalEstimatedMinutes.Should().Be(150);
+            savedParent.ScheduledDate.Should().Be(expected: TodoDay.Today.ToDateTime());
+            savedParent.TotalEstimatedMinutes.Should().Be(expected: 150);
         }
 
+        /// <summary>
+        /// Verifies that a zero daily time limit executes safely without infinite loops.
+        /// </summary>
         [Fact]
         public void ZeroDailyLimit_DoesNotCauseInfiniteLoop()
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
-            PlannerService plannerService = new(taskRepo);
+            TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepository: taskRepo);
 
-            var task = new TaskItemBuilder().WithId(401).WithEstimatedMinutes(60)
-                .WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
-            taskRepo.Add(task);
+            var task = new TaskItemBuilder().WithId(id: 401).WithEstimatedMinutes(minutes: 60)
+                .WithDateSource(source: DateSource.AutoFlexible).WithStatus(status: TaskStatus.Planned).Build();
+            taskRepo.Add(entity: task);
 
-            var settings = new UserSettingsBuilder().WithDailyTimeLimit(0).Build();
+            var settings = new UserSettingsBuilder().WithDailyTimeLimit(limit: 0).Build();
 
             // Act
-            var act = () => plannerService.DistributeTasks(settings);
+            var act = () => plannerService.DistributeTasks(settings: settings);
 
             // Assert
             act.Should().NotThrow();
         }
 
-
+        /// <summary>
+        /// Verifies that completed tasks today consume daily time limits for planning new tasks.
+        /// </summary>
         [Fact]
         public void CompletedTasks_CountAgainstDailyLimits()
         {
-            // Arrange: Проверка, что завершённые сегодня дела учитываются при подсчёте лимита[cite: 1]
+            // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
-            PlannerService plannerService = new(taskRepo);
+            TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepository: taskRepo);
 
             var completedToday = new TaskItemBuilder()
-                .WithId(701)
-                .WithEstimatedMinutes(100)
-                .WithScheduledDate(TodoDay.Today.ToDateTime(), DateSource.Manual)
-                .WithCompletedDate(TodoDay.Today.ToDateTime())
-                .WithStatus(TaskStatus.Completed)
+                .WithId(id: 701)
+                .WithEstimatedMinutes(minutes: 100)
+                .WithScheduledDate(date: TodoDay.Today.ToDateTime(), dateSource: DateSource.Manual)
+                .WithCompletedDate(date: TodoDay.Today.ToDateTime())
+                .WithStatus(status: TaskStatus.Completed)
                 .Build();
 
             var newPlannedTask = new TaskItemBuilder()
-                .WithId(702)
-                .WithEstimatedMinutes(100)
-                .WithDateSource(DateSource.AutoFlexible)
-                .WithStatus(TaskStatus.Planned)
+                .WithId(id: 702)
+                .WithEstimatedMinutes(minutes: 100)
+                .WithDateSource(source: DateSource.AutoFlexible)
+                .WithStatus(status: TaskStatus.Planned)
                 .Build();
 
-            taskRepo.Add(completedToday);
-            taskRepo.Add(newPlannedTask);
+            taskRepo.Add(entity: completedToday);
+            taskRepo.Add(entity: newPlannedTask);
 
-            // Лимит 180 минут. Завершённая задача уже забрала 100 минут. 
-            // Новая задача на 100 минут не поместится (100 + 100 > 180) и должна уйти на завтра.
-            var settings = new UserSettingsBuilder().WithDailyTimeLimit(180).Build();
+            // Limit 180 min. Completed task consumes 100 min.
+            var settings = new UserSettingsBuilder().WithDailyTimeLimit(limit: 180).Build();
 
             // Act
-            plannerService.DistributeTasks(settings);
+            plannerService.DistributeTasks(settings: settings);
 
             // Assert
-            var savedNewTask = taskRepo.GetById(702);
-            savedNewTask!.ScheduledDate.Should().Be(TodoDay.Today.Tomorrow.ToDateTime());
+            var savedNewTask = taskRepo.GetById(id: 702);
+            savedNewTask!.ScheduledDate.Should().Be(expected: TodoDay.Today.Tomorrow.ToDateTime());
         }
 
+        /// <summary>
+        /// Verifies that daily task count limit stops distribution when limit is reached.
+        /// </summary>
         [Fact]
         public void DailyTaskLimit_StopsDistributionWhenLimitReached()
         {
-            // Arrange: Проверка лимита количества задач на день[cite: 3]
+            // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
-            PlannerService plannerService = new(taskRepo);
+            TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepository: taskRepo);
 
-            var task1 = new TaskItemBuilder().WithId(801).WithDateSource(DateSource.AutoFlexible)
-                .WithStatus(TaskStatus.Planned).Build();
-            var task2 = new TaskItemBuilder().WithId(802).WithDateSource(DateSource.AutoFlexible)
-                .WithStatus(TaskStatus.Planned).Build();
+            var task1 = new TaskItemBuilder().WithId(id: 801).WithDateSource(source: DateSource.AutoFlexible)
+                .WithStatus(status: TaskStatus.Planned).Build();
+            var task2 = new TaskItemBuilder().WithId(id: 802).WithDateSource(source: DateSource.AutoFlexible)
+                .WithStatus(status: TaskStatus.Planned).Build();
 
-            taskRepo.Add(task1);
-            taskRepo.Add(task2);
+            taskRepo.Add(entity: task1);
+            taskRepo.Add(entity: task2);
 
-            // Лимит - ровно 1 задача в день
-            var settings = new UserSettingsBuilder().WithDailyTaskLimit(1).Build();
+            // Limit = 1 task per day
+            var settings = new UserSettingsBuilder().WithDailyTaskLimit(limit: 1).Build();
 
             // Act
-            plannerService.DistributeTasks(settings);
+            plannerService.DistributeTasks(settings: settings);
 
             // Assert
-            taskRepo.GetById(801)!.ScheduledDate.Should().Be(TodoDay.Today.ToDateTime());
-            taskRepo.GetById(802)!.ScheduledDate.Should().Be(TodoDay.Today.Tomorrow.ToDateTime());
+            taskRepo.GetById(id: 801)!.ScheduledDate.Should().Be(expected: TodoDay.Today.ToDateTime());
+            taskRepo.GetById(id: 802)!.ScheduledDate.Should().Be(expected: TodoDay.Today.Tomorrow.ToDateTime());
         }
 
+        /// <summary>
+        /// Verifies that daily task count limit excludes subtasks from counting against limit.
+        /// </summary>
         [Fact]
         public void DailyTaskLimit_ExcludesSubtasksFromCount()
         {
-            // Arrange: Подзадачи не учитываются при сравнении с лимитом задач на день[cite: 3]
+            // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
-            PlannerService plannerService = new(taskRepo);
+            TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepository: taskRepo);
 
-            var subtask1 = new TaskItemBuilder().WithId(901).WithTitle("Subtask 1").Build();
-            var subtask2 = new TaskItemBuilder().WithId(902).WithTitle("Subtask 2").Build();
+            var subtask1 = new TaskItemBuilder().WithId(id: 901).WithTitle(title: "Subtask 1").Build();
+            var subtask2 = new TaskItemBuilder().WithId(id: 902).WithTitle(title: "Subtask 2").Build();
 
             var parentTask = new TaskItemBuilder()
-                .WithId(900)
-                .WithTitle("Parent Task")
-                .WithDateSource(DateSource.AutoFlexible)
-                .WithStatus(TaskStatus.Planned)
-                .WithSubtask(subtask1)
-                .WithSubtask(subtask2)
+                .WithId(id: 900)
+                .WithTitle(title: "Parent Task")
+                .WithDateSource(source: DateSource.AutoFlexible)
+                .WithStatus(status: TaskStatus.Planned)
+                .WithSubtask(subtask: subtask1)
+                .WithSubtask(subtask: subtask2)
                 .Build();
 
-            var anotherTask = new TaskItemBuilder().WithId(903).WithDateSource(DateSource.AutoFlexible)
-                .WithStatus(TaskStatus.Planned).Build();
+            var anotherTask = new TaskItemBuilder().WithId(id: 903).WithDateSource(source: DateSource.AutoFlexible)
+                .WithStatus(status: TaskStatus.Planned).Build();
 
-            taskRepo.Add(parentTask);
-            taskRepo.Add(anotherTask);
+            taskRepo.Add(entity: parentTask);
+            taskRepo.Add(entity: anotherTask);
 
-            // Лимит - 1 задача в день. Родительская (с подзадачами) считается как 1 задача.
-            var settings = new UserSettingsBuilder().WithDailyTaskLimit(1).Build();
+            // Limit = 1 task per day
+            var settings = new UserSettingsBuilder().WithDailyTaskLimit(limit: 1).Build();
 
             // Act
-            plannerService.DistributeTasks(settings);
+            plannerService.DistributeTasks(settings: settings);
 
-            // Assert: Родительская на сегодня, вторая задача улетает на завтра
-            taskRepo.GetById(900)!.ScheduledDate.Should().Be(TodoDay.Today.ToDateTime());
-            taskRepo.GetById(903)!.ScheduledDate.Should().Be(TodoDay.Today.Tomorrow.ToDateTime());
+            // Assert: Parent scheduled today, second task pushed to tomorrow
+            taskRepo.GetById(id: 900)!.ScheduledDate.Should().Be(expected: TodoDay.Today.ToDateTime());
+            taskRepo.GetById(id: 903)!.ScheduledDate.Should().Be(expected: TodoDay.Today.Tomorrow.ToDateTime());
         }
 
+        /// <summary>
+        /// Verifies that daily complexity limit stops distribution when limit is reached.
+        /// </summary>
         [Fact]
         public void DailyComplexityLimit_StopsDistributionWhenLimitReached()
         {
-            // Arrange: Проверка лимита по сложности[cite: 3]
+            // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
-            PlannerService plannerService = new(taskRepo);
+            TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepository: taskRepo);
 
-            var task1 = new TaskItemBuilder().WithId(1001).WithComplexity(60).WithDateSource(DateSource.AutoFlexible)
-                .WithStatus(TaskStatus.Planned).Build();
-            var task2 = new TaskItemBuilder().WithId(1002).WithComplexity(50).WithDateSource(DateSource.AutoFlexible)
-                .WithStatus(TaskStatus.Planned).Build();
+            var task1 = new TaskItemBuilder().WithId(id: 1001).WithComplexity(complexity: 60).WithDateSource(source: DateSource.AutoFlexible)
+                .WithStatus(status: TaskStatus.Planned).Build();
+            var task2 = new TaskItemBuilder().WithId(id: 1002).WithComplexity(complexity: 50).WithDateSource(source: DateSource.AutoFlexible)
+                .WithStatus(status: TaskStatus.Planned).Build();
 
-            taskRepo.Add(task1);
-            taskRepo.Add(task2);
+            taskRepo.Add(entity: task1);
+            taskRepo.Add(entity: task2);
 
-            // Лимит сложности - 100. 60 + 50 = 110 (превышение)
-            var settings = new UserSettingsBuilder().WithDailyComplexityLimit(100).Build();
+            // Complexity limit = 100
+            var settings = new UserSettingsBuilder().WithDailyComplexityLimit(limit: 100).Build();
 
             // Act
-            plannerService.DistributeTasks(settings);
+            plannerService.DistributeTasks(settings: settings);
 
             // Assert
-            taskRepo.GetById(1001)!.ScheduledDate.Should().Be(TodoDay.Today.ToDateTime());
-            taskRepo.GetById(1002)!.ScheduledDate.Should().Be(TodoDay.Today.Tomorrow.ToDateTime());
+            taskRepo.GetById(id: 1001)!.ScheduledDate.Should().Be(expected: TodoDay.Today.ToDateTime());
+            taskRepo.GetById(id: 1002)!.ScheduledDate.Should().Be(expected: TodoDay.Today.Tomorrow.ToDateTime());
         }
 
+        /// <summary>
+        /// Verifies that large task rule applies strictly to time limit and not to complexity.
+        /// </summary>
         [Fact]
         public void LargeTaskRule_OnlyAppliesToTimeLimit_NotComplexity()
         {
-            // Arrange: Крупным делом можно превышать ТОЛЬКО лимит часов, сложность превышать нельзя[cite: 1]
+            // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
-            PlannerService plannerService = new(taskRepo);
+            TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepository: taskRepo);
 
-            var existingTask = new TaskItemBuilder().WithId(1101).WithComplexity(50)
-                .WithScheduledDate(TodoDay.Today.ToDateTime(), DateSource.Manual).WithStatus(TaskStatus.Planned)
+            var existingTask = new TaskItemBuilder().WithId(id: 1101).WithComplexity(complexity: 50)
+                .WithScheduledDate(date: TodoDay.Today.ToDateTime(), dateSource: DateSource.Manual).WithStatus(status: TaskStatus.Planned)
                 .Build();
 
-            // Задача со сложностью 75 (что > 70% от лимита в 100), претендует на статус "крупной", 
-            // но для сложности это правило не работает
-            var largeComplexityTask = new TaskItemBuilder().WithId(1102).WithComplexity(75)
-                .WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
+            var largeComplexityTask = new TaskItemBuilder().WithId(id: 1102).WithComplexity(complexity: 75)
+                .WithDateSource(source: DateSource.AutoFlexible).WithStatus(status: TaskStatus.Planned).Build();
 
-            taskRepo.Add(existingTask);
-            taskRepo.Add(largeComplexityTask);
+            taskRepo.Add(entity: existingTask);
+            taskRepo.Add(entity: largeComplexityTask);
 
-            var settings = new UserSettingsBuilder().WithDailyComplexityLimit(100).Build();
+            var settings = new UserSettingsBuilder().WithDailyComplexityLimit(limit: 100).Build();
 
             // Act
-            plannerService.DistributeTasks(settings);
+            plannerService.DistributeTasks(settings: settings);
 
-            // Assert: Так как лимит сложности не прощает превышений даже для >=70%, задача уходит на завтра
-            taskRepo.GetById(1102)!.ScheduledDate.Should().Be(TodoDay.Today.Tomorrow.ToDateTime());
+            // Assert
+            taskRepo.GetById(id: 1102)!.ScheduledDate.Should().Be(expected: TodoDay.Today.Tomorrow.ToDateTime());
         }
 
+        /// <summary>
+        /// Verifies that overdue tasks are processed before normal tasks during planning.
+        /// </summary>
         [Fact]
         public void OverdueTasks_ProcessedBeforeNormalTasks_CanExceedLimits()
         {
-            // Arrange: Перенесённая просрочка заполняет день раньше обычных дел и может превышать лимиты[cite: 1]
+            // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
-            PlannerService plannerService = new(taskRepo);
+            TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepository: taskRepo);
 
             var overdueDate = TodoDay.Today.Yesterday.ToDateTime();
 
             var overdueTask = new TaskItemBuilder()
-                .WithId(1201)
-                .WithEstimatedMinutes(200)
-                .WithScheduledDate(overdueDate, DateSource.Manual) // Просрочена
-                .WithStatus(TaskStatus.Planned)
+                .WithId(id: 1201)
+                .WithEstimatedMinutes(minutes: 200)
+                .WithScheduledDate(date: overdueDate, dateSource: DateSource.Manual)
+                .WithStatus(status: TaskStatus.Planned)
                 .Build();
 
             var normalTask = new TaskItemBuilder()
-                .WithId(1202)
-                .WithEstimatedMinutes(30)
-                .WithDateSource(DateSource.AutoFlexible)
-                .WithStatus(TaskStatus.Planned)
+                .WithId(id: 1202)
+                .WithEstimatedMinutes(minutes: 30)
+                .WithDateSource(source: DateSource.AutoFlexible)
+                .WithStatus(status: TaskStatus.Planned)
                 .Build();
 
-            taskRepo.Add(overdueTask);
-            taskRepo.Add(normalTask);
+            taskRepo.Add(entity: overdueTask);
+            taskRepo.Add(entity: normalTask);
 
-            // Лимит 180. Просрочка берёт 200 (превышая лимит).
-            var settings = new UserSettingsBuilder().WithDailyTimeLimit(180).Build();
+            var settings = new UserSettingsBuilder().WithDailyTimeLimit(limit: 180).Build();
 
             // Act
-            plannerService.DistributeTasks(settings);
+            plannerService.DistributeTasks(settings: settings);
 
-            // Assert: Просрочка встаёт на сегодня (и меняет Source на AutoFlexible по правилу). Обычная задача идёт на завтра, так как лимит исчерпан.
-            var savedOverdue = taskRepo.GetById(1201);
-            savedOverdue!.ScheduledDate.Should().Be(TodoDay.Today.ToDateTime());
-            savedOverdue.DateSource.Should().Be(DateSource.AutoFlexible);
+            // Assert
+            var savedOverdue = taskRepo.GetById(id: 1201);
+            savedOverdue!.ScheduledDate.Should().Be(expected: TodoDay.Today.ToDateTime());
+            savedOverdue.DateSource.Should().Be(expected: DateSource.AutoFlexible);
 
-            taskRepo.GetById(1202)!.ScheduledDate.Should().Be(TodoDay.Today.Tomorrow.ToDateTime());
+            taskRepo.GetById(id: 1202)!.ScheduledDate.Should().Be(expected: TodoDay.Today.Tomorrow.ToDateTime());
         }
     }
 
+    /// <summary>
+    /// Tests verification of blocker date calculations during capacity deficits.
+    /// </summary>
+    [UsedImplicitly]
+    [Trait(name: "Category", value: "Planning")]
     public class BlockerDateCalculation
     {
+        /// <summary>
+        /// Verifies that blocked tasks with fixed dates force AutoFixed dates for blockers when chain exceeds capacity.
+        /// </summary>
         [Fact]
         public void BlockedTaskWithFixedDate_WhenChainExceedsCapacity_ForcesAutoFixedDatesForBlockers()
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
-            PlannerService plannerService = new(taskRepo);
+            TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepository: taskRepo);
 
             var today = TodoDay.Today.ToDateTime();
-            var targetDate = today.AddDays(3);
+            var targetDate = today.AddDays(value: 3);
 
             TaskItem blockerA = new()
             {
@@ -455,118 +522,129 @@ public class PlanningEngineTests
                 Id = 602, Title = "Blocked B", ScheduledDate = targetDate, DateSource = DateSource.Manual,
                 Status = TaskStatus.Planned, EstimatedMinutes = 300
             };
-            context.Tasks.AddRange(blockerA, blockedB);
+            context.Tasks.AddRange(entities: [blockerA, blockedB]);
 
-            context.TaskRelations.Add(new() { Id = 6001, SourceTaskId = blockerA.Id, TargetTaskId = blockedB.Id, Type = RelationType.Blocks });
+            context.TaskRelations.Add(entity: new() { Id = 6001, SourceTaskId = blockerA.Id, TargetTaskId = blockedB.Id, Type = RelationType.Blocks });
             context.SaveChanges();
 
             // Act: Daily limit 200 mins. Total A+B = 600 mins -> capacity deficit!
-            var settings = new UserSettingsBuilder().WithDailyTimeLimit(200).Build();
-            plannerService.DistributeTasks(settings);
+            var settings = new UserSettingsBuilder().WithDailyTimeLimit(limit: 200).Build();
+            plannerService.DistributeTasks(settings: settings);
 
-            var updatedA = taskRepo.GetById(blockerA.Id);
+            var updatedA = taskRepo.GetById(id: blockerA.Id);
 
             // Assert: Blocker A forced to AutoFixed date to fit chain before B's deadline
             updatedA.Should().NotBeNull();
-            updatedA.DateSource.Should().Be(DateSource.AutoFixed);
+            updatedA.DateSource.Should().Be(expected: DateSource.AutoFixed);
         }
     }
 
+    /// <summary>
+    /// Tests verification of planning algorithm idempotency.
+    /// </summary>
+    [UsedImplicitly]
+    [Trait(name: "Category", value: "Planning")]
     public class IdempotencyAndAtomicity
     {
+        /// <summary>
+        /// Verifies that re-running planning algorithm produces identical dates.
+        /// </summary>
         [Fact]
         public void ReRunningPlanningAlgorithm_IsIdempotentAndProducesIdenticalDates()
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
-            PlannerService plannerService = new(taskRepo);
+            TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepository: taskRepo);
 
-            var task1 = new TaskItemBuilder().WithId(501).WithEstimatedMinutes(60)
-                .WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
-            var task2 = new TaskItemBuilder().WithId(502).WithEstimatedMinutes(90)
-                .WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
-            taskRepo.Add(task1);
-            taskRepo.Add(task2);
+            var task1 = new TaskItemBuilder().WithId(id: 501).WithEstimatedMinutes(minutes: 60)
+                .WithDateSource(source: DateSource.AutoFlexible).WithStatus(status: TaskStatus.Planned).Build();
+            var task2 = new TaskItemBuilder().WithId(id: 502).WithEstimatedMinutes(minutes: 90)
+                .WithDateSource(source: DateSource.AutoFlexible).WithStatus(status: TaskStatus.Planned).Build();
+            taskRepo.Add(entity: task1);
+            taskRepo.Add(entity: task2);
 
-            var settings = new UserSettingsBuilder().WithDailyTimeLimit(180).Build();
+            var settings = new UserSettingsBuilder().WithDailyTimeLimit(limit: 180).Build();
 
             // Act 1: First distribution
-            plannerService.DistributeTasks(settings);
-            var date1AfterFirst = taskRepo.GetById(501)!.ScheduledDate;
-            var date2AfterFirst = taskRepo.GetById(502)!.ScheduledDate;
+            plannerService.DistributeTasks(settings: settings);
+            var date1AfterFirst = taskRepo.GetById(id: 501)!.ScheduledDate;
+            var date2AfterFirst = taskRepo.GetById(id: 502)!.ScheduledDate;
 
             // Act 2: Immediate re-run
-            plannerService.DistributeTasks(settings);
-            var date1AfterSecond = taskRepo.GetById(501)!.ScheduledDate;
-            var date2AfterSecond = taskRepo.GetById(502)!.ScheduledDate;
+            plannerService.DistributeTasks(settings: settings);
+            var date1AfterSecond = taskRepo.GetById(id: 501)!.ScheduledDate;
+            var date2AfterSecond = taskRepo.GetById(id: 502)!.ScheduledDate;
 
             // Assert: Dates must remain identical
-            date1AfterSecond.Should().Be(date1AfterFirst);
-            date2AfterSecond.Should().Be(date2AfterFirst);
+            date1AfterSecond.Should().Be(expected: date1AfterFirst);
+            date2AfterSecond.Should().Be(expected: date2AfterFirst);
         }
     }
 
+    /// <summary>
+    /// Verifies that inactive tasks completed or marked irrelevant today consume daily limits for auto-flexible tasks.
+    /// </summary>
     [Fact]
     public void InactiveTasks_CompletedOrIrrelevantToday_ConsumeDailyLimitsForAutoFlexible()
     {
-        // Arrange: Неактивные сегодняшние задачи (Completed и Irrelevant) учитываются в лимитах
+        // Arrange
         using var context = TestDbContextFactory.CreateInMemoryContext();
-        TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
-        PlannerService plannerService = new(taskRepo);
+        TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
+        PlannerService plannerService = new(taskRepository: taskRepo);
 
         var completedToday = new TaskItemBuilder()
-            .WithId(101).WithEstimatedMinutes(60)
-            .WithScheduledDate(TodoDay.Today.ToDateTime(), DateSource.Manual)
-            .WithCompletedDate(TodoDay.Today.ToDateTime()).WithStatus(TaskStatus.Completed).Build();
+            .WithId(id: 101).WithEstimatedMinutes(minutes: 60)
+            .WithScheduledDate(date: TodoDay.Today.ToDateTime(), dateSource: DateSource.Manual)
+            .WithCompletedDate(date: TodoDay.Today.ToDateTime()).WithStatus(status: TaskStatus.Completed).Build();
 
         var irrelevantToday = new TaskItemBuilder()
-            .WithId(102).WithEstimatedMinutes(60)
-            .WithScheduledDate(TodoDay.Today.ToDateTime(), DateSource.Manual)
-            .WithCompletedDate(TodoDay.Today.ToDateTime()).WithStatus(TaskStatus.Irrelevant).Build();
+            .WithId(id: 102).WithEstimatedMinutes(minutes: 60)
+            .WithScheduledDate(date: TodoDay.Today.ToDateTime(), dateSource: DateSource.Manual)
+            .WithCompletedDate(date: TodoDay.Today.ToDateTime()).WithStatus(status: TaskStatus.Irrelevant).Build();
 
         var newFlexibleTask = new TaskItemBuilder()
-            .WithId(103).WithEstimatedMinutes(60)
-            .WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
+            .WithId(id: 103).WithEstimatedMinutes(minutes: 60)
+            .WithDateSource(source: DateSource.AutoFlexible).WithStatus(status: TaskStatus.Planned).Build();
 
-        taskRepo.Add(completedToday);
-        taskRepo.Add(irrelevantToday);
-        taskRepo.Add(newFlexibleTask);
+        taskRepo.Add(entity: completedToday);
+        taskRepo.Add(entity: irrelevantToday);
+        taskRepo.Add(entity: newFlexibleTask);
 
-        // Лимит 150 минут. Неактивные задачи уже забрали 120 минут (60 + 60).
-        // Осталось 30. Новая задача требует 60.
-        var settings = new UserSettingsBuilder().WithDailyTimeLimit(150).Build();
+        var settings = new UserSettingsBuilder().WithDailyTimeLimit(limit: 150).Build();
 
         // Act
-        plannerService.DistributeTasks(settings);
+        plannerService.DistributeTasks(settings: settings);
 
-        // Assert: Задача 103 не помещается и должна быть перенесена на завтра
-        var savedNewTask = taskRepo.GetById(103);
-        savedNewTask!.ScheduledDate.Should().Be(TodoDay.Today.Tomorrow.ToDateTime());
+        // Assert
+        var savedNewTask = taskRepo.GetById(id: 103);
+        savedNewTask!.ScheduledDate.Should().Be(expected: TodoDay.Today.Tomorrow.ToDateTime());
     }
 
+    /// <summary>
+    /// Verifies that completing a severely overdue recurring task skips to next actual future date.
+    /// </summary>
     [Fact]
     public void SeverelyOverdueRecurringTask_WhenCompleted_SkipsToNextActualFutureDate()
     {
-        // Arrange: Создавать повторки только на актуальные даты, пропуская сильно просроченные
+        // Arrange
         using var context = TestDbContextFactory.CreateInMemoryContext();
-        TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
+        TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
 
-        // Задача должна была выполняться ежедневно, но просрочена на 10 дней
-        var tenDaysAgo = TodoDay.Today.ToDateTime().AddDays(-10);
+        var tenDaysAgo = TodoDay.Today.ToDateTime().AddDays(value: -10);
         var overdueTask = new TaskItemBuilder()
-            .WithId(301).WithRecurrence(RecurrenceType.Daily)
-            .WithScheduledDate(tenDaysAgo, DateSource.AutoFixed)
-            .WithStatus(TaskStatus.Planned).Build();
+            .WithId(id: 301).WithRecurrence(type: RecurrenceType.Daily)
+            .WithScheduledDate(date: tenDaysAgo, dateSource: DateSource.AutoFixed)
+            .WithStatus(status: TaskStatus.Planned).Build();
 
-        taskRepo.Add(overdueTask);
+        taskRepo.Add(entity: overdueTask);
 
-        // Act: Завершаем её сегодня
-        taskRepo.CompleteTask(overdueTask.Id);
+        // Act
+        taskRepo.CompleteTask(taskId: overdueTask.Id);
 
-        // Assert: Новая копия должна быть на завтра, а не на 9 дней назад
-        var newCopy = taskRepo.GetAll().FirstOrDefault(t => t.RecurrenceSourceId == overdueTask.Id);
+        // Assert
+        var newCopy = taskRepo.GetAll().FirstOrDefault(predicate: t => t.RecurrenceSourceId == overdueTask.Id);
         newCopy.Should().NotBeNull();
-        newCopy!.ScheduledDate.Should().Be(TodoDay.Today.Tomorrow.ToDateTime());
+        newCopy.ScheduledDate.Should().Be(expected: TodoDay.Today.Tomorrow.ToDateTime());
     }
 }

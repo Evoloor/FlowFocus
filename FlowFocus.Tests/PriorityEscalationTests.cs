@@ -6,17 +6,29 @@ using FlowFocus.Core.Validation;
 using FlowFocus.Data;
 using FlowFocus.Data.Repositories;
 using FlowFocus.Tests.Builders;
+using JetBrains.Annotations;
 using NSubstitute;
 
 namespace FlowFocus.Tests;
 
-[Trait("Category", "Domain")]
-[Collection("StaticState")]
+/// <summary>
+/// Unit tests for priority escalation rules, auto-escalation, manual adaptation, and day-start time boundaries.
+/// </summary>
+[UsedImplicitly]
+[Trait(name: "Category", value: "Domain")]
+[Collection(name: "StaticState")]
 public class PriorityEscalationTests
 {
-
+    /// <summary>
+    /// Tests verification of escalation rule validation.
+    /// </summary>
+    [UsedImplicitly]
+    [Trait(name: "Category", value: "Domain")]
     public class RuleValidation
     {
+        /// <summary>
+        /// Verifies that adding an escalation rule to a lower or equal priority throws a validation exception.
+        /// </summary>
         [Fact]
         public void AddEscalationRuleToLowerOrEqualPriority_ThrowsValidationError()
         {
@@ -25,61 +37,77 @@ public class PriorityEscalationTests
             var targetPriority = PriorityLevelBuilder.Medium; // Order 3 (Lower)
 
             // Act: Call real domain validator
-            var act = () => TaskItemValidator.ValidateEscalationRule(currentPriority, targetPriority);
+            var act = () => TaskItemValidator.ValidateEscalationRule(currentPriority: currentPriority, targetPriority: targetPriority);
 
             // Assert
             act.Should().Throw<InvalidOperationException>()
-               .WithMessage("*более высоких приоритетов*");
+               .WithMessage(expectedWildcardPattern: "*более высоких приоритетов*");
         }
     }
 
+    /// <summary>
+    /// Tests verification of adapting escalation rules on manual priority changes.
+    /// </summary>
+    [UsedImplicitly]
+    [Trait(name: "Category", value: "Domain")]
     public class ManualPriorityAdaptation
     {
+        /// <summary>
+        /// Verifies that manually elevating priority removes redundant lower escalation rules in repository.
+        /// </summary>
         [Fact]
         public void ManuallyElevatePriority_RemovesRedundantLowerEscalationRulesInRepository()
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
+            TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
 
-            var priorities = context.Priorities.OrderBy(p => p.Order).ToList();
-            var criticalPriority = priorities[0]; // Id 1
-            var highPriority = priorities[1];     // Id 2
-            var mediumPriority = priorities[2];   // Id 3
+            var priorities = context.Priorities.OrderBy(keySelector: p => p.Order).ToList();
+            var criticalPriority = priorities[index: 0]; // Id 1
+            var highPriority = priorities[index: 1];     // Id 2
+            var mediumPriority = priorities[index: 2];   // Id 3
 
             var task = new TaskItemBuilder()
-                .WithId(500)
-                .WithPriorityId(mediumPriority.Id)
+                .WithId(id: 500)
+                .WithPriorityId(priorityId: mediumPriority.Id)
                 .Build();
 
-            task.PriorityEscalations.Add(new() { TaskId = 500, TargetPriorityId = highPriority.Id, EscalationDate = DateTime.UtcNow.AddDays(1) });
-            task.PriorityEscalations.Add(new() { TaskId = 500, TargetPriorityId = criticalPriority.Id, EscalationDate = DateTime.UtcNow.AddDays(5) });
+            task.PriorityEscalations.Add(item: new() { TaskId = 500, TargetPriorityId = highPriority.Id, EscalationDate = DateTime.UtcNow.AddDays(value: 1) });
+            task.PriorityEscalations.Add(item: new() { TaskId = 500, TargetPriorityId = criticalPriority.Id, EscalationDate = DateTime.UtcNow.AddDays(value: 5) });
 
-            taskRepo.Add(task);
+            taskRepo.Add(entity: task);
 
             // Act: User elevates task priority to High (Order 2) in application repository
             task.PriorityId = highPriority.Id;
-            task.PriorityEscalations.RemoveAll(e => e.TargetPriorityId == highPriority.Id);
-            taskRepo.Update(task);
+            task.PriorityEscalations.RemoveAll(match: e => e.TargetPriorityId == highPriority.Id);
+            taskRepo.Update(entity: task);
 
-            var savedTask = taskRepo.GetById(task.Id);
+            var savedTask = taskRepo.GetById(id: task.Id);
 
             // Assert
             savedTask.Should().NotBeNull();
-            savedTask.PriorityEscalations.Should().ContainSingle(e => e.TargetPriorityId == criticalPriority.Id);
+            savedTask.PriorityEscalations.Should().ContainSingle(predicate: e => e.TargetPriorityId == criticalPriority.Id);
         }
     }
 
+    /// <summary>
+    /// Tests verification of auto-escalation mechanics when escalation date is reached.
+    /// </summary>
+    [UsedImplicitly]
+    [Trait(name: "Category", value: "Domain")]
     public class AutoEscalation
     {
+        /// <summary>
+        /// Verifies that ActualizePriorities elevates priority when escalation date is reached.
+        /// </summary>
         [Fact]
         public void ActualizePriorities_ElevatesPriorityWhenEscalationDateReached()
         {
             // Arrange
             using var context = TestDbContextFactory.CreateInMemoryContext();
-            var priorities = context.Priorities.OrderBy(p => p.Order).ToList();
-            var criticalPriority = priorities[0];
-            var lowPriority = priorities[3];
+            var priorities = context.Priorities.OrderBy(keySelector: p => p.Order).ToList();
+            var criticalPriority = priorities[index: 0];
+            var lowPriority = priorities[index: 3];
 
             var today = TodoDay.Today.ToDateTime();
             PriorityEscalation escalation = new()
@@ -92,48 +120,56 @@ public class PriorityEscalationTests
             };
 
             var task = new TaskItemBuilder()
-                .WithId(500)
-                .WithPriorityId(lowPriority.Id)
+                .WithId(id: 500)
+                .WithPriorityId(priorityId: lowPriority.Id)
                 .Build();
-            task.PriorityEscalations.Add(escalation);
+            task.PriorityEscalations.Add(item: escalation);
 
-            context.Tasks.Add(task);
+            context.Tasks.Add(entity: task);
             context.SaveChanges();
 
-            TaskRepository taskRepo = new(context, Substitute.For<INotificationService>());
-            PlannerService plannerService = new(taskRepo);
+            TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepository: taskRepo);
 
             // Act: Call application service method
             plannerService.ActualizePriorities();
             taskRepo.SaveChanges();
 
             // Assert: Inspect persistent state in task repository
-            var updatedTask = taskRepo.GetById(task.Id);
+            var updatedTask = taskRepo.GetById(id: task.Id);
             updatedTask.Should().NotBeNull();
-            updatedTask.PriorityId.Should().Be(criticalPriority.Id);
+            updatedTask.PriorityId.Should().Be(expected: criticalPriority.Id);
         }
     }
 
+    /// <summary>
+    /// Tests verification of DayStartHour boundary accounting in TodoDay.
+    /// </summary>
+    [UsedImplicitly]
+    [Trait(name: "Category", value: "Domain")]
     public class StartOfDayAccounting
     {
+        /// <summary>
+        /// Verifies that system time prior to DayStartHour evaluates to previous calendar date.
+        /// </summary>
         [Fact]
         public void StartOfDayAt4AM_SystemTime230AM_EvaluatesPreviousLogicalDate()
         {
             // Arrange
             try
             {
-                TodoDay.Configure(4);
-                DateTime systemTime = new(2026, 8, 4, 2, 30, 0); // 02:30 AM
+                TodoDay.Configure(dayStartHour: 4);
+                DateTime systemTime = new(year: 2026, month: 8, day: 4, hour: 2, minute: 30, second: 0); // 02:30 AM
 
                 // Act: Call application TodoDay logic
-                var logicalDate = systemTime.Hour < 4 ? systemTime.Date.AddDays(-1) : systemTime.Date;
+                var logicalDate = systemTime.Hour < 4 ? systemTime.Date.AddDays(value: -1) : systemTime.Date;
 
                 // Assert
-                logicalDate.Should().Be(new(2026, 8, 3));
+                logicalDate.Should().Be(expected: new(year: 2026, month: 8, day: 3));
             }
             finally
             {
-                TodoDay.Configure(5);
+                TodoDay.Configure(dayStartHour: 5);
             }
         }
     }

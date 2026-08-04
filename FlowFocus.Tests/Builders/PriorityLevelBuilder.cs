@@ -45,9 +45,9 @@ public class PriorityLevelBuilder
         };
     }
 
-    public static PriorityLevel Critical => new PriorityLevelBuilder().WithId(1).WithOrder(1).WithName("Критический").WithColor("#FF4444").Build();
-    public static PriorityLevel High => new PriorityLevelBuilder().WithId(2).WithOrder(2).WithName("Высокий").WithColor("#FF8C00").Build();
-    public static PriorityLevel Medium => new PriorityLevelBuilder().WithId(3).WithOrder(3).WithName("Средний").WithColor("#FFD700").Build();
-    public static PriorityLevel Low => new PriorityLevelBuilder().WithId(4).WithOrder(4).WithName("Низкий").WithColor("#4CAF50").Build();
-    public static PriorityLevel Background => new PriorityLevelBuilder().WithId(5).WithOrder(5).WithName("Фоновый").WithColor("#2196F3").Build();
+    public static PriorityLevel Critical => new PriorityLevelBuilder().WithId(id: 1).WithOrder(order: 1).WithName(name: "Критический").WithColor(color: "#FF4444").Build();
+    public static PriorityLevel High => new PriorityLevelBuilder().WithId(id: 2).WithOrder(order: 2).WithName(name: "Высокий").WithColor(color: "#FF8C00").Build();
+    public static PriorityLevel Medium => new PriorityLevelBuilder().WithId(id: 3).WithOrder(order: 3).WithName(name: "Средний").WithColor(color: "#FFD700").Build();
+    public static PriorityLevel Low => new PriorityLevelBuilder().WithId(id: 4).WithOrder(order: 4).WithName(name: "Низкий").WithColor(color: "#4CAF50").Build();
+    public static PriorityLevel Background => new PriorityLevelBuilder().WithId(id: 5).WithOrder(order: 5).WithName(name: "Фоновый").WithColor(color: "#2196F3").Build();
 }

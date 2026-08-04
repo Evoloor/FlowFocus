@@ -8,10 +8,10 @@ public static class TestDbContextFactory
     public static StorageContext CreateInMemoryContext()
     {
         var options = new DbContextOptionsBuilder<StorageContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        StorageContext context = new(options);
+        StorageContext context = new(options: options);
         context.Database.EnsureCreated();
         return context;
     }

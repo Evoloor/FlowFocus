@@ -2,145 +2,205 @@ using FluentAssertions;
 using FlowFocus.Core.Enums;
 using FlowFocus.Core.Validation;
 using FlowFocus.Tests.Builders;
+using JetBrains.Annotations;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Tests;
 
-[Trait("Category", "Validation")]
+/// <summary>
+/// Unit tests for TaskItem and TaskRelation domain validation rules and numeric constraints.
+/// </summary>
+[UsedImplicitly]
+[Trait(name: "Category", value: "Validation")]
 public class ValidationTests
 {
+    /// <summary>
+    /// Tests verification of task title string validations.
+    /// </summary>
+    [UsedImplicitly]
+    [Trait(name: "Category", value: "Validation")]
     public class TitleValidation
     {
+        /// <summary>
+        /// Verifies that empty, whitespace, or null titles return false.
+        /// </summary>
         [Theory]
-        [InlineData("")]
-        [InlineData("   ")]
-        [InlineData(null)]
+        [InlineData(data: "")]
+        [InlineData(data: "   ")]
+        [InlineData(data: null)]
         public void EmptyOrWhitespaceTitle_ReturnsFalse(string? inputTitle)
         {
             // Act: Call application validator
-            var isValid = TaskItemValidator.IsTitleValid(inputTitle);
+            var isValid = TaskItemValidator.IsTitleValid(title: inputTitle);
 
             // Assert
             isValid.Should().BeFalse();
         }
 
+        /// <summary>
+        /// Verifies that valid non-empty titles return true.
+        /// </summary>
         [Fact]
         public void ValidTitle_ReturnsTrue()
         {
             // Act: Call application validator
-            var isValid = TaskItemValidator.IsTitleValid("Купить хлеб");
+            var isValid = TaskItemValidator.IsTitleValid(title: "Купить хлеб");
 
             // Assert
             isValid.Should().BeTrue();
         }
     }
 
+    /// <summary>
+    /// Tests verification of self-referencing relation constraints.
+    /// </summary>
+    [UsedImplicitly]
+    [Trait(name: "Category", value: "Validation")]
     public class SelfRelation
     {
+        /// <summary>
+        /// Verifies that attempting to create a relation between a task and itself throws a validation exception.
+        /// </summary>
         [Fact]
         public void SelectSelfTaskInRelations_ThrowsValidationError()
         {
             // Arrange
-            var task = new TaskItemBuilder().WithId(10).WithTitle("Task A").Build();
+            var task = new TaskItemBuilder().WithId(id: 10).WithTitle(title: "Task A").Build();
 
             // Act: Call real domain validator
-            var act = () => TaskRelationValidator.ValidateNewRelation(task, task, RelationType.Blocks);
+            var act = () => TaskRelationValidator.ValidateNewRelation(sourceTask: task, targetTask: task, type: RelationType.Blocks);
 
             // Assert
             act.Should().Throw<InvalidOperationException>()
-               .WithMessage("*сама с собой*");
+               .WithMessage(expectedWildcardPattern: "*сама с собой*");
         }
     }
 
+    /// <summary>
+    /// Tests verification of relation rules for recurring tasks.
+    /// </summary>
+    [UsedImplicitly]
+    [Trait(name: "Category", value: "Validation")]
     public class RecurringTaskRelations
     {
+        /// <summary>
+        /// Verifies that linking relations to a recurring task throws a validation exception.
+        /// </summary>
         [Fact]
         public void SelectRecurringTaskAsRelation_ThrowsValidationError()
         {
             // Arrange
-            var taskA = new TaskItemBuilder().WithId(1).WithTitle("Regular Task").Build();
-            var taskB = new TaskItemBuilder().WithId(2).WithTitle("Recurring Task").WithRecurrence(RecurrenceType.Daily).Build();
+            var taskA = new TaskItemBuilder().WithId(id: 1).WithTitle(title: "Regular Task").Build();
+            var taskB = new TaskItemBuilder().WithId(id: 2).WithTitle(title: "Recurring Task").WithRecurrence(type: RecurrenceType.Daily).Build();
 
             // Act: Call real domain validator
-            var act = () => TaskRelationValidator.ValidateNewRelation(taskA, taskB, RelationType.Blocks);
+            var act = () => TaskRelationValidator.ValidateNewRelation(sourceTask: taskA, targetTask: taskB, type: RelationType.Blocks);
 
             // Assert
             act.Should().Throw<InvalidOperationException>()
-               .WithMessage("*повторяющимися задачами запрещены*");
+               .WithMessage(expectedWildcardPattern: "*повторяющимися задачами запрещены*");
         }
     }
 
+    /// <summary>
+    /// Tests verification of upper limit enforcement on total relations per task.
+    /// </summary>
+    [UsedImplicitly]
+    [Trait(name: "Category", value: "Validation")]
     public class RelationsLimit
     {
+        /// <summary>
+        /// Verifies that creating more than 15 relations on a single task throws a validation exception.
+        /// </summary>
         [Fact]
         public void Exceeding15Relations_ThrowsValidationError()
         {
             // Arrange
-            var taskA = new TaskItemBuilder().WithId(100).WithTitle("Main Task").Build();
+            var taskA = new TaskItemBuilder().WithId(id: 100).WithTitle(title: "Main Task").Build();
             for (var i = 1; i <= 15; i++)
             {
-                var target = new TaskItemBuilder().WithId(i).Build();
-                taskA.Relations.Add(new() { SourceTaskId = taskA.Id, TargetTaskId = target.Id, Type = RelationType.RelatedTo });
+                var target = new TaskItemBuilder().WithId(id: i).Build();
+                taskA.Relations.Add(item: new() { SourceTaskId = taskA.Id, TargetTaskId = target.Id, Type = RelationType.RelatedTo });
             }
 
-            var extraTask = new TaskItemBuilder().WithId(101).Build();
+            var extraTask = new TaskItemBuilder().WithId(id: 101).Build();
 
             // Act: Call real domain validator
-            var act = () => TaskRelationValidator.ValidateNewRelation(taskA, extraTask, RelationType.RelatedTo);
+            var act = () => TaskRelationValidator.ValidateNewRelation(sourceTask: taskA, targetTask: extraTask, type: RelationType.RelatedTo);
 
             // Assert
             act.Should().Throw<InvalidOperationException>()
-               .WithMessage("*Достигнут лимит количества связей (15/15)*");
+               .WithMessage(expectedWildcardPattern: "*Достигнут лимит количества связей (15/15)*");
         }
     }
 
+    /// <summary>
+    /// Tests verification of numeric clamping ranges for task properties.
+    /// </summary>
+    [UsedImplicitly]
+    [Trait(name: "Category", value: "Validation")]
     public class NumericRanges
     {
+        /// <summary>
+        /// Verifies that interest values are clamped to the 1-10 valid range.
+        /// </summary>
         [Theory]
-        [InlineData(-5, 1)]
-        [InlineData(0, 1)]
-        [InlineData(5, 5)]
-        [InlineData(11, 10)]
+        [InlineData(data: [-5, 1])]
+        [InlineData(data: [0, 1])]
+        [InlineData(data: [5, 5])]
+        [InlineData(data: [11, 10])]
         public void InterestValue_IsClampedToValidRange(int input, int expected)
         {
             // Act: Call real domain validator
-            var result = TaskItemValidator.ClampInterest(input);
+            var result = TaskItemValidator.ClampInterest(interest: input);
 
             // Assert
-            result.Should().Be(expected);
+            result.Should().Be(expected: expected);
         }
 
+        /// <summary>
+        /// Verifies that complexity values are clamped to the 1-100 valid range.
+        /// </summary>
         [Theory]
-        [InlineData(-10, 1)]
-        [InlineData(0, 1)]
-        [InlineData(50, 50)]
-        [InlineData(150, 100)]
+        [InlineData(data: [-10, 1])]
+        [InlineData(data: [0, 1])]
+        [InlineData(data: [50, 50])]
+        [InlineData(data: [150, 100])]
         public void ComplexityValue_IsClampedToValidRange(int input, int expected)
         {
             // Act: Call real domain validator
-            var result = TaskItemValidator.ClampComplexity(input);
+            var result = TaskItemValidator.ClampComplexity(complexity: input);
 
             // Assert
-            result.Should().Be(expected);
+            result.Should().Be(expected: expected);
         }
     }
+
+    /// <summary>
+    /// Tests verification of relation target task status validation.
+    /// </summary>
+    [UsedImplicitly]
+    [Trait(name: "Category", value: "Validation")]
     public class RelationTargetStatusValidation
     {
+        /// <summary>
+        /// Verifies that attempting to create a relation with an inactive (Completed or Irrelevant) task throws a validation exception.
+        /// </summary>
         [Theory]
-        [InlineData(TaskStatus.Completed)]
-        [InlineData(TaskStatus.Irrelevant)]
+        [InlineData(data: TaskStatus.Completed)]
+        [InlineData(data: TaskStatus.Irrelevant)]
         public void CreateRelationWithInactiveTask_ThrowsValidationError(TaskStatus inactiveStatus)
         {
-            // Arrange: Запрет связей с завершенными или неактуальными задачами[cite: 1]
-            var activeTask = new TaskItemBuilder().WithId(1).WithStatus(TaskStatus.Planned).Build();
-            var inactiveTask = new TaskItemBuilder().WithId(2).WithStatus(inactiveStatus).Build();
+            // Arrange: Relations to completed or irrelevant tasks are forbidden
+            var activeTask = new TaskItemBuilder().WithId(id: 1).WithStatus(status: TaskStatus.Planned).Build();
+            var inactiveTask = new TaskItemBuilder().WithId(id: 2).WithStatus(status: inactiveStatus).Build();
 
-            // Act: Попытка добавить связь к неактуальной задаче
-            var act = () => TaskRelationValidator.ValidateNewRelation(activeTask, inactiveTask, RelationType.RelatedTo);
+            // Act: Attempt to link relation to inactive task
+            var act = () => TaskRelationValidator.ValidateNewRelation(sourceTask: activeTask, targetTask: inactiveTask, type: RelationType.RelatedTo);
 
             // Assert
             act.Should().Throw<InvalidOperationException>()
-                .WithMessage("*ссылаться можно только на актуальные задачи*");
+                .WithMessage(expectedWildcardPattern: "*ссылаться можно только на актуальные задачи*");
         }
     }
 }
