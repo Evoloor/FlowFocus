@@ -116,6 +116,17 @@ public abstract class CachedRepository<T>(StorageContext context, INotificationS
             if (entity == null) return;
             updateAction(entity);
             entity.LastChangesOn = DateTime.UtcNow;
+
+            if (_cache != null)
+            {
+                var cachedEntity = _cache.FirstOrDefault(e => e.Id == id);
+                if (cachedEntity != null)
+                {
+                    updateAction(cachedEntity);
+                    cachedEntity.LastChangesOn = entity.LastChangesOn;
+                }
+            }
+
             if (saveChanges)
             {
                 Context.SaveChanges();

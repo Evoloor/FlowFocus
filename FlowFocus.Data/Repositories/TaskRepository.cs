@@ -318,8 +318,29 @@ public class TaskRepository(
                 hasChanges = true;
             }
 
-            // 2. Нормализация повторяющихся задач: проверка на просроченность и сброс слишком далеких дат
             var today = TodoDay.Today;
+
+            // 1.2. Нормализация просроченных задач с ручной датой:
+            // Просроченная задача с DateSource.Manual переводится в AutoFlexible для перераспределения.
+            // Логика AutoFixed затронута быть не должна.
+            var overdueManualTasks = Context.Tasks
+                .Where(t => t.ParentTaskId == null)
+                .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
+                .Where(t => t.DateSource == DateSource.Manual)
+                .ToList()
+                .Where(t => today.IsOverdue(t.ScheduledDate))
+                .ToList();
+
+            if (overdueManualTasks.Count > 0)
+            {
+                foreach (var task in overdueManualTasks)
+                {
+                    task.DateSource = DateSource.AutoFlexible;
+                    task.LastChangesOn = DateTime.UtcNow;
+                }
+                hasChanges = true;
+            }
+
             var todayDt = today.ToDateTime();
 
             // Собираем из базы все задачи для анализа серии повторений без N+1 запросов
