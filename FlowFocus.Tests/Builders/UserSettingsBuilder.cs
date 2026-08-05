@@ -10,6 +10,7 @@ public class UserSettingsBuilder : EntityBuilder<UserSettings, UserSettingsBuild
     private int _dailyTaskLimit = 10;
     private const bool AutoDistributeEnabled = true;
     private const bool IsDarkMode = true;
+    private bool _hideTaskTitlesDefault;
     private int _defaultPriorityId = 3;
 
     public UserSettingsBuilder WithDayStartHour(int hour)
@@ -36,6 +37,12 @@ public class UserSettingsBuilder : EntityBuilder<UserSettings, UserSettingsBuild
         return this;
     }
 
+    public UserSettingsBuilder WithHideTaskTitlesDefault(bool hide)
+    {
+        _hideTaskTitlesDefault = hide;
+        return this;
+    }
+
     public UserSettingsBuilder WithDefaultPriorityId(int priorityId)
     {
         _defaultPriorityId = priorityId;
@@ -53,6 +60,7 @@ public class UserSettingsBuilder : EntityBuilder<UserSettings, UserSettingsBuild
             DailyTaskLimit = _dailyTaskLimit,
             AutoDistributeEnabled = AutoDistributeEnabled,
             IsDarkMode = IsDarkMode,
+            HideTaskTitlesDefault = _hideTaskTitlesDefault,
             DefaultPriorityId = _defaultPriorityId
         };
     }

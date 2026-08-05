@@ -11,7 +11,7 @@ using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Blazor.Components;
 
-public partial class TaskCard
+public partial class TaskCard : IDisposable
 {
     [Inject] public ITaskRepository TaskRepo { get; set; } = null!;
     [Inject] public ISettingsRepository SettingsRepo { get; set; } = null!;
@@ -38,6 +38,13 @@ public partial class TaskCard
     protected override void OnInitialized()
     {
         _settings = SettingsRepo.GetUserSettings();
+        NotificationService.OnSettingsChanged += OnSettingsChanged;
+    }
+
+    private void OnSettingsChanged()
+    {
+        _settings = SettingsRepo.GetUserSettings();
+        InvokeAsync(StateHasChanged);
     }
 
     private bool ShouldHideUnderSpoiler =>
@@ -195,5 +202,10 @@ public partial class TaskCard
             NotificationService.NotifyTasksChanged();
             await OnTaskChanged.InvokeAsync();
         }
+    }
+
+    public void Dispose()
+    {
+        NotificationService.OnSettingsChanged -= OnSettingsChanged;
     }
 }

@@ -41,7 +41,8 @@
 
 <MudPaper Class="pa-4 mb-4" Elevation="1">
     <MudText Typo="Typo.h6" Class="mb-3">Приватность</MudText>
-    <MudSwitch T="bool" @bind-Value="_settings.HideTaskTitlesDefault"
+    <MudSwitch T="bool" Value="_settings.HideTaskTitlesDefault"
+               ValueChanged="OnPrivacyModeChanged"
                Color="Color.Primary"
                Label="Режим приватности (включает скрытие текста задач)" />
 </MudPaper>

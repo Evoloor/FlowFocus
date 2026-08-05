@@ -320,4 +320,24 @@ public class UiAndUxEngineTests : IntegrationTestBase
         // Assert
         dto.HideUnderSpoiler.Should().BeTrue();
     }
+
+    /// <summary>
+    /// Verifies that privacy mode setting (HideTaskTitlesDefault) persists in SettingsRepository across calls.
+    /// </summary>
+    [Fact]
+    public void PrivacyMode_PersistsInSettingsRepository()
+    {
+        // Arrange
+        var settingsRepo = new SettingsRepository(Context, NotificationService);
+        var settings = settingsRepo.GetUserSettings();
+        settings.HideTaskTitlesDefault = true;
+
+        // Act
+        settingsRepo.UpdateSettings(settings);
+        var reloadedSettings = settingsRepo.GetUserSettings();
+
+        // Assert
+        reloadedSettings.Should().NotBeNull();
+        reloadedSettings.HideTaskTitlesDefault.Should().BeTrue();
+    }
 }

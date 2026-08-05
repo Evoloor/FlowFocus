@@ -118,6 +118,20 @@ public partial class Settings
         _dropContainer?.Refresh();
     }
 
+    private void OnPrivacyModeChanged(bool value)
+    {
+        _settings.HideTaskTitlesDefault = value;
+        try
+        {
+            SettingsRepo.UpdateSettings(_settings);
+            NotificationService.NotifySettingsChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Ошибка сохранения: {ex.Message}", Severity.Error);
+        }
+    }
+
     private void ResetToDefaults()
     {
         _settings.DayStartHour = 5;
