@@ -69,6 +69,12 @@ public class TaskEditDialogTests : IntegrationTestBase
         }
     }
 
+    private void AssertNoSnackbarErrors()
+    {
+        _snackbar.DidNotReceive().Add(Arg.Any<string>(), Severity.Error, Arg.Any<Action<SnackbarOptions>>(), Arg.Any<string>());
+        _snackbar.DidNotReceive().Add(Arg.Any<string>(), Severity.Error);
+    }
+
     /// <summary>
     /// Test 1: Normal saving of a task via TaskEditDialog.
     /// </summary>
@@ -83,6 +89,7 @@ public class TaskEditDialogTests : IntegrationTestBase
         await cut.InvokeAsync(() => InvokeSaveTaskAsync(dialogInstance));
 
         // Assert
+        AssertNoSnackbarErrors();
         var saved = TaskRepo.GetAll().FirstOrDefault(t => t.Title == "Обычная задача");
         saved.Should().NotBeNull();
         saved!.Status.Should().Be(TaskStatus.Planned);
@@ -114,6 +121,7 @@ public class TaskEditDialogTests : IntegrationTestBase
         await cut.InvokeAsync(() => InvokeSaveTaskAsync(dialogInstance));
 
         // Assert
+        AssertNoSnackbarErrors();
         var savedA = TaskRepo.GetAll().FirstOrDefault(t => t.Title == "Задача А");
         savedA.Should().NotBeNull();
 
@@ -144,6 +152,7 @@ public class TaskEditDialogTests : IntegrationTestBase
         await cut.InvokeAsync(() => InvokeSaveTaskAsync(dialogInstance));
 
         // Assert
+        AssertNoSnackbarErrors();
         var updated = TaskRepo.GetById(10);
         updated.Should().NotBeNull();
         updated!.Title.Should().Be("Новое название");
@@ -178,6 +187,7 @@ public class TaskEditDialogTests : IntegrationTestBase
         await cut.InvokeAsync(() => InvokeSaveTaskAsync(dialogInstance));
 
         // Assert
+        AssertNoSnackbarErrors();
         var updatedA = TaskRepo.GetById(10);
         updatedA.Should().NotBeNull();
 
@@ -227,7 +237,7 @@ public class TaskEditDialogTests : IntegrationTestBase
         await cut.InvokeAsync(() => InvokeSaveTaskAsync(dialogInstance));
 
         // Assert
-        _snackbar.DidNotReceive().Add(Arg.Any<string>(), Severity.Error);
+        AssertNoSnackbarErrors();
 
         var savedA = TaskRepo.GetById(10);
         savedA.Should().NotBeNull();
