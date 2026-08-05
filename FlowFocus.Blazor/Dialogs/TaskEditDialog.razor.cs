@@ -138,6 +138,7 @@ public partial class TaskEditDialog
         {
             Id = s.Id,
             Title = s.Title,
+            HideUnderSpoiler = s.HideUnderSpoiler,
             IsFavorite = s.IsFavorite,
             Interest = s.Interest,
             Complexity = s.Complexity,
@@ -333,6 +334,7 @@ public partial class TaskEditDialog
                     }
 
                     ti.Title = dto.Title;
+                    ti.HideUnderSpoiler = dto.HideUnderSpoiler;
                     ti.IsFavorite = dto.IsFavorite;
                     ti.Interest = dto.Interest;
                     ti.Complexity = dto.Complexity;

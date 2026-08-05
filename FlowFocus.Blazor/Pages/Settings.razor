@@ -40,6 +40,13 @@
 </MudPaper>
 
 <MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudText Typo="Typo.h6" Class="mb-3">Приватность</MudText>
+    <MudSwitch T="bool" @bind-Value="_settings.HideTaskTitlesDefault"
+               Color="Color.Primary"
+               Label="Режим приватности (включает скрытие текста задач)" />
+</MudPaper>
+
+<MudPaper Class="pa-4 mb-4" Elevation="1">
     <MudText Typo="Typo.h6" Class="mb-3">Приоритет по умолчанию</MudText>
 
     <MudSelect T="int?" @bind-Value="_settings.DefaultPriorityId"

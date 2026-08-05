@@ -23,6 +23,10 @@
         <MudPaper Class="subtask-card mb-2 pa-2" Elevation="0" Outlined="true">
             <div class="d-flex align-center gap-2">
                 <MudText>@subtask.Title</MudText>
+                @if (subtask.HideUnderSpoiler)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Text">Скрыто</MudChip>
+                }
                 <MudSpacer />
                 <MudIconButton Icon="@Icons.Material.Filled.Edit"
                                Size="Size.Small"

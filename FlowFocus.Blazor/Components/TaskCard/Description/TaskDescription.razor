@@ -1,10 +1,11 @@
 @namespace FlowFocus.Blazor.Components
+@using FlowFocus.Core.Helpers
 
 @if (!string.IsNullOrEmpty(Task.Description) && DisplayMode != DisplayMode.Compact)
 {
     @if (ShouldHideUnderSpoiler && !SpoilerRevealed)
     {
-        <MudText Typo="Typo.caption" Class="text-muted">Описание скрыто</MudText>
+        <MudText Typo="Typo.caption" Class="text-muted">Описание: @PrivacyHelper.MaskText(Task.Description)</MudText>
     }
     else
     {

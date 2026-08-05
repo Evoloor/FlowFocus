@@ -18,6 +18,12 @@
                                   Immediate="true" />
                 </MudItem>
 
+                @* Скрывать под спойлер *@
+                <MudItem xs="12" sm="6">
+                    <MudCheckBox T="bool" @bind-Value="_subtask.HideUnderSpoiler"
+                                 Label="Скрывать под спойлер" />
+                </MudItem>
+
                 @* Избранное *@
                 <MudItem xs="12" sm="6">
                     <MudCheckBox T="bool" @bind-Value="_subtask.IsFavorite"
@@ -99,6 +105,7 @@
             {
                 Id = ExistingSubtask.Id,
                 Title = ExistingSubtask.Title,
+                HideUnderSpoiler = ExistingSubtask.HideUnderSpoiler,
                 IsFavorite = ExistingSubtask.IsFavorite,
                 Interest = ExistingSubtask.Interest,
                 Complexity = ExistingSubtask.Complexity,

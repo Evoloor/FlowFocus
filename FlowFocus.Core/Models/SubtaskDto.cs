@@ -7,6 +7,7 @@ public class SubtaskDto
 {
     public int? Id { get; set; }
     public string Title { get; set; } = string.Empty;
+    public bool HideUnderSpoiler { get; set; }
     public bool IsFavorite { get; set; }
     public int? Interest { get; set; }
     public int? Complexity { get; set; }

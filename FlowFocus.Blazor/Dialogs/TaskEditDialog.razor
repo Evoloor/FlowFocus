@@ -19,13 +19,10 @@
                                   Immediate="true"/>
                 </MudItem>
 
-                @if (!IsSubtaskMode)
-                {
-                    <MudItem xs="12" sm="6">
-                        <MudCheckBox T="bool" @bind-Value="_task.HideUnderSpoiler"
-                                     Label="Скрывать под спойлер"/>
-                    </MudItem>
-                }
+                <MudItem xs="12" sm="6">
+                    <MudCheckBox T="bool" @bind-Value="_task.HideUnderSpoiler"
+                                 Label="Скрывать под спойлер"/>
+                </MudItem>
 
                 @* === ДАТА НАЗНАЧЕНИЯ === *@
                 @if (!IsSubtaskMode)

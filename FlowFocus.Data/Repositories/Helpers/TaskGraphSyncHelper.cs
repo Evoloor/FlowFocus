@@ -139,13 +139,23 @@ public static class TaskGraphSyncHelper
     {
         var desired = source.Relations ?? [];
         var trackedOutgoing = tracked.Relations ?? [];
+        var trackedIncoming = tracked.InverseRelations ?? [];
 
-        var toRemove = trackedOutgoing.Where(r =>
+        var toRemoveOutgoing = trackedOutgoing.Where(r =>
             !((r.Id > 0 && desired.Any(d => d.Id > 0 && d.Id == r.Id)) ||
               desired.Any(d => d.SourceTaskId == r.SourceTaskId && d.TargetTaskId == r.TargetTaskId && d.Type == r.Type))
         ).ToList();
 
-        foreach (var rel in toRemove)
+        foreach (var rel in toRemoveOutgoing)
+        {
+            context.TaskRelations.Remove(rel);
+        }
+
+        var toRemoveIncoming = trackedIncoming.Where(r =>
+            r.Id > 0 && !desired.Any(d => d.Id > 0 && d.Id == r.Id)
+        ).ToList();
+
+        foreach (var rel in toRemoveIncoming)
         {
             context.TaskRelations.Remove(rel);
         }
@@ -156,12 +166,18 @@ public static class TaskGraphSyncHelper
 
             if (desiredRel.Id > 0)
             {
-                existing = trackedOutgoing.FirstOrDefault(r => r.Id == desiredRel.Id);
+                existing = trackedOutgoing.FirstOrDefault(r => r.Id == desiredRel.Id)
+                           ?? trackedIncoming.FirstOrDefault(r => r.Id == desiredRel.Id)
+                           ?? context.TaskRelations.Local.FirstOrDefault(r => r.Id == desiredRel.Id);
             }
 
             existing ??= trackedOutgoing.FirstOrDefault(r => 
                 r.SourceTaskId == desiredRel.SourceTaskId && 
                 r.TargetTaskId == desiredRel.TargetTaskId && 
+                r.Type == desiredRel.Type)
+                ?? trackedIncoming.FirstOrDefault(r =>
+                r.SourceTaskId == desiredRel.SourceTaskId &&
+                r.TargetTaskId == desiredRel.TargetTaskId &&
                 r.Type == desiredRel.Type);
 
             if (existing != null)

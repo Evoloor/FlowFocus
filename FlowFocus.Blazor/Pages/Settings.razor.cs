@@ -125,6 +125,7 @@ public partial class Settings
         _settings.DailyComplexityLimit = 100;
         _dailyTimeHours = 8;
         _settings.AutoDistributeEnabled = false;
+        _settings.HideTaskTitlesDefault = false;
         _settings.DefaultPriorityId = null;
         Snackbar.Add("Настройки сброшены к значениям по умолчанию", Severity.Info);
     }

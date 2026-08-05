@@ -59,16 +59,35 @@ public static class RelationModule
 
             if (dto.Id is > 0)
             {
-                var existing = existingRelationsSource.FirstOrDefault(r => r.Id == dto.Id.Value)
-                               ?? existingRelationsInverse.FirstOrDefault(r => r.Id == dto.Id.Value);
+                var existingInSource = existingRelationsSource.FirstOrDefault(r => r.Id == dto.Id.Value);
+                var existingInInverse = existingRelationsInverse.FirstOrDefault(r => r.Id == dto.Id.Value);
+                var existing = existingInSource ?? existingInInverse;
+
                 if (existing != null)
                 {
+                    int finalSourceId;
+                    int finalTargetId;
+                    RelationType finalType;
+
+                    if (existingInInverse != null)
+                    {
+                        finalSourceId = existing.SourceTaskId;
+                        finalTargetId = existing.TargetTaskId;
+                        finalType = existing.Type;
+                    }
+                    else
+                    {
+                        finalSourceId = dbSourceId != 0 ? dbSourceId : existing.SourceTaskId;
+                        finalTargetId = dbTargetId != 0 ? dbTargetId : existing.TargetTaskId;
+                        finalType = dbType;
+                    }
+
                     TaskRelation updatedRelation = new()
                     {
                         Id = existing.Id,
-                        SourceTaskId = dbSourceId != 0 ? dbSourceId : existing.SourceTaskId,
-                        TargetTaskId = dbTargetId,
-                        Type = dbType,
+                        SourceTaskId = finalSourceId,
+                        TargetTaskId = finalTargetId,
+                        Type = finalType,
                         LastChangesOn = DateTime.UtcNow
                     };
                     resultRelations.Add(updatedRelation);

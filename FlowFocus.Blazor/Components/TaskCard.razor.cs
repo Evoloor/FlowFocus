@@ -41,7 +41,7 @@ public partial class TaskCard
     }
 
     private bool ShouldHideUnderSpoiler =>
-        Task.HideUnderSpoiler || (_settings?.HideTaskTitlesDefault ?? false);
+        (_settings?.HideTaskTitlesDefault ?? false) && Task.HideUnderSpoiler;
 
     private void ToggleSpoiler()
     {
