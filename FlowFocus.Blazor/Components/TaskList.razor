@@ -38,6 +38,12 @@
                     </MudSelect>
                 }
 
+                @* Чекбокс показа неактивных задач *@
+                @if (ShowInactiveToggle)
+                {
+                    <MudCheckBox T="bool" @bind-Value="ShowInactive" Label="Показать неактивные" Dense="true" Class="ml-2" />
+                }
+
                 @* Режим отображения *@
                 @if (ShowDisplayMode)
                 {

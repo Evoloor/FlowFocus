@@ -9,7 +9,7 @@ namespace FlowFocus.Blazor.Helpers;
 
 public static class TaskFilterEvaluator
 {
-    public static IEnumerable<TaskItem> ApplyDefaultFilter(IEnumerable<TaskItem> tasks, TaskListFilter? defaultFilter)
+    public static IEnumerable<TaskItem> ApplyDefaultFilter(IEnumerable<TaskItem> tasks, TaskListFilter? defaultFilter, bool showInactive = false)
     {
         if (defaultFilter == null) return tasks;
 
@@ -17,18 +17,18 @@ public static class TaskFilterEvaluator
         return defaultFilter.Type switch
         {
             TaskListFilterType.Today => tasks.Where(t =>
-                today.IsSameDay(t.ScheduledDate) &&
-                t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant),
+                (today.IsSameDay(t.ScheduledDate) || (t.CompletedDate.HasValue && today.IsSameDay(t.CompletedDate))) &&
+                (showInactive || (t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant))),
 
             TaskListFilterType.Tomorrow => tasks.Where(t =>
                 today.IsTomorrow(t.ScheduledDate) &&
-                t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant),
+                (showInactive || (t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant))),
 
             TaskListFilterType.NotConfigured => tasks.Where(t => t.Status == TaskStatus.NotConfigured),
 
             TaskListFilterType.Overdue => tasks.Where(t =>
                 today.IsOverdue(t.ScheduledDate) &&
-                t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant),
+                (showInactive || (t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant))),
 
             _ => tasks
         };
@@ -38,7 +38,7 @@ public static class TaskFilterEvaluator
         IEnumerable<TaskItem> tasks,
         string searchQuery,
         DateRange? dateRange,
-        IEnumerable<TaskStatus?> selectedStatuses,
+        IEnumerable<TaskStatus?>? selectedStatuses,
         DurationFilter durationFilter,
         IEnumerable<int?> selectedTagIds,
         bool hideWithDates)
@@ -57,7 +57,7 @@ public static class TaskFilterEvaluator
             tasks = tasks.Where(t => t.ScheduledDate <= dateRange.End);
         }
 
-        if (selectedStatuses.Any())
+        if (selectedStatuses != null && selectedStatuses.Any())
         {
             var statuses = selectedStatuses.Where(s => s != null).Cast<TaskStatus>().ToList();
             tasks = tasks.Where(t => statuses.Contains(t.Status));

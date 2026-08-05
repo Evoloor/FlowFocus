@@ -25,6 +25,7 @@ public partial class TaskList : IDisposable
     [Parameter] public bool ShowDisplayMode { get; set; } = true;
     [Parameter] public bool ShowPagination { get; set; } = true;
     [Parameter] public bool ShowTags { get; set; } = true;
+    [Parameter] public bool ShowInactiveToggle { get; set; } = false;
 
     // === Фильтры по умолчанию ===
     [Parameter] public TaskListFilter? DefaultFilter { get; set; }
@@ -44,6 +45,7 @@ public partial class TaskList : IDisposable
     private DurationFilter _durationFilter = DurationFilter.All;
     private IEnumerable<int?> _selectedTagIds = new List<int?>();
     private bool _hideWithDates = false;
+    private bool _showInactive = false;
 
     private int _currentPage = 1;
     private int _pageSize = 25;
@@ -55,6 +57,18 @@ public partial class TaskList : IDisposable
         {
             if (_hideWithDates == value) return;
             _hideWithDates = value;
+            _currentPage = 1;
+            _ = InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private bool ShowInactive
+    {
+        get => _showInactive;
+        set
+        {
+            if (_showInactive == value) return;
+            _showInactive = value;
             _currentPage = 1;
             _ = InvokeAsync(StateHasChanged);
         }
@@ -112,18 +126,20 @@ public partial class TaskList : IDisposable
     private bool HasActiveFilters =>
         !string.IsNullOrEmpty(_searchQuery) ||
         _dateRange != null ||
-        _selectedStatuses.Any() ||
+        (ShowFilters && _selectedStatuses.Any()) ||
         _durationFilter != DurationFilter.All ||
         _selectedTagIds.Any() ||
-        _hideWithDates;
+        _hideWithDates ||
+        _showInactive;
 
     private List<TaskItem> FilteredTasks
     {
         get
         {
             var tasks = _allTasks.AsEnumerable();
-            tasks = TaskFilterEvaluator.ApplyDefaultFilter(tasks, DefaultFilter);
-            tasks = TaskFilterEvaluator.ApplySearchAndFilters(tasks, _searchQuery, _dateRange, _selectedStatuses, _durationFilter, _selectedTagIds, _hideWithDates);
+            tasks = TaskFilterEvaluator.ApplyDefaultFilter(tasks, DefaultFilter, _showInactive);
+            var activeStatuses = ShowFilters ? _selectedStatuses : null;
+            tasks = TaskFilterEvaluator.ApplySearchAndFilters(tasks, _searchQuery, _dateRange, activeStatuses, _durationFilter, _selectedTagIds, _hideWithDates);
             tasks = TaskFilterEvaluator.ApplySort(tasks, _sortType);
 
             return tasks.ToList();

@@ -1,4 +1,6 @@
 using FluentAssertions;
+using FlowFocus.Blazor.Components;
+using FlowFocus.Blazor.Helpers;
 using FlowFocus.Core;
 using FlowFocus.Core.Models;
 using FlowFocus.Core.Services;
@@ -218,5 +220,51 @@ public class UiAndUxEngineTests : IntegrationTestBase
         // Assert
         suggestions.Should().HaveCount(5);
         suggestions.First().Id.Should().Be(sessionTag.Id);
+    }
+
+    /// <summary>
+    /// Verifies that Today filter excludes completed and irrelevant tasks when showInactive is false.
+    /// </summary>
+    [Fact]
+    public void ApplyDefaultFilter_TodayFilter_HidesInactiveTasks_WhenShowInactiveIsFalse()
+    {
+        // Arrange
+        var today = TodoDay.Today.ToDateTime();
+        var activeTask = new TaskItemBuilder().WithId(1).WithScheduledDate(today).WithStatus(TaskStatus.Planned).Build();
+        var completedTask = new TaskItemBuilder().WithId(2).WithScheduledDate(today).WithStatus(TaskStatus.Completed).Build();
+        var irrelevantTask = new TaskItemBuilder().WithId(3).WithScheduledDate(today).WithStatus(TaskStatus.Irrelevant).Build();
+
+        List<TaskItem> tasks = [activeTask, completedTask, irrelevantTask];
+        TaskListFilter filter = new() { Type = TaskListFilterType.Today };
+
+        // Act
+        var filtered = TaskFilterEvaluator.ApplyDefaultFilter(tasks, filter, showInactive: false).ToList();
+
+        // Assert
+        filtered.Should().ContainSingle();
+        filtered.Single().Id.Should().Be(1);
+    }
+
+    /// <summary>
+    /// Verifies that Today filter includes completed and irrelevant tasks when showInactive is true.
+    /// </summary>
+    [Fact]
+    public void ApplyDefaultFilter_TodayFilter_IncludesInactiveTasks_WhenShowInactiveIsTrue()
+    {
+        // Arrange
+        var today = TodoDay.Today.ToDateTime();
+        var activeTask = new TaskItemBuilder().WithId(1).WithScheduledDate(today).WithStatus(TaskStatus.Planned).Build();
+        var completedTask = new TaskItemBuilder().WithId(2).WithScheduledDate(today).WithStatus(TaskStatus.Completed).Build();
+        var irrelevantTask = new TaskItemBuilder().WithId(3).WithScheduledDate(today).WithStatus(TaskStatus.Irrelevant).Build();
+
+        List<TaskItem> tasks = [activeTask, completedTask, irrelevantTask];
+        TaskListFilter filter = new() { Type = TaskListFilterType.Today };
+
+        // Act
+        var filtered = TaskFilterEvaluator.ApplyDefaultFilter(tasks, filter, showInactive: true).ToList();
+
+        // Assert
+        filtered.Should().HaveCount(3);
+        filtered.Select(t => t.Id).Should().BeEquivalentTo(new[] { 1, 2, 3 });
     }
 }

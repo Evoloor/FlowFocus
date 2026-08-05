@@ -26,6 +26,7 @@
   <ItemGroup>
     <ProjectReference Include="..\FlowFocus.Core\FlowFocus.Core.csproj" />
     <ProjectReference Include="..\FlowFocus.Data\FlowFocus.Data.csproj" />
+    <ProjectReference Include="..\FlowFocus.Blazor\FlowFocus.Blazor.csproj" />
   </ItemGroup>
 
 </Project>
