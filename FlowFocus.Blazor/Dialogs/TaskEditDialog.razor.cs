@@ -293,7 +293,13 @@ public partial class TaskEditDialog
                 _ => _estimatedValue
             };
 
-            if (_task.ScheduledDate == null)
+            if (_task.IsRecurring && _task.ScheduledDate == null)
+            {
+                _task.ScheduledDate = TodoDay.Today.ToDateTime();
+                _task.DateSource = DateSource.Manual;
+                _scheduledDate = _task.ScheduledDate;
+            }
+            else if (_task.ScheduledDate == null)
             {
                 _task.DateSource = DateSource.AutoFlexible;
             }
@@ -440,8 +446,12 @@ public partial class TaskEditDialog
         List<string> errors = [];
         if (string.IsNullOrWhiteSpace(_task.Title)) errors.Add("Название обязательно");
 
-        if (_task.IsRecurring && !IsEdit && _task.ScheduledDate == null)
-            errors.Add("Для повторяющейся задачи необходимо указать дату начала");
+        if (_task.IsRecurring && _task.ScheduledDate == null)
+        {
+            _task.ScheduledDate = TodoDay.Today.ToDateTime();
+            _task.DateSource = DateSource.Manual;
+            _scheduledDate = _task.ScheduledDate;
+        }
 
         var escalationValidation = TaskEditValidator.ValidateEscalations(_escalations, _task, _priorities);
         if (!escalationValidation.IsValid) errors.AddRange(escalationValidation.Errors);
