@@ -1,6 +1,7 @@
 using FlowFocus.Core.Services;
 using FlowFocus.Data;
 using FlowFocus.Data.Repositories;
+using Microsoft.Data.Sqlite;
 using NSubstitute;
 
 namespace FlowFocus.Tests;
@@ -11,6 +12,7 @@ namespace FlowFocus.Tests;
 /// </summary>
 public abstract class IntegrationTestBase : IDisposable
 {
+    private readonly SqliteConnection _sqliteConnection;
     protected StorageContext Context { get; }
     protected INotificationService NotificationService { get; }
     protected TaskRepository TaskRepo { get; }
@@ -20,7 +22,7 @@ public abstract class IntegrationTestBase : IDisposable
 
     protected IntegrationTestBase()
     {
-        Context = TestDbContextFactory.CreateInMemoryContext();
+        (Context, _sqliteConnection) = TestDbContextFactory.CreateSqliteContext();
         NotificationService = Substitute.For<INotificationService>();
         TaskRepo = new TaskRepository(Context, NotificationService);
         PriorityRepo = new PriorityRepository(Context, NotificationService);
@@ -39,6 +41,7 @@ public abstract class IntegrationTestBase : IDisposable
         if (disposing)
         {
             Context.Dispose();
+            _sqliteConnection.Dispose();
         }
     }
 }

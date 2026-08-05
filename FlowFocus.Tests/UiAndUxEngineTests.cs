@@ -2,6 +2,7 @@ using FluentAssertions;
 using FlowFocus.Blazor.Components;
 using FlowFocus.Blazor.Helpers;
 using FlowFocus.Core;
+using FlowFocus.Core.Helpers;
 using FlowFocus.Core.Models;
 using FlowFocus.Core.Services;
 using FlowFocus.Data.Repositories;
@@ -266,5 +267,57 @@ public class UiAndUxEngineTests : IntegrationTestBase
         // Assert
         filtered.Should().HaveCount(3);
         filtered.Select(t => t.Id).Should().BeEquivalentTo(new[] { 1, 2, 3 });
+    }
+
+    /// <summary>
+    /// Verifies that PrivacyHelper.MaskText preserves the first letter and appends asterisks.
+    /// </summary>
+    [Theory]
+    [InlineData("Купить хлеб", "К***")]
+    [InlineData("Task title", "T***")]
+    [InlineData("A", "A")]
+    [InlineData("", "")]
+    [InlineData(null, "")]
+    [InlineData("   ", "")]
+    public void PrivacyHelper_MaskText_PreservesFirstLetterAndAppendsAsterisks(string? input, string expected)
+    {
+        // Act
+        var result = PrivacyHelper.MaskText(input);
+
+        // Assert
+        result.Should().Be(expected);
+    }
+
+    /// <summary>
+    /// Verifies that PrivacyHelper.MaskText correctly handles Unicode surrogate pairs (e.g. emoji).
+    /// </summary>
+    [Fact]
+    public void PrivacyHelper_MaskText_HandlesSurrogatePairs()
+    {
+        // Arrange
+        var emojiInput = "😀 test task";
+
+        // Act
+        var result = PrivacyHelper.MaskText(emojiInput);
+
+        // Assert
+        result.Should().Be("😀***");
+    }
+
+    /// <summary>
+    /// Verifies that SubtaskDto retains HideUnderSpoiler property.
+    /// </summary>
+    [Fact]
+    public void SubtaskDto_PreservesHideUnderSpoiler()
+    {
+        // Arrange
+        SubtaskDto dto = new()
+        {
+            Title = "Секретная подзадача",
+            HideUnderSpoiler = true
+        };
+
+        // Assert
+        dto.HideUnderSpoiler.Should().BeTrue();
     }
 }
