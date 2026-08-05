@@ -130,9 +130,9 @@ public static class TaskGraphSyncHelper
     public static void UpdateRelations(StorageContext context, TaskItem tracked, TaskItem source)
     {
         var desired = source.Relations ?? [];
-        var trackedAll = (tracked.Relations ?? []).Concat(tracked.InverseRelations ?? []).ToList();
+        var trackedOutgoing = tracked.Relations ?? [];
 
-        var toRemove = trackedAll.Where(r =>
+        var toRemove = trackedOutgoing.Where(r =>
             !((r.Id > 0 && desired.Any(d => d.Id > 0 && d.Id == r.Id)) ||
               desired.Any(d => d.SourceTaskId == r.SourceTaskId && d.TargetTaskId == r.TargetTaskId && d.Type == r.Type))
         ).ToList();
@@ -148,10 +148,10 @@ public static class TaskGraphSyncHelper
 
             if (desiredRel.Id > 0)
             {
-                existing = trackedAll.FirstOrDefault(r => r.Id == desiredRel.Id);
+                existing = trackedOutgoing.FirstOrDefault(r => r.Id == desiredRel.Id);
             }
 
-            existing ??= trackedAll.FirstOrDefault(r => 
+            existing ??= trackedOutgoing.FirstOrDefault(r => 
                 r.SourceTaskId == desiredRel.SourceTaskId && 
                 r.TargetTaskId == desiredRel.TargetTaskId && 
                 r.Type == desiredRel.Type);

@@ -71,6 +71,19 @@ public class TaskRepository(
             TaskGraphSyncHelper.UpdateRelations(Context, trackedEntity, entity);
             TaskGraphSyncHelper.UpdateEscalations(Context, trackedEntity, entity);
 
+            if (trackedEntity.Status != TaskStatus.Completed && trackedEntity.Status != TaskStatus.Irrelevant)
+            {
+                var incomingBlockers = Context.TaskRelations
+                    .Where(r => r.TargetTaskId == entity.Id && r.Type == RelationType.Blocks)
+                    .Select(r => r.SourceTask)
+                    .ToList();
+                var hasActiveBlockers = incomingBlockers.Any(b => b != null && b.Status != TaskStatus.Completed && b.Status != TaskStatus.Irrelevant);
+                if (hasActiveBlockers)
+                {
+                    trackedEntity.Status = TaskStatus.Blocked;
+                }
+            }
+
             trackedEntity.LastChangesOn = DateTime.UtcNow;
             Context.SaveChanges();
 
@@ -233,6 +246,18 @@ public class TaskRepository(
             t.Status = targetStatus;
             t.CompletedDate = completedDate;
         });
+
+        if (targetStatus is TaskStatus.Completed or TaskStatus.Irrelevant)
+        {
+            var incomingBlockers = Context.TaskRelations
+                .Where(r => r.TargetTaskId == taskId && r.Type == RelationType.Blocks)
+                .ToList();
+            if (incomingBlockers.Count > 0)
+            {
+                Context.TaskRelations.RemoveRange(incomingBlockers);
+                Context.SaveChanges();
+            }
+        }
 
         if (task.IsRecurring && task.RecurrenceType != RecurrenceType.None)
         {

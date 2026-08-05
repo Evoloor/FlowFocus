@@ -12,6 +12,18 @@ public class PriorityRepository(StorageContext context, INotificationService not
 {
     protected override DbSet<PriorityLevel> GetDbSet() => Context.Priorities;
 
+    public override void Add(PriorityLevel entity)
+    {
+        lock (CacheLock)
+        {
+            if (Context.Priorities.Count() >= 20)
+            {
+                throw new InvalidOperationException("Maximum 20 priorities limit reached");
+            }
+            base.Add(entity);
+        }
+    }
+
     public List<PriorityLevel> GetAllOrdered()
     {
         return GetAll().OrderBy(p => p.Order).ToList();

@@ -42,6 +42,8 @@ public class PlannerService(ITaskRepository taskRepository) : IPlannerService
                 saveChanges: true
             );
         }
+
+        NormalizeBlockerPriorities();
     }
 
     /// <summary>
@@ -114,6 +116,32 @@ public class PlannerService(ITaskRepository taskRepository) : IPlannerService
         // мутируем их на месте (Scenario B из спецификации).
         HandleRecurringBeforeDistribution(settings);
 
+        var allTasksMap = taskRepository.GetAll().ToDictionary(t => t.Id);
+
+        // Автоматически фиксируем (AutoFixed) даты для блокеров, если заблокированные задачи имеют фиксированную дату (Manual / AutoFixed)
+        var unassignedBlockers = taskRepository.GetAll()
+            .Where(t => t.ParentTaskId == null)
+            .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
+            .Where(t => t.DateSource == DateSource.AutoFlexible)
+            .ToList();
+
+        foreach (var blocker in unassignedBlockers)
+        {
+            var blockedWithFixedDate = blocker.Relations
+                .Where(r => r.Type == RelationType.Blocks)
+                .Select(r => allTasksMap.TryGetValue(r.TargetTaskId, out var target) ? target : r.TargetTask)
+                .Where(t => t != null && t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
+                .Where(t => t!.DateSource is DateSource.Manual or DateSource.AutoFixed && t.ScheduledDate.HasValue)
+                .OrderBy(t => t!.ScheduledDate!.Value)
+                .FirstOrDefault();
+
+            if (blockedWithFixedDate != null)
+            {
+                var targetDate = blockedWithFixedDate.ScheduledDate!.Value;
+                taskRepository.UpdateTaskSchedule(blocker.Id, targetDate, DateSource.AutoFixed, saveChanges: false);
+            }
+        }
+
         // Задачи с AutoFlexible — кандидаты для авто-распределения
         var tasks = taskRepository.GetAll()
             .Where(t => t.ParentTaskId == null) // Исключаем подзадачи
@@ -134,65 +162,77 @@ public class PlannerService(ITaskRepository taskRepository) : IPlannerService
         var today = TodoDay.Today;
         var tomorrow = today.AddDays(1);
 
-        // Собираем все задачи (Manual / AutoFixed), у которых уже зафиксирована дата
-        var fixedTasks = taskRepository.GetAll()
+        // Собираем все неактивные и фиксированные задачи для построения начальной загрузки по дням
+        var allRootTasks = taskRepository.GetAll()
             .Where(t => t.ParentTaskId == null)
-            .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
-            .Where(t => t.DateSource == DateSource.Manual || t.DateSource == DateSource.AutoFixed)
-            .Where(t => t.ScheduledDate.HasValue)
             .ToList();
 
-        // Заполняем стартовую статистику на сегодня и на завтра на основе фиксированных задач
-        DailyStats todayStats = new();
-        DailyStats tomorrowStats = new();
+        // Словарь загрузки по дням
+        var dailyStatsMap = new Dictionary<TodoDay, DailyStats>();
 
-        foreach (var task in fixedTasks)
+        DailyStats GetStatsForDay(TodoDay day)
         {
-            if (today.IsSameDay(task.ScheduledDate))
+            if (dailyStatsMap.TryGetValue(day, out var existing))
+                return existing;
+
+            var stats = new DailyStats();
+            foreach (var t in allRootTasks)
             {
-                todayStats.TotalComplexity += task.TotalComplexity;
-                todayStats.TotalMinutes += task.TotalEstimatedMinutes;
-                todayStats.TaskCount++;
+                var isInactive = t.Status is TaskStatus.Completed or TaskStatus.Irrelevant;
+                if (isInactive)
+                {
+                    var inactiveDate = t.CompletedDate ?? t.ScheduledDate;
+                    if (inactiveDate.HasValue && day.IsSameDay(inactiveDate))
+                    {
+                        stats.TotalComplexity += t.TotalComplexity;
+                        stats.TotalMinutes += t.TotalEstimatedMinutes;
+                        stats.TaskCount++;
+                    }
+                }
+                else if (t.Status != TaskStatus.NotConfigured)
+                {
+                    var isFixed = t.DateSource is DateSource.Manual or DateSource.AutoFixed;
+                    if (isFixed && t.ScheduledDate.HasValue && day.IsSameDay(t.ScheduledDate))
+                    {
+                        stats.TotalComplexity += t.TotalComplexity;
+                        stats.TotalMinutes += t.TotalEstimatedMinutes;
+                        stats.TaskCount++;
+                    }
+                }
             }
-            else if (today.IsTomorrow(task.ScheduledDate))
-            {
-                tomorrowStats.TotalComplexity += task.TotalComplexity;
-                tomorrowStats.TotalMinutes += task.TotalEstimatedMinutes;
-                tomorrowStats.TaskCount++;
-            }
+
+            dailyStatsMap[day] = stats;
+            return stats;
         }
 
         var currentDate = today;
-        DailyStats dailyStats = todayStats;
 
         foreach (var task in sortedTasks)
         {
-            var isLargeTask = IsLargeTask(task, settings);
-
-            // Проверяем лимиты для текущего дня. Если превышен, пытаемся перейти на следующий день.
-            while (!CanAddToDay(task, dailyStats, settings, isLargeTask))
+            while (true)
             {
+                if (currentDate > tomorrow)
+                {
+                    taskRepository.UpdateTaskSchedule(task.Id, null, saveChanges: false);
+                    break;
+                }
+
+                var dailyStats = GetStatsForDay(currentDate);
+
+                if (CanAddToDay(task, dailyStats, settings))
+                {
+                    taskRepository.UpdateTaskSchedule(task.Id, currentDate.ToDateTime(), saveChanges: false);
+                    Console.WriteLine($"Planner: assigned non-recurring task {task.Id} '{task.Title}' -> {currentDate}");
+
+                    // Обновляем статистику дня (подзадачи не учитываются в счётчике задач)
+                    dailyStats.TotalComplexity += task.TotalComplexity;
+                    dailyStats.TotalMinutes += task.TotalEstimatedMinutes;
+                    dailyStats.TaskCount++;
+                    break;
+                }
+
                 currentDate = currentDate.AddDays(1);
-                dailyStats = currentDate == tomorrow ? tomorrowStats : new DailyStats();
             }
-
-            // Детальный просчёт только для "сегодня" и "завтра"
-            if (currentDate <= tomorrow)
-            {
-                taskRepository.UpdateTaskSchedule(task.Id, currentDate.ToDateTime(), saveChanges: false);
-                Console.WriteLine($"Planner: assigned non-recurring task {task.Id} '{task.Title}' -> {currentDate}");
-            }
-            else
-            {
-                // Остальные задачи не имеют даты назначения
-                taskRepository.UpdateTaskSchedule(task.Id, null, saveChanges: false);
-                Console.WriteLine($"Planner: task {task.Id} '{task.Title}' beyond tomorrow, clearing ScheduledDate");
-            }
-
-            // Обновляем статистику дня (подзадачи не учитываются в счётчике задач)
-            dailyStats.TotalComplexity += task.TotalComplexity;
-            dailyStats.TotalMinutes += task.TotalEstimatedMinutes;
-            dailyStats.TaskCount++;
         }
     }
 
@@ -248,24 +288,47 @@ public class PlannerService(ITaskRepository taskRepository) : IPlannerService
         return task.Priority?.Order ?? 99;
     }
 
-    private bool IsLargeTask(TaskItem task, UserSettings settings)
+    private bool CanAddToDay(TaskItem task, DailyStats stats, UserSettings settings)
     {
-        var timeThreshold = settings.DailyTimeLimit * AppConfig.LargeTaskThresholdPercent;
-        var complexityThreshold = settings.DailyComplexityLimit * AppConfig.LargeTaskThresholdPercent;
+        // Задача с критическим приоритетом (Order <= 1) проходит в обход лимитов
+        if (GetEffectivePriorityOrder(task) <= 1)
+        {
+            return true;
+        }
 
-        return task.TotalEstimatedMinutes >= timeThreshold ||
-               task.TotalComplexity >= complexityThreshold;
-    }
+        // Если текущая загрузка дня УЖЕ исчерпала лимиты
+        if (stats.TaskCount >= settings.DailyTaskLimit ||
+            stats.TotalMinutes >= settings.DailyTimeLimit ||
+            stats.TotalComplexity >= settings.DailyComplexityLimit)
+        {
+            return false;
+        }
 
-    private bool CanAddToDay(TaskItem task, DailyStats stats, UserSettings settings, bool isLargeTask)
-    {
-        // Крупные дела и задачи с наивысшим (критическим) приоритетом (Order <= 1) игнорируют лимит
-        var isCriticalPriority = GetEffectivePriorityOrder(task) <= 1;
-        if (isCriticalPriority || isLargeTask) return true;
+        // 1. Лимит количества задач (TaskCount) — СТРОГИЙ (без исключений)
+        if (stats.TaskCount + 1 > settings.DailyTaskLimit)
+        {
+            return false;
+        }
 
-        if (stats.TaskCount >= settings.DailyTaskLimit) return false;
-        if (stats.TotalComplexity + task.TotalComplexity > settings.DailyComplexityLimit) return false;
-        if (stats.TotalMinutes + task.TotalEstimatedMinutes > settings.DailyTimeLimit) return false;
+        // 2. Лимит времени — если превышает остаток времени дня, разрешено только для крупных по времени задач (>= 70% от dailyTimeLimit)
+        if (stats.TotalMinutes + task.TotalEstimatedMinutes > settings.DailyTimeLimit)
+        {
+            var isLargeTimeTask = task.TotalEstimatedMinutes >= settings.DailyTimeLimit * AppConfig.LargeTaskThresholdPercent;
+            if (!isLargeTimeTask)
+            {
+                return false;
+            }
+        }
+
+        // 3. Лимит сложности — если превышает остаток сложности дня, разрешено только для крупных по сложности задач (>= 70% от dailyComplexityLimit)
+        if (stats.TotalComplexity + task.TotalComplexity > settings.DailyComplexityLimit)
+        {
+            var isLargeComplexityTask = task.TotalComplexity >= settings.DailyComplexityLimit * AppConfig.LargeTaskThresholdPercent;
+            if (!isLargeComplexityTask)
+            {
+                return false;
+            }
+        }
 
         return true;
     }

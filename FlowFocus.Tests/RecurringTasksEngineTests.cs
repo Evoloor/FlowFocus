@@ -176,10 +176,9 @@ public class RecurringTasksEngineTests : IntegrationTestBase
         // Assert
         newCopy.Should().NotBeNull();
         newCopy!.Subtasks.Should().HaveCount(2);
-        newCopy.Subtasks.Select(s => s.Title).Should().ContainInConsecutiveOrder(["Subtask 1", "Subtask 2"]);
+        newCopy.Subtasks.Select(s => s.Title).Should().ContainInConsecutiveOrder("Subtask 1", "Subtask 2");
     }
-
-
+    
     /// <summary>
     /// Verifies that rapid double-clicks on completion generates only a single copy in repository.
     /// </summary>

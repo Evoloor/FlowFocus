@@ -40,6 +40,14 @@ public class TaskRecurrenceService : ITaskRecurrenceService
             var nextDate = CalculateNextRecurrenceDate(sourceTask);
             if (nextDate == null) return;
 
+            var todayDt = TodoDay.Today.ToDateTime();
+            while (nextDate != null && nextDate.Value.Date <= todayDt.Date)
+            {
+                nextDate = CalculateNextRecurrenceDateFromBase(sourceTask, nextDate.Value.Date);
+            }
+
+            if (nextDate == null) return;
+
             var sourceId = sourceTask.RecurrenceSourceId ?? sourceTask.Id;
             var start = nextDate.Value.Date;
             var end = start.AddDays(1);

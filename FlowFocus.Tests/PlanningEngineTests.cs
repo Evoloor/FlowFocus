@@ -335,10 +335,10 @@ public class PlanningEngineTests : IntegrationTestBase
     }
 
     /// <summary>
-    /// Verifies that large task rule applies strictly to time limit and not to complexity.
+    /// Verifies that large task rule applies to complexity limit if task is large by complexity and limit is not yet exhausted.
     /// </summary>
     [Fact]
-    public void LargeTaskRule_OnlyAppliesToTimeLimit_NotComplexity()
+    public void LargeTaskRule_AppliesToComplexityLimit_WhenTaskIsLargeByComplexity()
     {
         // Arrange
         var existingTask = new TaskItemBuilder().WithId(1101).WithComplexity(50)
@@ -358,7 +358,7 @@ public class PlanningEngineTests : IntegrationTestBase
         PlannerService.DistributeTasks(settings);
 
         // Assert
-        TaskRepo.GetById(1102)!.ScheduledDate.Should().Be(TodoDay.Today.Tomorrow.ToDateTime());
+        TaskRepo.GetById(1102)!.ScheduledDate.Should().Be(TodoDay.Today.ToDateTime());
     }
 
     /// <summary>
