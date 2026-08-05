@@ -1,3 +1,4 @@
+using FlowFocus.Core.Enums;
 using FlowFocus.Core.Models;
 
 namespace FlowFocus.Core.Validation;
@@ -45,6 +46,11 @@ public static class TaskHierarchyValidator
             {
                 throw new InvalidOperationException("Подзадача: приоритет не может быть выше приоритета родительской задачи.");
             }
+        }
+
+        if (childTask.IsRecurring || childTask.RecurrenceType != RecurrenceType.None)
+        {
+            throw new InvalidOperationException("подзадачи не поддерживают независимые даты или повторения");
         }
 
         // Проверка: даты назначения должны совпадать, а дата подзадачи не может быть позже родительской задачи

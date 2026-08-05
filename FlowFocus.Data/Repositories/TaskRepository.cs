@@ -2,6 +2,7 @@ using FlowFocus.Core;
 using FlowFocus.Core.Enums;
 using FlowFocus.Core.Models;
 using FlowFocus.Core.Services;
+using FlowFocus.Core.Validation;
 using FlowFocus.Data.Repositories.Helpers;
 using FlowFocus.Data.Services;
 using Microsoft.EntityFrameworkCore;
@@ -36,7 +37,7 @@ public class TaskRepository(
 
             entity.LastChangesOn = DateTime.UtcNow;
 
-            TaskGraphSyncHelper.PrepareSubtasksForAdd(entity);
+            TaskGraphSyncHelper.PrepareSubtasksForAdd(Context, entity);
             TaskGraphSyncHelper.PrepareRelationsForAdd(entity);
             TaskGraphSyncHelper.PrepareEscalationsForAdd(entity);
 
@@ -63,6 +64,15 @@ public class TaskRepository(
                 .Include(t => t.PriorityEscalations)
                 .FirstOrDefault(e => e.Id == entity.Id)
                 ?? throw new InvalidOperationException($"Entity with ID {entity.Id} not found");
+
+            if (trackedEntity.ParentTaskId != null)
+            {
+                var parent = GetById(trackedEntity.ParentTaskId.Value);
+                if (parent != null)
+                {
+                    TaskHierarchyValidator.ValidateSubtaskParent(parent, entity);
+                }
+            }
 
             Context.Entry(trackedEntity).CurrentValues.SetValues(entity);
 

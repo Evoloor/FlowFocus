@@ -1,5 +1,6 @@
 using FlowFocus.Core.Models;
 using FlowFocus.Core.Validation;
+using Microsoft.EntityFrameworkCore;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Data.Repositories.Helpers;
@@ -11,11 +12,18 @@ public static class TaskGraphSyncHelper
 {
     #region Add Helpers
 
-    public static void PrepareSubtasksForAdd(TaskItem entity)
+    public static void PrepareSubtasksForAdd(StorageContext context, TaskItem entity)
     {
+        var dbMax = context.Tasks.AsNoTracking().Select(t => (int?)t.Id).Max() ?? 0;
+        var maxId = Math.Max(dbMax, entity.Id);
         foreach (var subtask in entity.Subtasks)
         {
             subtask.ParentTaskId ??= entity.Id;
+            if (subtask.Id == 0)
+            {
+                maxId++;
+                subtask.Id = maxId;
+            }
             TaskHierarchyValidator.ValidateSubtaskParent(entity, subtask);
             if (subtask.CreatedDate == default)
             {

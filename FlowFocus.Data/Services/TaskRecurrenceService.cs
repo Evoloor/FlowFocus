@@ -61,6 +61,7 @@ public class TaskRecurrenceService : ITaskRecurrenceService
         catch (Exception ex)
         {
             Console.WriteLine($"HandleTaskCompletionRecurrence error for task {sourceTask?.Id}: {ex}");
+            throw;
         }
     }
 
@@ -80,19 +81,20 @@ public class TaskRecurrenceService : ITaskRecurrenceService
         EstimatedMinutes = source.EstimatedMinutes,
         IsFavorite = source.IsFavorite,
         HideUnderSpoiler = source.HideUnderSpoiler,
-        ScheduledDate = isParent ? (scheduledDate ?? source.ScheduledDate) : null,
+        ScheduledDate = scheduledDate ?? source.ScheduledDate,
         DateSource = isParent ? (dateSource ?? source.DateSource) : DateSource.AutoFlexible,
-        IsRecurring = source.IsRecurring,
-        RecurrenceType = source.RecurrenceType,
-        RecurrenceInterval = source.RecurrenceInterval,
-        RecurrenceWeekDays = source.RecurrenceWeekDays,
+        IsRecurring = isParent && source.IsRecurring,
+        RecurrenceType = isParent ? source.RecurrenceType : RecurrenceType.None,
+        RecurrenceInterval = isParent ? source.RecurrenceInterval : null,
+        RecurrenceWeekDays = isParent ? source.RecurrenceWeekDays : null,
         RecurrenceSourceId = isParent ? (recurrenceSourceId ?? source.RecurrenceSourceId) : null,
+        ParentTaskId = null,
         CreatedDate = DateTime.UtcNow,
         Tags = source.Tags?.Select(t => new TaskTag { TagId = t.TagId }).ToList() ?? [],
         PriorityEscalations = source.PriorityEscalations?
             .Select(e => new PriorityEscalation { TargetPriorityId = e.TargetPriorityId, EscalationDate = e.EscalationDate, IsApplied = e.IsApplied })
             .ToList() ?? [],
-        Subtasks = source.Subtasks?.Select(s => CloneTaskItem(s, isParent: false)).ToList() ?? []
+        Subtasks = source.Subtasks?.Select(s => CloneTaskItem(s, isParent: false, scheduledDate: scheduledDate, dateSource: dateSource)).ToList() ?? []
     };
 
     private static DateTime CalculateNextMonthDate(DateTime baseDate, int monthsInterval)

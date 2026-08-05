@@ -1,3 +1,4 @@
+using FlowFocus.Core.Enums;
 using FlowFocus.Core.Models;
 
 namespace FlowFocus.Core.Validation;
@@ -35,6 +36,11 @@ public static class TaskItemValidator
         if (task is { IsRecurring: true, ScheduledDate: null })
         {
             throw new InvalidOperationException("Повторяющаяся задача при первом создании обязана иметь ручную дату.");
+        }
+
+        if (task is { IsRecurring: true, DateSource: DateSource.AutoFlexible })
+        {
+            throw new InvalidOperationException("Повторяющаяся задача не может быть автоматически гибкой.");
         }
     }
 

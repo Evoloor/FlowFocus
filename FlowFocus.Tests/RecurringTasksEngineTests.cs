@@ -162,6 +162,7 @@ public class RecurringTasksEngineTests : IntegrationTestBase
         parent.IsRecurring = true;
         parent.RecurrenceType = RecurrenceType.Daily;
         parent.ScheduledDate = TodoDay.Today.ToDateTime();
+        parent.DateSource = DateSource.AutoFixed;
         parent.Status = TaskStatus.Planned;
 
         TaskRepo.Add(parent);
