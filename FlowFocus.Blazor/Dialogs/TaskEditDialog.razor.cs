@@ -264,7 +264,6 @@ public partial class TaskEditDialog
                 }
                 _relations.Clear();
 
-                Snackbar.Add("Связи удалены для повторяющейся задачи", Severity.Info);
                 InvokeAsync(StateHasChanged);
             }
         }
