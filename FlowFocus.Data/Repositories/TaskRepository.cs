@@ -155,8 +155,7 @@ public class TaskRepository(
             .Include(t => t.Subtasks)
             .Include(t => t.PriorityEscalations).ThenInclude(pe => pe.TargetPriority);
 
-    private IEnumerable<TaskItem> GetActiveRootTasks() =>
-        GetAll().Where(t => t.ParentTaskId == null && t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant);
+    private IEnumerable<TaskItem> GetActiveRootTasks() => GetAll().FilterActiveRootTasks();
 
     public List<TaskItem> GetTasksForDate(DateTime date) =>
         GetActiveRootTasks()
@@ -201,40 +200,11 @@ public class TaskRepository(
             .OrderBy(t => t.Title)
             .ToList();
 
-    public TaskItem? GetProcrastinationTask(List<int> excludeIds) =>
-        GetAll()
-            .Where(t => t.ParentTaskId == null &&
-                        t is { Interest: >= AppConfig.MinProcrastinationInterest, Status: TaskStatus.Planned } &&
-                        !excludeIds.Contains(t.Id))
-            .OrderByDescending(t => t.Interest - Math.Sqrt(t.Priority?.Order ?? 99))
-            .FirstOrDefault();
+    public TaskItem? GetProcrastinationTask(List<int> excludeIds) => GetAll().FindProcrastinationTask(excludeIds);
 
-    public TaskItem? GetLeastPriorityTaskOfDay()
-    {
-        var today = TodoDay.Today;
-        return GetActiveRootTasks()
-            .Where(t => t.ScheduledDate != null && today.IsSameDay(t.ScheduledDate) && t.Status == TaskStatus.Planned)
-            .OrderByDescending(t => t.Priority?.Order ?? 99)
-            .ThenBy(t => t.Interest ?? 0)
-            .FirstOrDefault();
-    }
+    public TaskItem? GetLeastPriorityTaskOfDay() => GetAll().FindLeastPriorityTaskOfDay();
 
-    public List<TaskItem> GetRecurringCandidatesForPlanner()
-    {
-        var today = TodoDay.Today;
-
-        return Context.Tasks
-            .AsNoTracking()
-            .Where(t => t.ParentTaskId == null &&
-                        t.Status != TaskStatus.Completed &&
-                        t.Status != TaskStatus.Irrelevant &&
-                        t.Status != TaskStatus.NotConfigured &&
-                        t.IsRecurring)
-            .ToList()
-            .Where(t => (t.DateSource != DateSource.Manual || today.IsOverdue(t.ScheduledDate)) &&
-                        (today.IsOverdue(t.ScheduledDate) || t.ScheduledDate == null))
-            .ToList();
-    }
+    public List<TaskItem> GetRecurringCandidatesForPlanner() => Context.FindRecurringCandidatesForPlanner();
 
     #endregion
 
@@ -336,93 +306,7 @@ public class TaskRepository(
     {
         lock (CacheLock)
         {
-            var hasChanges = false;
-
-            // 1. Нормализация неназначенных дат: если ScheduledDate == null и DateSource не AutoFlexible
-            var tasksToNormalize = Context.Tasks
-                .Where(t => t.ScheduledDate == null && (t.DateSource == DateSource.Manual || t.DateSource == DateSource.AutoFixed))
-                .ToList();
-
-            if (tasksToNormalize.Count > 0)
-            {
-                foreach (var task in tasksToNormalize)
-                {
-                    task.DateSource = DateSource.AutoFlexible;
-                    task.LastChangesOn = DateTime.UtcNow;
-                }
-                hasChanges = true;
-            }
-
-            var today = TodoDay.Today;
-
-            // 1.2. Нормализация просроченных задач с ручной датой:
-            // Просроченная задача с DateSource.Manual переводится в AutoFlexible для перераспределения.
-            // Логика AutoFixed затронута быть не должна.
-            var overdueManualTasks = Context.Tasks
-                .Where(t => t.ParentTaskId == null)
-                .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
-                .Where(t => t.DateSource == DateSource.Manual)
-                .ToList()
-                .Where(t => today.IsOverdue(t.ScheduledDate))
-                .ToList();
-
-            if (overdueManualTasks.Count > 0)
-            {
-                foreach (var task in overdueManualTasks)
-                {
-                    task.DateSource = DateSource.AutoFlexible;
-                    task.LastChangesOn = DateTime.UtcNow;
-                }
-                hasChanges = true;
-            }
-
-            var todayDt = today.ToDateTime();
-
-            // Собираем из базы все задачи для анализа серии повторений без N+1 запросов
-            var allTasks = Context.Tasks.AsNoTracking().ToList();
-
-            var lastCompletedDates = allTasks
-                .Where(t => t is { Status: TaskStatus.Completed, CompletedDate: not null })
-                .GroupBy(t => t.RecurrenceSourceId ?? t.Id)
-                .ToDictionary(g => g.Key, g => g.Max(t => t.CompletedDate!.Value));
-
-            var activeRecurringTasks = Context.Tasks
-                .Where(t => t.ParentTaskId == null)
-                .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
-                .Where(t => t.IsRecurring || t.RecurrenceSourceId != null)
-                .Where(t => t.DateSource != DateSource.Manual)
-                .ToList();
-
-            foreach (var task in activeRecurringTasks)
-            {
-                var sourceId = task.RecurrenceSourceId ?? task.Id;
-                DateTime? nextDate = null;
-
-                if (lastCompletedDates.TryGetValue(sourceId, out var lastCompleted))
-                {
-                    nextDate = _recurrenceService.CalculateNextRecurrenceDateFromBase(task, lastCompleted);
-                }
-
-                // Если задача не выполнялась вовсе или рассчитанный очередной срок <= today, значит просрочена/должна выполняться сегодня
-                DateTime targetDate;
-                if (nextDate == null || nextDate.Value.Date <= todayDt.Date)
-                {
-                    targetDate = todayDt;
-                }
-                else
-                {
-                    targetDate = nextDate.Value.Date;
-                }
-
-                if (task.ScheduledDate != targetDate || task.DateSource != DateSource.AutoFixed)
-                {
-                    task.ScheduledDate = targetDate;
-                    task.DateSource = DateSource.AutoFixed;
-                    task.LastChangesOn = DateTime.UtcNow;
-                    hasChanges = true;
-                }
-            }
-
+            var hasChanges = TaskDateNormalizer.NormalizeDateSources(Context, _recurrenceService);
             if (hasChanges && saveChanges)
             {
                 Context.SaveChanges();
