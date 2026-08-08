@@ -102,14 +102,15 @@
                     </div>
                 </MudItem>
 
-                @* === ТЕГИ === *@
+                @* === ТЕГИ И УСЛОВИЯ === *@
                 @if (!IsSubtaskMode)
                 {
                     <MudItem xs="12">
-                        <TagInput SuggestedTags="_suggestedTags" SelectedTags="_selectedTags"
-                                  SelectedTagIds="_selectedTagIds"
-                                  OnTagAdded="@(async (Tag t) => await AddTag(t))"
-                                  OnTagRemoved="@(async (Tag t) =>
+                        <TagInput SuggestedLabels="_suggestedTags"
+                                  SelectedLabels="_selectedTags"
+                                  SelectedLabelIds="_selectedTagIds"
+                                  OnLabelAdded="@(async (Tag t) => await AddTag(t))"
+                                  OnLabelRemoved="@(async (Tag t) =>
                                                 {
                                                     RemoveTag(t);
                                                     await RefreshSuggestedTags();
@@ -118,10 +119,11 @@
                     </MudItem>
 
                     <MudItem xs="12">
-                        <ConditionInput SelectedConditions="_selectedConditions"
-                                        SelectedConditionIds="_selectedConditionIds"
-                                        OnConditionAdded="@(async (ExternalCondition c) => { if (!_selectedConditionIds.Contains(c.Id)) { _selectedConditions.Add(c); _selectedConditionIds.Add(c.Id); } await InvokeAsync(StateHasChanged); })"
-                                        OnConditionRemoved="@((ExternalCondition c) => { _selectedConditions.RemoveAll(x => x.Id == c.Id); _selectedConditionIds.Remove(c.Id); InvokeAsync(StateHasChanged); })" />
+                        <ConditionInput SuggestedLabels="_suggestedConditions"
+                                        SelectedLabels="_selectedConditions"
+                                        SelectedLabelIds="_selectedConditionIds"
+                                        OnLabelAdded="@(async (ExternalCondition c) => { await RefreshSuggestedConditions(); await InvokeAsync(StateHasChanged); })"
+                                        OnLabelRemoved="@(async (ExternalCondition c) => { await RefreshSuggestedConditions(); await InvokeAsync(StateHasChanged); })" />
                     </MudItem>
                 }
 

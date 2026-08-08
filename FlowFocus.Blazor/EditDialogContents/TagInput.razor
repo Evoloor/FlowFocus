@@ -1,36 +1,41 @@
+@inherits LabelInputBase<Tag>
 @inject ITagRepository TagRepo
 @inject ITagSessionService TagSessionService
 
 <div class="tag-input-container">
     <MudText Typo="Typo.subtitle2" Class="mb-2">Теги</MudText>
-    <div class="suggested-tags mb-3">
-        @foreach (var tag in SuggestedTags)
-        {
-            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Add" IconColor="Color.Primary"
-                     Style="@($"background-color: {tag.BackgroundColor}40; color: #333; border-color: {tag.BackgroundColor}; cursor: pointer;")"
-                     OnClick="@(async () => await AddTag(tag))">
-                @tag.Name
-            </MudChip>
-        }
-    </div>
+    
+    @if (SuggestedLabels.Any())
+    {
+        <div class="suggested-tags mb-3">
+            @foreach (var tag in SuggestedLabels)
+            {
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Add" IconColor="Color.Primary"
+                         Style="@($"background-color: {tag.BackgroundColor}40; color: #333; border-color: {tag.BackgroundColor}; cursor: pointer;")"
+                         OnClick="@(async () => await AddLabel(tag))">
+                    @tag.Name
+                </MudChip>
+            }
+        </div>
+    }
 
     <div class="d-flex gap-2 align-end mb-3">
-        <MudTextField T="string" @bind-Value="NewTagInput" @bind-Value:after="OnTagInputChanged"
+        <MudTextField T="string" @bind-Value="NewInput" @bind-Value:after="OnInputChanged"
                      Label="Название тега или поиск" Variant="Variant.Outlined" Margin="Margin.Dense"
-                     OnKeyDown="OnTagKeyDown" Immediate="true" Clearable="true" Class="flex-grow-1" @ref="_tagInputRef" @key="_inputResetKey" />
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddNewTag" Disabled="@IsAddTagButtonDisabled" TabIndex="-1" @onmousedown:preventDefault="true">
+                     OnKeyDown="OnKeyDown" Immediate="true" Clearable="true" Class="flex-grow-1" @ref="InputRef" @key="InputResetKey" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddNew" Disabled="@IsAddButtonDisabled" TabIndex="-1" @onmousedown:preventDefault="true">
             Добавить
         </MudButton>
     </div>
 
-    @if (TagSearchResults.Any() && !string.IsNullOrWhiteSpace(NewTagInput))
+    @if (SearchResults.Any() && !string.IsNullOrWhiteSpace(NewInput))
     {
         <div class="tag-search-results mt-2">
             <MudText Typo="Typo.caption" Class="mb-1 text-muted">Результаты поиска:</MudText>
             <div class="search-result-tags">
-                @foreach (var tag in TagSearchResults.Where(tag => !SelectedTagIds.Contains(tag.Id)))
+                @foreach (var tag in SearchResults.Where(tag => !SelectedLabelIds.Contains(tag.Id)))
                 {
-                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Style="@($"background-color: {tag.BackgroundColor}40; color: #333; border-color: {tag.BackgroundColor}; cursor: pointer;")" OnClick="@(() => SelectExistingTag(tag))">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Style="@($"background-color: {tag.BackgroundColor}40; color: #333; border-color: {tag.BackgroundColor}; cursor: pointer;")" OnClick="@(() => AddLabel(tag))">
                         @tag.Name
                     </MudChip>
                 }
@@ -38,13 +43,13 @@
         </div>
     }
 
-    @if (SelectedTags.Any())
+    @if (SelectedLabels.Any())
     {
         <MudText Typo="Typo.caption" Class="mt-2 mb-1 font-weight-medium">Выбранные:</MudText>
         <div class="selected-tags">
-            @foreach (var tag in SelectedTags)
+            @foreach (var tag in SelectedLabels)
             {
-                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Style="@($"background-color: {tag.BackgroundColor}; color: #333;")" OnClose="@(() => RemoveTag(tag))">
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Style="@($"background-color: {tag.BackgroundColor}; color: #333;")" OnClose="@(() => RemoveLabel(tag))">
                     @tag.Name
                 </MudChip>
             }
@@ -53,134 +58,12 @@
 </div>
 
 @code {
-    [Parameter]
-    public List<Tag> SuggestedTags { get; set; } = [];
-
-    [Parameter]
-    public List<Tag> SelectedTags { get; set; } = [];
-
-    [Parameter]
-    public HashSet<int> SelectedTagIds { get; set; } = [];
-
-    [Parameter]
-    public EventCallback<Tag> OnTagAdded { get; set; }
-
-    [Parameter]
-    public EventCallback<Tag> OnTagRemoved { get; set; }
-
-    private string NewTagInput { get; set; } = string.Empty;
-    private List<Tag> TagSearchResults { get; set; } = [];
-
-    private MudTextField<string>? _tagInputRef;
-    private int _inputResetKey;
-
-    // Use safe null-aware checks to avoid NullReferenceException when NewTagInput is null
-    private bool IsAddTagButtonDisabled => string.IsNullOrWhiteSpace(NewTagInput);
-
-    private async Task OnTagInputChanged()
+    protected override List<Tag> SearchLabels(string query) => TagRepo.SearchByName(query);
+    protected override Tag? GetByName(string name) => TagRepo.GetByName(name);
+    protected override Tag GetOrCreate(string name)
     {
-        if (string.IsNullOrWhiteSpace(NewTagInput))
-        {
-            TagSearchResults = [];
-            await InvokeAsync(StateHasChanged);
-            return;
-        }
-
-        TagSearchResults = TagRepo.SearchByName(NewTagInput);
-        await InvokeAsync(StateHasChanged);
-    }
-
-    private async Task OnTagKeyDown(KeyboardEventArgs e)
-    {
-        // Avoid calling Trim() on possibly-null NewTagInput
-        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(NewTagInput))
-        {
-            await AddNewTag();
-        }
-        else if (e.Key == "Escape")
-        {
-            // Сбрасываем значение и очистим внутреннее состояние текстового поля
-            NewTagInput = string.Empty;
-            TagSearchResults = [];
-            await InvokeAsync(StateHasChanged);
-            await Task.Yield();
-            // Пересоздадим компонент поля, чтобы гарантированно сбросить его внутреннее значение
-            _inputResetKey++;
-            // Убедимся, что компонент пересоздан и _tagInputRef привязан к новому экземпляру
-            await InvokeAsync(StateHasChanged);
-            await Task.Yield();
-            await Task.Delay(30);
-            if (_tagInputRef != null)
-            {
-                await _tagInputRef.FocusAsync();
-            }
-        }
-    }
-
-    private async Task AddNewTag()
-    {
-        if (string.IsNullOrWhiteSpace(NewTagInput)) return;
-
-        var tagName = NewTagInput.Trim();
-        var existing = TagRepo.GetByName(tagName);
-        if (existing != null)
-        {
-            await AddTag(existing);
-        }
-        else
-        {
-            var created = TagRepo.GetOrCreate(tagName);
-            await AddTag(created);
-        }
-
-        // Очистим поле ввода и результаты поиска, обновим UI и вернём фокус
-        NewTagInput = string.Empty;
-        TagSearchResults = [];
-        await InvokeAsync(StateHasChanged);
-        await Task.Yield();
-        // Пересоздадим компонент поля, чтобы убедиться, что внутреннее состояние сброшено
-        _inputResetKey++;
-        await InvokeAsync(StateHasChanged);
-        await Task.Yield();
-        await Task.Delay(30);
-        if (_tagInputRef != null)
-        {
-            await _tagInputRef.FocusAsync();
-        }
-    }
-
-    private async Task AddTag(Tag tag)
-    {
-        if (SelectedTagIds.Contains(tag.Id)) return;
-        SelectedTags.Add(tag);
-        SelectedTagIds.Add(tag.Id);
+        var tag = TagRepo.GetOrCreate(name);
         TagSessionService.MarkTagUsed(tag);
-        await OnTagAdded.InvokeAsync(tag);
-
-        // Очистим поле ввода после выбора тега и вернём фокус
-        NewTagInput = string.Empty;
-        TagSearchResults = [];
-        await InvokeAsync(StateHasChanged);
-        await Task.Yield();
-        _inputResetKey++;
-        await InvokeAsync(StateHasChanged);
-        await Task.Yield();
-        await Task.Delay(30);
-        if (_tagInputRef != null)
-        {
-            await _tagInputRef.FocusAsync();
-        }
-    }
-
-    private async Task SelectExistingTag(Tag tag)
-    {
-        await AddTag(tag);
-    }
-
-    private async Task RemoveTag(Tag tag)
-    {
-        SelectedTags.Remove(tag);
-        SelectedTagIds.Remove(tag.Id);
-        await OnTagRemoved.InvokeAsync(tag);
+        return tag;
     }
 }

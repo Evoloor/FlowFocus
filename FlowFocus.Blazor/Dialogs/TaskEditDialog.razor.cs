@@ -18,6 +18,7 @@ public partial class TaskEditDialog
     [Inject] public ISettingsRepository SettingsRepo { get; set; } = null!;
     [Inject] public IPriorityRepository PriorityRepo { get; set; } = null!;
     [Inject] public ITagRepository TagRepo { get; set; } = null!;
+    [Inject] public IExternalConditionRepository ConditionRepo { get; set; } = null!;
     [Inject] public ITagSessionService TagSessionService { get; set; } = null!;
     [Inject] public IPlannerService PlannerService { get; set; } = null!;
     [Inject] public INotificationService NotificationService { get; set; } = null!;
@@ -110,8 +111,9 @@ public partial class TaskEditDialog
         // Инициализируем флаг отслеживания повторяемости
         _wasRecurring = _task.IsRecurring;
 
-        // Обновим предлагаемые теги с учётом уже выбранных
+        // Обновим предлагаемые теги и условия с учётом уже выбранных
         await RefreshSuggestedTags();
+        await RefreshSuggestedConditions();
     }
 
     private void LoadExistingTaskData()
@@ -514,6 +516,8 @@ public partial class TaskEditDialog
         return false;
     }
 
+    private List<ExternalCondition> _suggestedConditions = [];
+
     private async Task RefreshSuggestedTags()
     {
         var allSuggested = TagSessionService.GetSuggestedTags(10);
@@ -528,6 +532,18 @@ public partial class TaskEditDialog
                 _suggestedTags.Add(tag);
             }
         }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RefreshSuggestedConditions()
+    {
+        var allConditions = ConditionRepo.GetAll();
+        _suggestedConditions = allConditions
+            .Where(c => !_selectedConditionIds.Contains(c.Id))
+            .OrderByDescending(c => c.UsageCount)
+            .Take(5)
+            .ToList();
 
         await InvokeAsync(StateHasChanged);
     }

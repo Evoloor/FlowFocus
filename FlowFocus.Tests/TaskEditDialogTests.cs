@@ -42,6 +42,7 @@ public class TaskEditDialogTests : IntegrationTestBase
         _ctx.Services.AddSingleton<ITaskRepository>(TaskRepo);
         _ctx.Services.AddSingleton<IPriorityRepository>(PriorityRepo);
         _ctx.Services.AddSingleton<ITagRepository>(TagRepo);
+        _ctx.Services.AddSingleton<IExternalConditionRepository>(ConditionRepo);
         _ctx.Services.AddSingleton<ISettingsRepository>(_settingsRepo);
         _ctx.Services.AddSingleton<ITagSessionService>(_tagSessionService);
         _ctx.Services.AddSingleton<IPlannerService>(PlannerService);
