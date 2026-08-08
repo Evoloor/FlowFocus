@@ -41,7 +41,8 @@ public static class TaskFilterEvaluator
         IEnumerable<TaskStatus?>? selectedStatuses,
         DurationFilter durationFilter,
         IEnumerable<int?> selectedTagIds,
-        bool hideWithDates)
+        bool hideWithDates,
+        IEnumerable<int?>? selectedConditionIds = null)
     {
         if (!string.IsNullOrWhiteSpace(searchQuery))
         {
@@ -72,10 +73,24 @@ public static class TaskFilterEvaluator
             _ => tasks
         };
 
-        if (selectedTagIds.Any())
+        if (selectedTagIds != null && selectedTagIds.Any())
         {
-            var tagIds = selectedTagIds.Where(id => id != null).Cast<int>().ToList();
-            tasks = tasks.Where(t => t.Tags.Any(tt => tagIds.Contains(tt.TagId)));
+            var hasNoTags = selectedTagIds.Contains(0) || selectedTagIds.Contains(null);
+            var tagIds = selectedTagIds.Where(id => id != null && id != 0).Cast<int>().ToList();
+
+            tasks = tasks.Where(t =>
+                (hasNoTags && !t.Tags.Any()) ||
+                (tagIds.Count > 0 && t.Tags.Any(tt => tagIds.Contains(tt.TagId))));
+        }
+
+        if (selectedConditionIds != null && selectedConditionIds.Any())
+        {
+            var hasNoConditions = selectedConditionIds.Contains(0) || selectedConditionIds.Contains(null);
+            var conditionIds = selectedConditionIds.Where(id => id != null && id != 0).Cast<int>().ToList();
+
+            tasks = tasks.Where(t =>
+                (hasNoConditions && !t.Conditions.Any()) ||
+                (conditionIds.Count > 0 && t.Conditions.Any(tc => conditionIds.Contains(tc.ConditionId))));
         }
 
         if (hideWithDates)

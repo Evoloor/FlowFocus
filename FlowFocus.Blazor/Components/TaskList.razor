@@ -95,14 +95,29 @@
                     </MudSelect>
 
                     @* Фильтр по тегам *@
-                    @if (_availableTags.Count > 1)
+                    @if (_availableTags.Count > 0)
                     {
                         <MudSelect T="int?" @bind-SelectedValues="_selectedTagIds" Label="Теги"
                                    MultiSelection="true" Variant="Variant.Outlined" Margin="Margin.Dense"
                                    Dense="true">
+                            <MudSelectItem T="int?" Value="0">Без тегов</MudSelectItem>
                             @foreach (var tag in _availableTags)
                             {
                                 <MudSelectItem T="int?" Value="tag.Id">@tag.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+
+                    @* Фильтр по внешним условиям *@
+                    @if (_availableConditions.Count > 0)
+                    {
+                        <MudSelect T="int?" @bind-SelectedValues="_selectedConditionIds" Label="Условия"
+                                   MultiSelection="true" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                   Dense="true">
+                            <MudSelectItem T="int?" Value="0">Без условий</MudSelectItem>
+                            @foreach (var cond in _availableConditions)
+                            {
+                                <MudSelectItem T="int?" Value="cond.Id">@cond.Name</MudSelectItem>
                             }
                         </MudSelect>
                     }

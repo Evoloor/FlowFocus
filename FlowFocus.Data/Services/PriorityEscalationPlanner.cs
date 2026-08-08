@@ -91,19 +91,13 @@ public class PriorityEscalationPlanner(ITaskRepository taskRepository)
             if (task.Status is TaskStatus.Completed or TaskStatus.Irrelevant)
                 continue;
 
-            List<TaskItem?> blockers = [];
+            var isBlocked = FlowFocus.Core.Helpers.TaskStatusCalculator.IsTaskBlocked(task);
 
-            blockers.AddRange(task.InverseRelations
-                .Where(r => r.Type == RelationType.Blocks)
-                .Select(r => r.SourceTask));
-
-            var hasActiveBlockers = blockers.Any(b => b != null && b.Status != TaskStatus.Completed && b.Status != TaskStatus.Irrelevant);
-
-            if (hasActiveBlockers && task.Status != TaskStatus.Blocked)
+            if (isBlocked && task.Status != TaskStatus.Blocked)
             {
                 taskRepository.UpdateTaskStatus(task.Id, TaskStatus.Blocked, saveChanges: false);
             }
-            else if (!hasActiveBlockers && task.Status == TaskStatus.Blocked)
+            else if (!isBlocked && task.Status == TaskStatus.Blocked)
             {
                 taskRepository.UpdateTaskStatus(task.Id, TaskStatus.Planned, saveChanges: false);
             }

@@ -7,9 +7,7 @@
         {
             <MudChip T="string" Size="Size.Small"
                      Variant="Variant.Filled"
-                     Style="@($"background-color: {taskTag.Tag.BackgroundColor}; color: #333; border: none; cursor: default;")"
-                     Clickable="false"
-                     Deletable="false">
+                     Style="@($"background-color: {taskTag.Tag.BackgroundColor}; color: #333; border: none; cursor: default;")">
                 @taskTag.Tag.Name
             </MudChip>
         }

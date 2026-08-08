@@ -13,14 +13,21 @@ namespace FlowFocus.Data.Repositories;
 /// <summary>
 /// Репозиторий задач (Чистый Data Access & Queries)
 /// </summary>
-public class TaskRepository(
-    StorageContext context,
-    INotificationService notificationService,
-    ITaskRecurrenceService? recurrenceService = null)
-    : CachedRepository<TaskItem>(context, notificationService), ITaskRepository
+public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
 {
-    private readonly Lazy<TagRepository> _tagRepository = new(() => new TagRepository(context, notificationService));
-    private readonly ITaskRecurrenceService _recurrenceService = recurrenceService ?? new TaskRecurrenceService();
+    private readonly Lazy<TagRepository> _tagRepository;
+    private readonly ITaskRecurrenceService _recurrenceService;
+
+    public TaskRepository(
+        StorageContext context,
+        INotificationService notificationService,
+        ITaskRecurrenceService? recurrenceService = null)
+        : base(context, notificationService)
+    {
+        _tagRepository = new Lazy<TagRepository>(() => new TagRepository(context, notificationService));
+        _recurrenceService = recurrenceService ?? new TaskRecurrenceService();
+        notificationService.OnTasksChanged += RefreshCache;
+    }
 
     protected override DbSet<TaskItem> GetDbSet() => Context.Tasks;
 
@@ -58,6 +65,7 @@ public class TaskRepository(
 
             var trackedEntity = GetTrackedQuery()
                 .Include(t => t.Tags)
+                .Include(t => t.Conditions).ThenInclude(tc => tc.Condition)
                 .Include(t => t.Subtasks)
                 .Include(t => t.Relations)
                 .Include(t => t.InverseRelations)
@@ -77,18 +85,14 @@ public class TaskRepository(
             Context.Entry(trackedEntity).CurrentValues.SetValues(entity);
 
             var removedTagIds = TaskGraphSyncHelper.UpdateTags(Context, trackedEntity, entity);
+            TaskGraphSyncHelper.UpdateConditions(Context, trackedEntity, entity);
             TaskGraphSyncHelper.UpdateSubtasks(Context, trackedEntity, entity);
             TaskGraphSyncHelper.UpdateRelations(Context, trackedEntity, entity);
             TaskGraphSyncHelper.UpdateEscalations(Context, trackedEntity, entity);
 
             if (trackedEntity.Status != TaskStatus.Completed && trackedEntity.Status != TaskStatus.Irrelevant)
             {
-                var incomingBlockers = Context.TaskRelations
-                    .Where(r => r.TargetTaskId == entity.Id && r.Type == RelationType.Blocks)
-                    .Select(r => r.SourceTask)
-                    .ToList();
-                var hasActiveBlockers = incomingBlockers.Any(b => b != null && b.Status != TaskStatus.Completed && b.Status != TaskStatus.Irrelevant);
-                if (hasActiveBlockers)
+                if (FlowFocus.Core.Helpers.TaskStatusCalculator.IsTaskBlocked(trackedEntity))
                 {
                     trackedEntity.Status = TaskStatus.Blocked;
                 }
@@ -108,6 +112,7 @@ public class TaskRepository(
         {
             var task = GetTrackedQuery()
                 .Include(t => t.Tags)
+                .Include(t => t.Conditions)
                 .FirstOrDefault(e => e.Id == id);
 
             if (task == null) return;
@@ -150,6 +155,7 @@ public class TaskRepository(
             .AsNoTracking()
             .Include(t => t.Priority)
             .Include(t => t.Tags).ThenInclude(tt => tt.Tag)
+            .Include(t => t.Conditions).ThenInclude(tc => tc.Condition)
             .Include(t => t.Relations).ThenInclude(r => r.TargetTask)
             .Include(t => t.InverseRelations).ThenInclude(r => r.SourceTask)
             .Include(t => t.Subtasks)
@@ -183,6 +189,7 @@ public class TaskRepository(
         var today = TodoDay.Today;
         return GetActiveRootTasks()
             .Where(t => t.ScheduledDate != null && today.IsOverdue(t.ScheduledDate))
+            .Where(t => !t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))
             .ToList();
     }
 

@@ -40,6 +40,8 @@ public partial class TaskEditDialog
     private List<Tag> _suggestedTags = [];
     private List<Tag> _selectedTags = [];
     private HashSet<int> _selectedTagIds = [];
+    private List<ExternalCondition> _selectedConditions = [];
+    private HashSet<int> _selectedConditionIds = [];
     // Исходные id тегов при открытии диалога — нужны для расчёта удалённых тегов при сохранении
     private HashSet<int> _originalTagIds = [];
     private List<SubtaskDto> _subtasks = [];
@@ -132,6 +134,17 @@ public partial class TaskEditDialog
             _selectedTags = [];
             _selectedTagIds = [];
             _originalTagIds = [];
+        }
+
+        if (source != null && source.Conditions.Any())
+        {
+            _selectedConditions = source.Conditions.Select(tc => tc.Condition).Where(c => c != null).ToList();
+            _selectedConditionIds = _selectedConditions.Select(c => c.Id).ToHashSet();
+        }
+        else
+        {
+            _selectedConditions = [];
+            _selectedConditionIds = [];
         }
 
         _subtasks = (source?.Subtasks ?? []).Select(s => new SubtaskDto
@@ -312,6 +325,11 @@ public partial class TaskEditDialog
             _task.Tags = _selectedTags.Select(tag => new TaskTag
             {
                 TagId = tag.Id,
+            }).ToList();
+
+            _task.Conditions = _selectedConditions.Select(cond => new TaskCondition
+            {
+                ConditionId = cond.Id,
             }).ToList();
 
             var existingTracked = ExistingTask is { Id: > 0 } ? TaskRepo.GetById(ExistingTask.Id) : null;

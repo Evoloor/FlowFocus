@@ -18,15 +18,19 @@ public abstract class IntegrationTestBase : IDisposable
     protected TaskRepository TaskRepo { get; }
     protected PriorityRepository PriorityRepo { get; }
     protected TagRepository TagRepo { get; }
+    protected ExternalConditionRepository ConditionRepo { get; }
+    protected SettingsRepository SettingsRepo { get; }
     protected PlannerService PlannerService { get; }
 
     protected IntegrationTestBase()
     {
         (Context, _sqliteConnection) = TestDbContextFactory.CreateSqliteContext();
-        NotificationService = Substitute.For<INotificationService>();
+        NotificationService = new NotificationService();
         TaskRepo = new TaskRepository(Context, NotificationService);
         PriorityRepo = new PriorityRepository(Context, NotificationService);
         TagRepo = new TagRepository(Context, NotificationService);
+        ConditionRepo = new ExternalConditionRepository(Context, NotificationService);
+        SettingsRepo = new SettingsRepository(Context, NotificationService);
         PlannerService = new PlannerService(TaskRepo);
     }
 

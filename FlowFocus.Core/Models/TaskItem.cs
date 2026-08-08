@@ -98,6 +98,9 @@ public class TaskItem : IAuditEntity
     /// <summary>Теги задачи</summary>
     public List<TaskTag> Tags { get; set; } = [];
 
+    /// <summary>Внешние условия задачи</summary>
+    public List<TaskCondition> Conditions { get; set; } = [];
+
     /// <summary>Связи с другими задачами</summary>
     public List<TaskRelation> Relations { get; set; } = [];
 
@@ -110,10 +113,11 @@ public class TaskItem : IAuditEntity
     // === Вычисляемые свойства ===
     [NotMapped]
     public bool IsBlocked =>
-        // Учёт через обратные связи, где другая задача имеет тип Blocks (SourceTask -> this)
+        // Учёт через обратные связи (блокеры) или неактивные внешние условия
         InverseRelations.Any(r => r.Type == RelationType.Blocks &&
                                    r.SourceTask?.Status != TaskStatus.Completed &&
-                                   r.SourceTask?.Status != TaskStatus.Irrelevant);
+                                   r.SourceTask?.Status != TaskStatus.Irrelevant)
+        || Conditions.Any(c => c.Condition != null && !c.Condition.IsActive);
 
     [NotMapped]
     public bool IsSubtask => ParentTaskId != null;

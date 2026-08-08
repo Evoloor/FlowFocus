@@ -1,0 +1,170 @@
+@inject IExternalConditionRepository ConditionRepo
+
+<div class="condition-input-container">
+    <MudText Typo="Typo.subtitle2" Class="mb-2">Внешние условия</MudText>
+
+    <div class="d-flex gap-2 align-end mb-3">
+        <MudTextField T="string" @bind-Value="NewConditionInput" @bind-Value:after="OnConditionInputChanged"
+                     Label="Название условия или поиск" Variant="Variant.Outlined" Margin="Margin.Dense"
+                     OnKeyDown="OnConditionKeyDown" Immediate="true" Clearable="true" Class="flex-grow-1" @ref="_conditionInputRef" @key="_inputResetKey" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddNewCondition" Disabled="@IsAddButtonDisabled" TabIndex="-1" @onmousedown:preventDefault="true">
+            Добавить
+        </MudButton>
+    </div>
+
+    @if (SearchResults.Any() && !string.IsNullOrWhiteSpace(NewConditionInput))
+    {
+        <div class="condition-search-results mt-2">
+            <MudText Typo="Typo.caption" Class="mb-1 text-muted">Результаты поиска:</MudText>
+            <div class="search-result-conditions">
+                @foreach (var cond in SearchResults.Where(c => !SelectedConditionIds.Contains(c.Id)))
+                {
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Style="@($"background-color: {cond.BackgroundColor}40; color: #333; border-color: {cond.BackgroundColor}; cursor: pointer;")" OnClick="@(() => SelectExistingCondition(cond))">
+                        @cond.Name
+                    </MudChip>
+                }
+            </div>
+        </div>
+    }
+
+    @if (SelectedConditions.Any())
+    {
+        <MudText Typo="Typo.caption" Class="mt-2 mb-1 font-weight-medium">Выбранные условия:</MudText>
+        <div class="selected-conditions d-flex flex-wrap gap-1">
+            @foreach (var cond in SelectedConditions)
+            {
+                var icon = cond.IsActive ? Icons.Material.Filled.Check : Icons.Material.Filled.Lock;
+                var chipColor = cond.IsActive ? "#E8F5E9" : "#FFEBEE";
+                var textColor = cond.IsActive ? "#2E7D32" : "#C62828";
+                var borderStyle = cond.IsActive ? "1px solid #A5D6A7" : "1px solid #EF9A9A";
+
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Icon="@icon"
+                         Style="@($"background-color: {chipColor}; color: {textColor}; border: {borderStyle}; font-weight: 500;")"
+                         OnClose="@(() => RemoveCondition(cond))">
+                    @cond.Name
+                </MudChip>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public List<ExternalCondition> SelectedConditions { get; set; } = [];
+
+    [Parameter]
+    public HashSet<int> SelectedConditionIds { get; set; } = [];
+
+    [Parameter]
+    public EventCallback<ExternalCondition> OnConditionAdded { get; set; }
+
+    [Parameter]
+    public EventCallback<ExternalCondition> OnConditionRemoved { get; set; }
+
+    private string NewConditionInput { get; set; } = string.Empty;
+    private List<ExternalCondition> SearchResults { get; set; } = [];
+
+    private MudTextField<string>? _conditionInputRef;
+    private int _inputResetKey;
+
+    private bool IsAddButtonDisabled => string.IsNullOrWhiteSpace(NewConditionInput);
+
+    private async Task OnConditionInputChanged()
+    {
+        if (string.IsNullOrWhiteSpace(NewConditionInput))
+        {
+            SearchResults = [];
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        SearchResults = ConditionRepo.SearchByName(NewConditionInput);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnConditionKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(NewConditionInput))
+        {
+            await AddNewCondition();
+        }
+        else if (e.Key == "Escape")
+        {
+            NewConditionInput = string.Empty;
+            SearchResults = [];
+            await InvokeAsync(StateHasChanged);
+            await Task.Yield();
+            _inputResetKey++;
+            await InvokeAsync(StateHasChanged);
+            await Task.Yield();
+            await Task.Delay(30);
+            if (_conditionInputRef != null)
+            {
+                await _conditionInputRef.FocusAsync();
+            }
+        }
+    }
+
+    private async Task AddNewCondition()
+    {
+        if (string.IsNullOrWhiteSpace(NewConditionInput)) return;
+
+        var name = NewConditionInput.Trim();
+        var existing = ConditionRepo.GetByName(name);
+        if (existing != null)
+        {
+            await AddCondition(existing);
+        }
+        else
+        {
+            var created = ConditionRepo.GetOrCreate(name);
+            await AddCondition(created);
+        }
+
+        NewConditionInput = string.Empty;
+        SearchResults = [];
+        await InvokeAsync(StateHasChanged);
+        await Task.Yield();
+        _inputResetKey++;
+        await InvokeAsync(StateHasChanged);
+        await Task.Yield();
+        await Task.Delay(30);
+        if (_conditionInputRef != null)
+        {
+            await _conditionInputRef.FocusAsync();
+        }
+    }
+
+    private async Task AddCondition(ExternalCondition condition)
+    {
+        if (SelectedConditionIds.Contains(condition.Id)) return;
+        SelectedConditions.Add(condition);
+        SelectedConditionIds.Add(condition.Id);
+        await OnConditionAdded.InvokeAsync(condition);
+
+        NewConditionInput = string.Empty;
+        SearchResults = [];
+        await InvokeAsync(StateHasChanged);
+        await Task.Yield();
+        _inputResetKey++;
+        await InvokeAsync(StateHasChanged);
+        await Task.Yield();
+        await Task.Delay(30);
+        if (_conditionInputRef != null)
+        {
+            await _conditionInputRef.FocusAsync();
+        }
+    }
+
+    private async Task SelectExistingCondition(ExternalCondition condition)
+    {
+        await AddCondition(condition);
+    }
+
+    private async Task RemoveCondition(ExternalCondition condition)
+    {
+        SelectedConditions.Remove(condition);
+        SelectedConditionIds.Remove(condition.Id);
+        await OnConditionRemoved.InvokeAsync(condition);
+    }
+}

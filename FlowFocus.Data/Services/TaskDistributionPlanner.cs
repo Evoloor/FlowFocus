@@ -17,6 +17,7 @@ public class TaskDistributionPlanner(ITaskRepository taskRepository)
             .Where(t => t.ParentTaskId == null)
             .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
             .Where(t => t.DateSource == DateSource.AutoFlexible)
+            .Where(t => !t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))
             .ToList();
 
         foreach (var blocker in unassignedBlockers)
@@ -40,6 +41,7 @@ public class TaskDistributionPlanner(ITaskRepository taskRepository)
             .Where(t => t.ParentTaskId == null)
             .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
             .Where(t => t.DateSource == DateSource.AutoFlexible)
+            .Where(t => !t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))
             .Where(t => t is { IsRecurring: false, RecurrenceSourceId: null })
             .ToList();
 

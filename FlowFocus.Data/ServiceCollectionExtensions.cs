@@ -22,6 +22,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISettingsRepository, SettingsRepository>();
         services.AddScoped<IPriorityRepository, PriorityRepository>();
         services.AddScoped<ITagRepository, TagRepository>();
+        services.AddScoped<IExternalConditionRepository, ExternalConditionRepository>();
 
         // Сервисы
         services.AddScoped<ITaskRecurrenceService, TaskRecurrenceService>();
@@ -43,6 +44,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISettingsRepository, SettingsRepository>();
         services.AddScoped<IPriorityRepository, PriorityRepository>();
         services.AddScoped<ITagRepository, TagRepository>();
+        services.AddScoped<IExternalConditionRepository, ExternalConditionRepository>();
 
         // Сервисы
         services.AddScoped<ITaskRecurrenceService, TaskRecurrenceService>();

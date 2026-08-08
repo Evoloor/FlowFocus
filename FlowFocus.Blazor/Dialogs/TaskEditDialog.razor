@@ -116,6 +116,13 @@
                                                     await InvokeAsync(StateHasChanged);
                                                 })"/>
                     </MudItem>
+
+                    <MudItem xs="12">
+                        <ConditionInput SelectedConditions="_selectedConditions"
+                                        SelectedConditionIds="_selectedConditionIds"
+                                        OnConditionAdded="@(async (ExternalCondition c) => { if (!_selectedConditionIds.Contains(c.Id)) { _selectedConditions.Add(c); _selectedConditionIds.Add(c.Id); } await InvokeAsync(StateHasChanged); })"
+                                        OnConditionRemoved="@((ExternalCondition c) => { _selectedConditions.RemoveAll(x => x.Id == c.Id); _selectedConditionIds.Remove(c.Id); InvokeAsync(StateHasChanged); })" />
+                    </MudItem>
                 }
 
                 @* === РАСШИРЕННЫЕ НАСТРОЙКИ === *@

@@ -10,11 +10,15 @@ public partial class Settings
 {
     [Inject] public ISettingsRepository SettingsRepo { get; set; } = null!;
     [Inject] public IPriorityRepository PriorityRepo { get; set; } = null!;
+    [Inject] public IExternalConditionRepository ConditionRepo { get; set; } = null!;
     [Inject] public INotificationService NotificationService { get; set; } = null!;
     [Inject] public ISnackbar Snackbar { get; set; } = null!;
+    [Inject] public IDialogService DialogService { get; set; } = null!;
 
     private UserSettings _settings = new();
     private List<PriorityItem> _priorityItems = [];
+    private List<ExternalCondition> _conditions = [];
+    private string _newConditionName = string.Empty;
     private int _dailyTimeHours;
 
     private static readonly string[] ColorPalette =
@@ -36,6 +40,7 @@ public partial class Settings
     {
         _settings = SettingsRepo.GetUserSettings();
         _dailyTimeHours = _settings.DailyTimeLimit / 60;
+        _conditions = ConditionRepo.GetAll();
         
         var priorities = PriorityRepo.GetAllOrdered();
         _priorityItems = priorities.Select(p => new PriorityItem
@@ -45,6 +50,39 @@ public partial class Settings
             Name = p.Name,
             Color = p.Color,
         }).ToList();
+    }
+
+    private void AddCondition()
+    {
+        if (string.IsNullOrWhiteSpace(_newConditionName)) return;
+
+        var created = ConditionRepo.GetOrCreate(_newConditionName.Trim());
+        _newConditionName = string.Empty;
+        _conditions = ConditionRepo.GetAll();
+        Snackbar.Add($"Внешнее условие «{created.Name}» добавлено", Severity.Success);
+    }
+
+    private void ToggleConditionActive(ExternalCondition condition, bool isActive)
+    {
+        ConditionRepo.ToggleConditionActive(condition.Id, isActive);
+        _conditions = ConditionRepo.GetAll();
+        var statusMsg = isActive ? "активировано" : "выключено";
+        Snackbar.Add($"Условие «{condition.Name}» {statusMsg}", isActive ? Severity.Success : Severity.Warning);
+    }
+
+    private async Task DeleteConditionWithConfirmation(ExternalCondition condition)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Удаление внешнего условия",
+            $"Вы уверены, что хотите удалить условие \"{condition.Name}\"? Привязанные задачи будут разблокированы, если у них нет других блокеров.",
+            yesText: "Удалить", cancelText: "Отмена");
+
+        if (confirmed == true)
+        {
+            ConditionRepo.DeleteCondition(condition.Id);
+            _conditions = ConditionRepo.GetAll();
+            Snackbar.Add($"Условие «{condition.Name}» удалено", Severity.Info);
+        }
     }
 
     private void OnPriorityDropped(MudItemDropInfo<PriorityItem> info)

@@ -35,6 +35,7 @@ public partial class TaskList : IDisposable
     // === Внутреннее состояние ===
     private List<TaskItem> _allTasks = [];
     private List<Tag> _availableTags = [];
+    private List<ExternalCondition> _availableConditions = [];
     private UserSettings? _settings;
 
     private string _searchQuery = string.Empty;
@@ -44,6 +45,7 @@ public partial class TaskList : IDisposable
     private IEnumerable<TaskStatus?> _selectedStatuses = new List<TaskStatus?> { TaskStatus.Planned, TaskStatus.NotConfigured, TaskStatus.Blocked };
     private DurationFilter _durationFilter = DurationFilter.All;
     private IEnumerable<int?> _selectedTagIds = new List<int?>();
+    private IEnumerable<int?> _selectedConditionIds = new List<int?>();
     private bool _hideWithDates = false;
     private bool _showInactive = false;
 
@@ -114,6 +116,13 @@ public partial class TaskList : IDisposable
             .OrderByDescending(t => t.UsageCount)
             .ToList();
 
+        _availableConditions = _allTasks
+            .SelectMany(t => t.Conditions.Select(tc => tc.Condition))
+            .Where(c => c != null)
+            .DistinctBy(c => c.Id)
+            .OrderByDescending(c => c.UsageCount)
+            .ToList();
+
         _currentPage = 1;
     }
 
@@ -129,6 +138,7 @@ public partial class TaskList : IDisposable
         (ShowFilters && _selectedStatuses.Any()) ||
         _durationFilter != DurationFilter.All ||
         _selectedTagIds.Any() ||
+        _selectedConditionIds.Any() ||
         _hideWithDates ||
         _showInactive;
 
@@ -139,7 +149,7 @@ public partial class TaskList : IDisposable
             var tasks = _allTasks.AsEnumerable();
             tasks = TaskFilterEvaluator.ApplyDefaultFilter(tasks, DefaultFilter, _showInactive);
             var activeStatuses = ShowFilters ? _selectedStatuses : null;
-            tasks = TaskFilterEvaluator.ApplySearchAndFilters(tasks, _searchQuery, _dateRange, activeStatuses, _durationFilter, _selectedTagIds, _hideWithDates);
+            tasks = TaskFilterEvaluator.ApplySearchAndFilters(tasks, _searchQuery, _dateRange, activeStatuses, _durationFilter, _selectedTagIds, _hideWithDates, _selectedConditionIds);
             tasks = TaskFilterEvaluator.ApplySort(tasks, _sortType);
 
             return tasks.ToList();

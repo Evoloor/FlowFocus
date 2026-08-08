@@ -1,0 +1,35 @@
+@namespace FlowFocus.Blazor.Components
+@using FlowFocus.Core.Models
+
+@if (Task.Conditions.Any() && DisplayMode != DisplayMode.Compact)
+{
+    <div class="task-conditions-row">
+        @foreach (var taskCondition in Task.Conditions)
+        {
+            var condition = taskCondition.Condition;
+            if (condition == null) continue;
+
+            var icon = condition.IsActive ? Icons.Material.Filled.Check : Icons.Material.Filled.Lock;
+            var chipColor = condition.IsActive ? "#E8F5E9" : "#FFEBEE";
+            var textColor = condition.IsActive ? "#2E7D32" : "#C62828";
+            var borderStyle = condition.IsActive ? "1px solid #A5D6A7" : "1px solid #EF9A9A";
+
+            <MudChip T="string" Size="Size.Small"
+                     Variant="Variant.Filled"
+                     Icon="@icon"
+                     Style="@($"background-color: {chipColor}; color: {textColor}; border: {borderStyle}; font-weight: 500; cursor: default;")"
+                     Clickable="false"
+                     Deletable="false">
+                @condition.Name
+            </MudChip>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public TaskItem Task { get; set; } = null!;
+
+    [Parameter]
+    public DisplayMode DisplayMode { get; set; }
+}

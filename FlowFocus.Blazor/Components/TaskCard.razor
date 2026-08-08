@@ -26,6 +26,8 @@
 
             <TaskRecurrenceRow Task="Task" DisplayMode="DisplayMode" />
 
+            <TaskConditions Task="Task" DisplayMode="DisplayMode" />
+
             <TaskTags Task="Task" DisplayMode="DisplayMode" />
 
             <TaskRelationsPanel Task="Task" IsNested="IsNested" OnTaskChanged="OnTaskChanged" />
@@ -103,6 +105,7 @@
     }
 
     .task-settings-row,
+    .task-conditions-row,
     .task-tags-row {
         display: flex;
         flex-wrap: wrap;

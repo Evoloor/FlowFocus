@@ -53,6 +53,27 @@ public static class TaskDateNormalizer
             hasChanges = true;
         }
 
+        // 1.3. Сброс дат для заблокированных неактивным условием повторяющихся задач ("улетают" из расписания)
+        var blockedRecurringTasks = context.Tasks
+            .Include(t => t.Conditions).ThenInclude(tc => tc.Condition)
+            .Where(t => t.ParentTaskId == null)
+            .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
+            .Where(t => t.IsRecurring || t.RecurrenceSourceId != null)
+            .Where(t => t.DateSource != DateSource.Manual)
+            .Where(t => t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))
+            .Where(t => t.ScheduledDate != null)
+            .ToList();
+
+        if (blockedRecurringTasks.Count > 0)
+        {
+            foreach (var task in blockedRecurringTasks)
+            {
+                task.ScheduledDate = null;
+                task.LastChangesOn = DateTime.UtcNow;
+            }
+            hasChanges = true;
+        }
+
         var todayDt = today.ToDateTime();
 
         // Собираем из базы все задачи для анализа серии повторений без N+1 запросов
@@ -64,10 +85,12 @@ public static class TaskDateNormalizer
             .ToDictionary(g => g.Key, g => g.Max(t => t.CompletedDate!.Value));
 
         var activeRecurringTasks = context.Tasks
+            .Include(t => t.Conditions).ThenInclude(tc => tc.Condition)
             .Where(t => t.ParentTaskId == null)
             .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
             .Where(t => t.IsRecurring || t.RecurrenceSourceId != null)
             .Where(t => t.DateSource != DateSource.Manual)
+            .Where(t => !t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))
             .ToList();
 
         foreach (var task in activeRecurringTasks)

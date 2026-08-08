@@ -103,6 +103,31 @@ public static class TaskGraphSyncHelper
         return removedTagIds;
     }
 
+    public static List<int> UpdateConditions(StorageContext context, TaskItem tracked, TaskItem source)
+    {
+        var sourceConditionIds = source.Conditions.Select(sc => sc.ConditionId).ToHashSet();
+        var trackedConditionIds = tracked.Conditions.Select(tc => tc.ConditionId).ToHashSet();
+
+        var conditionsToRemove = tracked.Conditions.Where(tc => !sourceConditionIds.Contains(tc.ConditionId)).ToList();
+        var removedConditionIds = conditionsToRemove.Select(tc => tc.ConditionId).ToList();
+
+        foreach (var condition in conditionsToRemove)
+        {
+            context.TaskConditions.Remove(condition);
+        }
+
+        foreach (var sourceCondition in source.Conditions.Where(sc => !trackedConditionIds.Contains(sc.ConditionId)))
+        {
+            context.TaskConditions.Add(new TaskCondition
+            {
+                TaskId = tracked.Id,
+                ConditionId = sourceCondition.ConditionId
+            });
+        }
+
+        return removedConditionIds;
+    }
+
     public static void UpdateSubtasks(StorageContext context, TaskItem tracked, TaskItem source)
     {
         var subtasksToRemove = tracked.Subtasks

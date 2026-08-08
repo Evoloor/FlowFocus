@@ -9,6 +9,8 @@ public class StorageContext : DbContext
     public DbSet<PriorityLevel> Priorities { get; set; } = null!;
     public DbSet<Tag> Tags { get; set; } = null!;
     public DbSet<TaskTag> TaskTags { get; set; } = null!;
+    public DbSet<ExternalCondition> ExternalConditions { get; set; } = null!;
+    public DbSet<TaskCondition> TaskConditions { get; set; } = null!;
     public DbSet<TaskRelation> TaskRelations { get; set; } = null!;
     public DbSet<PriorityEscalation> PriorityEscalations { get; set; } = null!;
     public DbSet<UserSettings> Settings { get; set; } = null!;
@@ -53,6 +55,11 @@ public class StorageContext : DbContext
                 .HasForeignKey(e => e.TaskId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            entity.HasMany(e => e.Conditions)
+                .WithOne(e => e.Task)
+                .HasForeignKey(e => e.TaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             entity.HasMany(e => e.Relations)
                 .WithOne(e => e.SourceTask)
                 .HasForeignKey(e => e.SourceTaskId)
@@ -86,6 +93,17 @@ public class StorageContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // TaskCondition
+        modelBuilder.Entity<TaskCondition>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.HasOne(e => e.Condition)
+                .WithMany()
+                .HasForeignKey(e => e.ConditionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // PriorityLevel
         modelBuilder.Entity<PriorityLevel>(entity =>
         {
@@ -94,6 +112,13 @@ public class StorageContext : DbContext
 
         // Tag
         modelBuilder.Entity<Tag>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Name).IsUnique();
+        });
+
+        // ExternalCondition
+        modelBuilder.Entity<ExternalCondition>(entity =>
         {
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.Name).IsUnique();
