@@ -1,0 +1,27 @@
+<MudCard Elevation="3" Class="kpi-card glass-card">
+    <MudCardContent>
+        <div class="kpi-header">
+            <span class="kpi-title">Оставшиеся задачи</span>
+            <MudIcon Icon="@Icons.Material.Filled.PendingActions" Size="Size.Small" Style="color: #10b981;" />
+        </div>
+        <div class="kpi-body">
+            <span class="kpi-value success-gradient-text">@Value.ToString("F1")%</span>
+        </div>
+        <div class="kpi-footer">
+            <MudProgressLinear Color="Color.Success" Value="@Value" Class="mt-2 rounded" Height="6px" />
+        </div>
+    </MudCardContent>
+</MudCard>
+
+<style>
+    .success-gradient-text {
+        background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public double Value { get; set; }
+}

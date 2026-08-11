@@ -1,0 +1,54 @@
+<MudCard Elevation="3" Class="chart-card glass-card">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6" Class="chart-title">Средняя активность по дням недели</MudText>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        @if (TotalSum == 0)
+        {
+            <DashboardEmptyState Message="Нет завершённых задач за выбранный период" />
+        }
+        else
+        {
+            <div class="weekday-bar-container">
+                <MudChart ChartType="ChartType.Bar"
+                          ChartSeries="@Series"
+                          XAxisLabels="@XLabels"
+                          Width="100%"
+                          Height="260px" />
+            </div>
+        }
+    </MudCardContent>
+</MudCard>
+
+<style>
+    .weekday-bar-container {
+        width: 100%;
+        min-height: 260px;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public Dictionary<DayOfWeek, double> Data { get; set; } = new();
+
+    private double TotalSum => Data.Values.Sum();
+
+    private static readonly DayOfWeek[] OrderedDays = new[]
+    {
+        DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
+        DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
+    };
+
+    private string[] XLabels => new[] { "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс" };
+
+    private List<ChartSeries> Series => new()
+    {
+        new ChartSeries
+        {
+            Name = "Ср. кол-во выполненных задач",
+            Data = OrderedDays.Select(d => Data.GetValueOrDefault(d, 0.0)).ToArray()
+        }
+    };
+}

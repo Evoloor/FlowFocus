@@ -1,0 +1,48 @@
+@using FlowFocus.Core.Enums
+
+<MudSelect T="DateRangeMode"
+           Value="@Value"
+           ValueChanged="OnValueChanged"
+           Label="Период"
+           Variant="Variant.Outlined"
+           AnchorOrigin="Origin.BottomCenter"
+           Class="dashboard-date-select">
+    <MudSelectItem Value="DateRangeMode.AllTime">
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.AllInclusive" Size="Size.Small" />
+            <span>За всё время</span>
+        </div>
+    </MudSelectItem>
+    <MudSelectItem Value="DateRangeMode.Recent">
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" />
+            <span>Недавние (14 дн / 100 дел)</span>
+        </div>
+    </MudSelectItem>
+    <MudSelectItem Value="DateRangeMode.Representative">
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.QueryStats" Size="Size.Small" />
+            <span>Показательные (3 мес / 300 дел)</span>
+        </div>
+    </MudSelectItem>
+</MudSelect>
+
+<style>
+    .dashboard-date-select {
+        min-width: 240px;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public DateRangeMode Value { get; set; } = DateRangeMode.AllTime;
+
+    [Parameter]
+    public EventCallback<DateRangeMode> ValueChanged { get; set; }
+
+    private async Task OnValueChanged(DateRangeMode newValue)
+    {
+        Value = newValue;
+        await ValueChanged.InvokeAsync(newValue);
+    }
+}

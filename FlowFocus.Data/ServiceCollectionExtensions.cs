@@ -28,6 +28,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITaskRecurrenceService, TaskRecurrenceService>();
         services.AddScoped<IPlannerService, PlannerService>();
         services.AddScoped<ITagSessionService, TagSessionService>();
+        services.AddScoped<IDashboardAnalyticsService, DashboardAnalyticsService>();
 
         return services;
     }
@@ -50,6 +51,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITaskRecurrenceService, TaskRecurrenceService>();
         services.AddScoped<IPlannerService, PlannerService>();
         services.AddScoped<ITagSessionService, TagSessionService>();
+        services.AddScoped<IDashboardAnalyticsService, DashboardAnalyticsService>();
 
         return services;
     }

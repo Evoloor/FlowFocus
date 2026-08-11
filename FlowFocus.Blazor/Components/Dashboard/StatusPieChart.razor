@@ -1,0 +1,123 @@
+@using FlowFocus.Core.Enums
+@using FlowFocus.Core.Helpers
+@using TaskStatus = FlowFocus.Core.Enums.TaskStatus
+
+@if (ProcessedData.Count >= 2)
+{
+    <MudCard Elevation="3" Class="chart-card glass-card">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6" Class="chart-title">Распределение по статусам</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <div class="chart-wrapper">
+                <MudChart ChartType="ChartType.Donut"
+                          InputData="@ChartData"
+                          InputLabels="@ChartLabels"
+                          Width="220px"
+                          Height="220px" />
+                <div class="chart-legend-grid">
+                    @for (int i = 0; i < ChartLabels.Length; i++)
+                    {
+                        var index = i;
+                        <div class="legend-item">
+                            <span class="legend-badge" style="background-color: @GetStatusColor(ChartLabels[index])"></span>
+                            <span class="legend-label">@ChartLabels[index]</span>
+                            <span class="legend-value">@ChartData[index]</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </MudCardContent>
+    </MudCard>
+}
+
+<style>
+    .chart-card {
+        border-radius: 16px;
+        background: rgba(30, 34, 45, 0.6);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        height: 100%;
+    }
+
+    .chart-title {
+        font-weight: 600;
+        font-size: 1.05rem;
+    }
+
+    .chart-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .chart-legend-grid {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 8px;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.85rem;
+    }
+
+    .legend-badge {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+    }
+
+    .legend-label {
+        color: var(--mud-palette-text-secondary);
+        flex-grow: 1;
+    }
+
+    .legend-value {
+        font-weight: 700;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public Dictionary<TaskStatus, int> Data { get; set; } = new();
+
+    private Dictionary<string, int> ProcessedData
+    {
+        get
+        {
+            var namedDict = Data.ToDictionary(kv => GetStatusName(kv.Key), kv => kv.Value);
+            return PieChartGroupingHelper.GroupSmallSlices(namedDict, "Другое");
+        }
+    }
+
+    private double[] ChartData => ProcessedData.Values.Select(v => (double)v).ToArray();
+    private string[] ChartLabels => ProcessedData.Keys.ToArray();
+
+    private static string GetStatusName(TaskStatus status) => status switch
+    {
+        TaskStatus.NotConfigured => "Ненастроена",
+        TaskStatus.Planned => "Запланирована",
+        TaskStatus.Completed => "Завершена",
+        TaskStatus.Irrelevant => "Неактуальна",
+        TaskStatus.Blocked => "Заблокирована",
+        _ => status.ToString()
+    };
+
+    private static string GetStatusColor(string label) => label switch
+    {
+        "Завершена" => "#10b981",
+        "Запланирована" => "#3b82f6",
+        "Ненастроена" => "#f59e0b",
+        "Заблокирована" => "#ef4444",
+        "Неактуальна" => "#6b7280",
+        "Другое" => "#94a3b8",
+        _ => "#8b5cf6"
+    };
+}

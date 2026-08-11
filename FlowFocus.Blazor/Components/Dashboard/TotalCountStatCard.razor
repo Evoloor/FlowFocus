@@ -1,0 +1,53 @@
+<MudCard Elevation="3" Class="kpi-card glass-card">
+    <MudCardContent>
+        <div class="kpi-header">
+            <span class="kpi-title">Общее количество</span>
+            <MudIcon Icon="@Icons.Material.Filled.Assignment" Size="Size.Small" Style="color: #3b82f6;" />
+        </div>
+        <div class="kpi-body d-flex align-baseline gap-2">
+            <span class="kpi-value info-gradient-text">@TotalTasks</span>
+            <span class="kpi-unit">задач</span>
+        </div>
+        <div class="kpi-nested-metric">
+            <MudIcon Icon="@Icons.Material.Filled.AccountTree" Size="Size.Small" Class="nested-icon" />
+            <span>Подзадач: <strong>@TotalSubtasks</strong></span>
+        </div>
+    </MudCardContent>
+</MudCard>
+
+<style>
+    .info-gradient-text {
+        background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .kpi-unit {
+        color: var(--mud-palette-text-secondary);
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .kpi-nested-metric {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 10px;
+        padding-top: 8px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        color: var(--mud-palette-text-secondary);
+        font-size: 0.85rem;
+    }
+
+    .nested-icon {
+        opacity: 0.7;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public int TotalTasks { get; set; }
+
+    [Parameter]
+    public int TotalSubtasks { get; set; }
+}

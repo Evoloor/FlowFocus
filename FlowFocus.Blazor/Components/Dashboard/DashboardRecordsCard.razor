@@ -1,0 +1,109 @@
+@using FlowFocus.Core.Models
+
+<MudCard Elevation="3" Class="records-card glass-card">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <div class="d-flex align-center gap-2">
+                <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Size="Size.Medium" Style="color: #f59e0b;" />
+                <MudText Typo="Typo.h6" Class="chart-title">Рекорды и достижения</MudText>
+            </div>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        @if (Records == null || Records.Count == 0)
+        {
+            <DashboardEmptyState Message="Рекорды отсутствуют" />
+        }
+        else
+        {
+            <div class="records-grid">
+                @foreach (var record in SortedRecords)
+                {
+                    <div class="record-item">
+                        <div class="record-info">
+                            <span class="record-title">@record.Title</span>
+                            <span class="record-value">@record.Value</span>
+                        </div>
+                        <div class="record-date-badge">
+                            <MudIcon Icon="@Icons.Material.Filled.Event" Size="Size.Small" Class="date-icon" />
+                            <span>@(record.Date.HasValue ? record.Date.Value.ToString("dd.MM.yyyy") : "-")</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </MudCardContent>
+</MudCard>
+
+<style>
+    .records-card {
+        border-radius: 16px;
+        background: rgba(30, 34, 45, 0.6);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        height: 100%;
+    }
+
+    .records-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .record-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: rgba(255, 255, 255, 0.03);
+        padding: 12px 16px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        transition: background 0.2s;
+    }
+
+    .record-item:hover {
+        background: rgba(255, 255, 255, 0.06);
+    }
+
+    .record-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .record-title {
+        font-size: 0.85rem;
+        color: var(--mud-palette-text-secondary);
+    }
+
+    .record-value {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--mud-palette-text-primary);
+    }
+
+    .record-date-badge {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.8rem;
+        color: var(--mud-palette-text-secondary);
+        background: rgba(255, 255, 255, 0.05);
+        padding: 4px 10px;
+        border-radius: 8px;
+        white-space: nowrap;
+    }
+
+    .date-icon {
+        opacity: 0.6;
+        font-size: 0.9rem;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public List<DashboardRecordItem> Records { get; set; } = new();
+
+    private IEnumerable<DashboardRecordItem> SortedRecords => Records
+        .OrderByDescending(r => r.Date ?? DateTime.MinValue);
+}

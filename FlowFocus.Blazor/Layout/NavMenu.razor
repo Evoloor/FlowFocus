@@ -1,4 +1,4 @@
-﻿@inject ITaskRepository TaskRepo
+@inject ITaskRepository TaskRepo
 @inject INotificationService NotificationService
 @implements IDisposable
 
@@ -23,6 +23,10 @@
                 <MudBadge Content="@_notConfiguredCount" Color="Color.Error" Overlap="false" Class="nav-badge" />
             }
         </div>
+    </MudNavLink>
+
+    <MudNavLink Href="/dashboard" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Dashboard">
+        Дашборд
     </MudNavLink>
 
     <MudNavLink Href="/settings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Settings">

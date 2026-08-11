@@ -1,0 +1,217 @@
+@page "/dashboard"
+@inject ITaskRepository TaskRepo
+@inject ITagRepository TagRepo
+@inject IExternalConditionRepository ConditionRepo
+@inject IDashboardAnalyticsService AnalyticsService
+@inject INotificationService NotificationService
+@using FlowFocus.Blazor.Components.Dashboard
+@using FlowFocus.Core.Enums
+@implements IDisposable
+
+<PageTitle>Дашборд — FlowFocus</PageTitle>
+
+<div class="dashboard-container">
+    <!-- 1. Верхняя панель фильтрации -->
+    <div class="filter-header-panel glass-panel">
+        <div class="d-flex align-center justify-space-between flex-wrap gap-4">
+            <div class="d-flex align-center gap-3">
+                <MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Large" Class="dashboard-icon" />
+                <div>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">Аналитический Дашборд</MudText>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Обзор активности, метрик и структуры задач</MudText>
+                </div>
+            </div>
+
+            <div class="d-flex align-center flex-wrap gap-4">
+                <DateRangeSelect Value="@_filter.DateRange" ValueChanged="OnDateRangeChanged" />
+                <EntityScopeSelect Filter="@_filter"
+                                   Tags="@_tags"
+                                   TagTaskCounts="@_tagTaskCounts"
+                                   Conditions="@_conditions"
+                                   ConditionTaskCounts="@_conditionTaskCounts"
+                                   FilterChanged="OnScopeChanged" />
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Общие метрики и активность (Summary Grid) -->
+    <div class="section-title">
+        <MudIcon Icon="@Icons.Material.Filled.Insights" Size="Size.Small" />
+        <span>Общие метрики и активность</span>
+    </div>
+    <div class="summary-grid">
+        @if (_filter.Scope != EntityScopeType.Active && _filter.Scope != EntityScopeType.Completed)
+        {
+            <ActivityMetricCard Value="@_metrics.ActivityPercentage" />
+        }
+        <TotalCountStatCard TotalTasks="@_metrics.TotalTasksCount" TotalSubtasks="@_metrics.TotalSubtasksCount" />
+        @if (_filter.Scope != EntityScopeType.Active && _filter.Scope != EntityScopeType.Completed)
+        {
+            <CompletionRateStatCard Value="@_metrics.CompletionRatePercentage" />
+        }
+        @if (_metrics.LongestDependencyChainLength > 1)
+        {
+            <LongestChainStatCard ChainLength="@_metrics.LongestDependencyChainLength" />
+        }
+        @if (_metrics.CreatedTasksCount.HasValue)
+        {
+            <CreatedTasksStatCard Count="@_metrics.CreatedTasksCount.Value" />
+        }
+    </div>
+
+    <!-- 3. Детализация задач и типов (Task Structure & Types Panel) -->
+    <div class="section-title mt-6">
+        <MudIcon Icon="@Icons.Material.Filled.PieChart" Size="Size.Small" />
+        <span>Структура задач и типы</span>
+    </div>
+    <div class="structure-grid">
+        @if (_filter.Scope != EntityScopeType.Active && _filter.Scope != EntityScopeType.Completed)
+        {
+            <StatusPieChart Data="@_metrics.StatusDistribution" />
+        }
+        <DateTypeDistributionCard Data="@_metrics.DateSourceDistribution" />
+        @if (_filter.Scope != EntityScopeType.Tag)
+        {
+            <TagsPieChart Data="@_metrics.TagsDistribution" />
+        }
+        @if (_filter.Scope != EntityScopeType.Condition)
+        {
+            <ConditionsPieChart Data="@_metrics.ConditionsDistribution" />
+        }
+    </div>
+
+    <!-- 4. Глубокая статистика и аналитика (Deep Analytics Panel) -->
+    <div class="section-title mt-6">
+        <MudIcon Icon="@Icons.Material.Filled.Analytics" Size="Size.Small" />
+        <span>Глубокая аналитика и рекорды</span>
+    </div>
+    <div class="analytics-grid">
+        <FilteredStatsGrid Metrics="@_metrics" />
+        @if (_filter.Scope != EntityScopeType.Active)
+        {
+            <WeekdayDistributionBarChart Data="@_metrics.WeekdayAverages" />
+        }
+        <InterestPriorityChart Data="@_metrics.InterestPriorityDistribution" />
+        <DashboardRecordsCard Records="@_metrics.Records" />
+    </div>
+</div>
+
+<style>
+    .dashboard-container {
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        max-width: 1600px;
+        margin: 0 auto;
+    }
+
+    .glass-panel {
+        background: rgba(30, 34, 45, 0.6);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 20px 24px;
+    }
+
+    .dashboard-icon {
+        color: #6366f1;
+    }
+
+    .section-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 1.1rem;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        color: var(--mud-palette-text-primary);
+    }
+
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+    }
+
+    .structure-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 16px;
+    }
+
+    .analytics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+        gap: 16px;
+    }
+</style>
+
+@code {
+    private DashboardFilter _filter = new();
+    private List<TaskItem> _allTasks = new();
+    private List<Tag> _tags = new();
+    private Dictionary<int, int> _tagTaskCounts = new();
+    private List<ExternalCondition> _conditions = new();
+    private Dictionary<int, int> _conditionTaskCounts = new();
+    private DashboardMetricsDto _metrics = new();
+
+    protected override void OnInitialized()
+    {
+        NotificationService.OnTasksChanged += OnTasksChanged;
+        LoadData();
+    }
+
+    private void LoadData()
+    {
+        _allTasks = TaskRepo.GetAll();
+        _tags = TagRepo.GetAll();
+        _conditions = ConditionRepo.GetAll();
+
+        // Подсчёт задач для сортировки в выпадающих списках тегов и условий
+        _tagTaskCounts = _allTasks
+            .SelectMany(t => t.Tags ?? [])
+            .GroupBy(tt => tt.TagId)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        _conditionTaskCounts = _allTasks
+            .SelectMany(t => t.Conditions ?? [])
+            .GroupBy(tc => tc.ConditionId)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        RecalculateMetrics();
+    }
+
+    private void RecalculateMetrics()
+    {
+        _metrics = AnalyticsService.CalculateMetrics(_allTasks, _filter);
+    }
+
+    private void OnDateRangeChanged(DateRangeMode mode)
+    {
+        _filter.DateRange = mode;
+        RecalculateMetrics();
+        StateHasChanged();
+    }
+
+    private void OnScopeChanged(DashboardFilter updatedFilter)
+    {
+        _filter = updatedFilter;
+        RecalculateMetrics();
+        StateHasChanged();
+    }
+
+    private void OnTasksChanged()
+    {
+        InvokeAsync(() =>
+        {
+            LoadData();
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        NotificationService.OnTasksChanged -= OnTasksChanged;
+    }
+}

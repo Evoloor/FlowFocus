@@ -1,0 +1,123 @@
+@using FlowFocus.Core.Enums
+@using FlowFocus.Core.Models
+
+<div class="entity-scope-group">
+    <MudSelect T="EntityScopeType"
+               Value="@Filter.Scope"
+               ValueChanged="OnScopeChanged"
+               Label="Область сущностей"
+               Variant="Variant.Outlined"
+               Class="scope-main-select">
+        <MudSelectItem Value="EntityScopeType.All">Все</MudSelectItem>
+        <MudSelectItem Value="EntityScopeType.Active">Активные</MudSelectItem>
+        <MudSelectItem Value="EntityScopeType.Completed">Завершённые</MudSelectItem>
+        <MudSelectItem Value="EntityScopeType.Tag">Фильтр по тегу</MudSelectItem>
+        <MudSelectItem Value="EntityScopeType.Condition">Фильтр по условию</MudSelectItem>
+    </MudSelect>
+
+    @if (Filter.Scope == EntityScopeType.Tag)
+    {
+        <MudSelect T="int?"
+                   Value="@Filter.TagId"
+                   ValueChanged="OnTagChanged"
+                   Label="Выберите тег"
+                   Variant="Variant.Outlined"
+                   Class="scope-sub-select">
+            @foreach (var tag in SortedTags)
+            {
+                int count = TagTaskCounts.GetValueOrDefault(tag.Id, 0);
+                <MudSelectItem Value="@((int?)tag.Id)">@tag.Name (@count)</MudSelectItem>
+            }
+        </MudSelect>
+    }
+    else if (Filter.Scope == EntityScopeType.Condition)
+    {
+        <MudSelect T="int?"
+                   Value="@Filter.ConditionId"
+                   ValueChanged="OnConditionChanged"
+                   Label="Выберите условие"
+                   Variant="Variant.Outlined"
+                   Class="scope-sub-select">
+            @foreach (var condition in SortedConditions)
+            {
+                int count = ConditionTaskCounts.GetValueOrDefault(condition.Id, 0);
+                <MudSelectItem Value="@((int?)condition.Id)">@condition.Name (@count)</MudSelectItem>
+            }
+        </MudSelect>
+    }
+</div>
+
+<style>
+    .entity-scope-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .scope-main-select {
+        min-width: 200px;
+    }
+
+    .scope-sub-select {
+        min-width: 220px;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public DashboardFilter Filter { get; set; } = new();
+
+    [Parameter]
+    public List<Tag> Tags { get; set; } = new();
+
+    [Parameter]
+    public Dictionary<int, int> TagTaskCounts { get; set; } = new();
+
+    [Parameter]
+    public List<ExternalCondition> Conditions { get; set; } = new();
+
+    [Parameter]
+    public Dictionary<int, int> ConditionTaskCounts { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<DashboardFilter> FilterChanged { get; set; }
+
+    private IEnumerable<Tag> SortedTags => Tags
+        .OrderByDescending(t => TagTaskCounts.GetValueOrDefault(t.Id, 0))
+        .ThenBy(t => t.Name);
+
+    private IEnumerable<ExternalCondition> SortedConditions => Conditions
+        .OrderByDescending(c => ConditionTaskCounts.GetValueOrDefault(c.Id, 0))
+        .ThenBy(c => c.Name);
+
+    private async Task OnScopeChanged(EntityScopeType scope)
+    {
+        Filter.Scope = scope;
+        var tagList = SortedTags.ToList();
+        var condList = SortedConditions.ToList();
+
+        if (scope == EntityScopeType.Tag && tagList.Count > 0 && !Filter.TagId.HasValue)
+        {
+            Filter.TagId = tagList[0].Id;
+        }
+        else if (scope == EntityScopeType.Condition && condList.Count > 0 && !Filter.ConditionId.HasValue)
+        {
+            Filter.ConditionId = condList[0].Id;
+        }
+
+        await FilterChanged.InvokeAsync(Filter);
+    }
+
+    private async Task OnTagChanged(int? tagId)
+    {
+        Filter.TagId = tagId;
+        await FilterChanged.InvokeAsync(Filter);
+    }
+
+    private async Task OnConditionChanged(int? conditionId)
+    {
+        Filter.ConditionId = conditionId;
+        await FilterChanged.InvokeAsync(Filter);
+    }
+}

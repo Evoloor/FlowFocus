@@ -1,0 +1,61 @@
+<MudCard Elevation="3" Class="chart-card glass-card">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <div class="d-flex align-center gap-2">
+                <MudIcon Icon="@Icons.Material.Filled.ShowChart" Size="Size.Medium" Style="color: #a855f7;" />
+                <div>
+                    <MudText Typo="Typo.h6" Class="chart-title">Приоритет по интересности</MudText>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Средний приоритет задач в зависимости от уровня интересности (1–10)</MudText>
+                </div>
+            </div>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        @if (TotalSum == 0)
+        {
+            <DashboardEmptyState Message="Нет задач с оценками интересности и приоритета" />
+        }
+        else
+        {
+            <div class="chart-container">
+                <MudChart ChartType="ChartType.Line"
+                          ChartSeries="@Series"
+                          XAxisLabels="@XLabels"
+                          Width="100%"
+                          Height="260px"
+                          ChartOptions="@Options" />
+            </div>
+        }
+    </MudCardContent>
+</MudCard>
+
+<style>
+    .chart-container {
+        width: 100%;
+        min-height: 260px;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public Dictionary<int, double> Data { get; set; } = new();
+
+    private double TotalSum => Data.Values.Sum();
+
+    private string[] XLabels => new[] { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" };
+
+    private ChartOptions Options => new ChartOptions
+    {
+        YAxisTicks = 1,
+        LineStrokeWidth = 3
+    };
+
+    private List<ChartSeries> Series => new()
+    {
+        new ChartSeries
+        {
+            Name = "Ср. уровень приоритета",
+            Data = Enumerable.Range(1, 10).Select(i => Data.GetValueOrDefault(i, 0.0)).ToArray()
+        }
+    };
+}

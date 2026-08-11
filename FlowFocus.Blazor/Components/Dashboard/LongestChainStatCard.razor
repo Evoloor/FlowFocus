@@ -1,0 +1,67 @@
+<MudCard Elevation="3" Class="kpi-card glass-card">
+    <MudCardContent>
+        <div class="kpi-header">
+            <span class="kpi-title">Цепочка блокировок</span>
+            <MudIcon Icon="@Icons.Material.Filled.LinearScale" Size="Size.Small" Style="color: #f59e0b;" />
+        </div>
+        <div class="kpi-body d-flex align-baseline gap-2">
+            <span class="kpi-value warning-gradient-text">@ChainLength</span>
+            <span class="kpi-unit">связей</span>
+        </div>
+        <div class="kpi-chain-preview">
+            <MudText Typo="Typo.caption" Class="chain-formula">
+                @if (ChainLength > 0)
+                {
+                    <span>
+                        @for (int i = 0; i <= Math.Min(ChainLength, 3); i++)
+                        {
+                            <span>@((char)('A' + i))</span>
+                            @if (i < Math.Min(ChainLength, 3))
+                            {
+                                <span class="arrow">→</span>
+                            }
+                        }
+                        @if (ChainLength > 3)
+                        {
+                            <span>...</span>
+                        }
+                    </span>
+                }
+                else
+                {
+                    <span>Нет блокировок</span>
+                }
+            </MudText>
+        </div>
+    </MudCardContent>
+</MudCard>
+
+<style>
+    .warning-gradient-text {
+        background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .kpi-chain-preview {
+        margin-top: 10px;
+        padding-top: 8px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .chain-formula {
+        color: var(--mud-palette-text-secondary);
+        font-family: monospace;
+        font-size: 0.85rem;
+    }
+
+    .arrow {
+        color: #f59e0b;
+        margin: 0 2px;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public int ChainLength { get; set; }
+}
