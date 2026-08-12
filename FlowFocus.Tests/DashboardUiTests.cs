@@ -199,14 +199,16 @@ public class DashboardUiTests : IntegrationTestBase
     }
 
     [Fact]
-    public void LongestChainCard_HiddenWhenLengthIsOneOrLess_ShownWhenGreaterThanOne()
+    public void BlockingChainRecord_DashWhenNoChain_ShowsLinksWhenChainExists()
     {
         var singleTask = new TaskItemBuilder().WithId(0).WithTitle("Single Task").Build();
         TaskRepo.Add(singleTask);
 
         var cut = _ctx.Render<Dashboard>();
 
-        cut.FindComponents<LongestChainStatCard>().Should().BeEmpty();
+        cut.FindComponent<DashboardRecordsCard>().Instance.Records
+            .Single(r => r.Title == "Самая длинная цепочка блокировок")
+            .Value.Should().Be("-");
 
         var taskC = new TaskItemBuilder().WithId(103).WithTitle("Task C").Build();
         var taskB = new TaskItemBuilder().WithId(102).WithTitle("Task B").WithRelation(taskC, RelationType.Blocks).Build();
@@ -218,7 +220,8 @@ public class DashboardUiTests : IntegrationTestBase
 
         var cut2 = _ctx.Render<Dashboard>();
 
-        cut2.FindComponents<LongestChainStatCard>().Should().NotBeEmpty();
-        cut2.FindComponent<LongestChainStatCard>().Instance.ChainLength.Should().Be(2);
+        cut2.FindComponent<DashboardRecordsCard>().Instance.Records
+            .Single(r => r.Title == "Самая длинная цепочка блокировок")
+            .Value.Should().Be("2 связей");
     }
 }

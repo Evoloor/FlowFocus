@@ -506,6 +506,50 @@ public class DashboardAnalyticsServiceTests
     }
 
     [Fact]
+    public void test_records_contains_longest_blocking_chain()
+    {
+        var tasks = new List<TaskItem>
+        {
+            new TaskItem
+            {
+                Id = 1,
+                Title = "A",
+                Relations = new List<TaskRelation>
+                {
+                    new TaskRelation { SourceTaskId = 1, TargetTaskId = 2, Type = RelationType.Blocks }
+                }
+            },
+            new TaskItem
+            {
+                Id = 2,
+                Title = "B",
+                Relations = new List<TaskRelation>
+                {
+                    new TaskRelation { SourceTaskId = 2, TargetTaskId = 3, Type = RelationType.Blocks }
+                }
+            },
+            new TaskItem { Id = 3, Title = "C" }
+        };
+
+        var metrics = _service.CalculateMetrics(tasks, new DashboardFilter { Scope = EntityScopeType.All });
+
+        var chainRecord = metrics.Records.Single(r => r.Title == "Самая длинная цепочка блокировок");
+        chainRecord.Value.Should().Be("2 связей");
+        chainRecord.Date.Should().BeNull();
+    }
+
+    [Fact]
+    public void test_records_blocking_chain_dash_when_absent()
+    {
+        var tasks = new List<TaskItem> { new TaskItem { Id = 1, Title = "Solo" } };
+
+        var metrics = _service.CalculateMetrics(tasks, new DashboardFilter { Scope = EntityScopeType.All });
+
+        var chainRecord = metrics.Records.Single(r => r.Title == "Самая длинная цепочка блокировок");
+        chainRecord.Value.Should().Be("-");
+    }
+
+    [Fact]
     public void test_interest_priority_distribution_calculation()
     {
         var priorityHigh = new PriorityLevel { Id = 1, Order = 1, Name = "High" };
@@ -538,7 +582,7 @@ public class DashboardAnalyticsServiceTests
         metrics.TotalTasksCount.Should().Be(0);
         metrics.TotalSubtasksCount.Should().Be(0);
         metrics.CompletionRatePercentage.Should().Be(0.0);
-        metrics.LongestDependencyChainLength.Should().Be(0);
+        metrics.Records.Should().BeEmpty();
         metrics.FilteredCount.Should().Be(0);
         metrics.FilteredAvgTimeMinutes.Should().BeNull();
         metrics.FilteredMinTimeMinutes.Should().BeNull();

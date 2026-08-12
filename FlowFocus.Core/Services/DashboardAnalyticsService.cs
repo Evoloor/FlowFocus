@@ -304,8 +304,6 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
             ? Math.Round(((double)activeTasksCount / totalForCompletion) * 100.0, 1)
             : 0.0;
 
-        dto.LongestDependencyChainLength = CalculateLongestDependencyChain(scopeFiltered);
-
         if (filter.DateRange != DateRangeMode.AllTime)
         {
             var currentDate = (now ?? DateTime.UtcNow).Date;
@@ -377,7 +375,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         return dto;
     }
 
-    private static List<DashboardRecordItem> CalculateRecords(List<TaskItem> tasks)
+    private List<DashboardRecordItem> CalculateRecords(List<TaskItem> tasks)
     {
         var rawRecords = new List<DashboardRecordItem>();
         var completed = tasks.Where(t => t.Status == TaskStatus.Completed && t.CompletedDate.HasValue).ToList();
@@ -491,6 +489,22 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         else
         {
             rawRecords.Add(new DashboardRecordItem { Title = "Макс. продолжительность задачи", Value = "-", Date = null });
+        }
+
+        // 7. Самая длинная цепочка блокировок
+        var chainLength = CalculateLongestDependencyChain(tasks);
+        if (chainLength > 1)
+        {
+            rawRecords.Add(new DashboardRecordItem
+            {
+                Title = "Самая длинная цепочка блокировок",
+                Value = $"{chainLength} связей",
+                Date = null
+            });
+        }
+        else
+        {
+            rawRecords.Add(new DashboardRecordItem { Title = "Самая длинная цепочка блокировок", Value = "-", Date = null });
         }
 
         // Сортировка по убыванию даты (если дата null, идут в конец)

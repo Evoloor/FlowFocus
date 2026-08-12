@@ -49,10 +49,6 @@
         {
             <CompletionRateStatCard Value="@_metrics.CompletionRatePercentage" />
         }
-        @if (_metrics.LongestDependencyChainLength > 1)
-        {
-            <LongestChainStatCard ChainLength="@_metrics.LongestDependencyChainLength" />
-        }
         @if (_metrics.CreatedTasksCount.HasValue)
         {
             <CreatedTasksStatCard Count="@_metrics.CreatedTasksCount.Value" />

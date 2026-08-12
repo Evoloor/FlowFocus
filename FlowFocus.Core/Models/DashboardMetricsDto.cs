@@ -21,9 +21,6 @@ public class DashboardMetricsDto
     /// <summary>Процент оставшихся (активных) задач</summary>
     public double CompletionRatePercentage { get; set; }
 
-    /// <summary>Самая длинная цепочка блокировок (переходов в графе)</summary>
-    public int LongestDependencyChainLength { get; set; }
-
     /// <summary>Создано задач за выбранный период (null если за все время)</summary>
     public int? CreatedTasksCount { get; set; }
 
