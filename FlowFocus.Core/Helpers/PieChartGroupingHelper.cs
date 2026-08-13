@@ -1,59 +1,75 @@
 namespace FlowFocus.Core.Helpers;
 
 /// <summary>
-/// DRY хелпер для группировки мелких категорий на круговых диаграммах
+/// DRY хелпер для группировки мелких категорий на круговых диаграммах по канонам и стандартам индустрии (Top N + Porog %).
 /// </summary>
 public static class PieChartGroupingHelper
 {
     /// <summary>
-    /// Группирует мелкие категории (<10% по возрастанию, но не более 15% суммарного размера) в категорию "Другое"
+    /// Группирует мелкие или избыточные категории в секцию "Другое" согласно лучшим практикам визуализации данных:
+    /// 1. Ограничение Top N (по умолчанию максимум 10 секторов на диаграмме).
+    /// 2. Порог малого сектора (меньше thresholdPercent от суммы, по умолчанию 2.5%).
+    /// 3. Защита: "Другое" создается только если объединяются минимум 2 категории (чтобы не терять смысл подписи).
+    /// 4. Сектор "Другое" всегда располагается в самом конце.
     /// </summary>
-    public static Dictionary<string, int> GroupSmallSlices(Dictionary<string, int> source, string otherLabel = "Другое")
+    public static Dictionary<string, int> GroupSmallSlices(
+        Dictionary<string, int> source,
+        string otherLabel = "Другое",
+        int maxSlices = 10,
+        double thresholdPercent = 0.025)
     {
-        if (source == null || source.Count == 0) return new Dictionary<string, int>();
+        if (source == null || source.Count == 0) return new();
 
-        var nonZero = source.Where(kv => kv.Value > 0).ToList();
-        if (nonZero.Count == 0) return new Dictionary<string, int>();
-
-        int totalSum = nonZero.Sum(kv => kv.Value);
-        if (totalSum == 0) return new Dictionary<string, int>();
-
-        double tenPercent = totalSum * 0.10;
-        double maxOtherLimit = totalSum * 0.15;
-
-        var candidates = nonZero
-            .Where(kv => kv.Value < tenPercent)
-            .OrderBy(kv => kv.Value)
+        var sortedNonZero = source
+            .Where(kv => kv.Value > 0)
+            .OrderByDescending(kv => kv.Value)
             .ToList();
 
-        var groupedKeys = new HashSet<string>();
-        int otherSum = 0;
+        if (sortedNonZero.Count == 0) return new();
 
-        foreach (var candidate in candidates)
+        // Если секторов 2 или меньше, группировка не имеет смысла
+        if (sortedNonZero.Count <= 2)
         {
-            if (otherSum + candidate.Value <= maxOtherLimit)
-            {
-                otherSum += candidate.Value;
-                groupedKeys.Add(candidate.Key);
-            }
-            else
-            {
-                break;
-            }
+            return sortedNonZero.ToDictionary(kv => kv.Key, kv => kv.Value);
         }
 
-        if (groupedKeys.Count < 2)
+        var totalSum = sortedNonZero.Sum(kv => kv.Value);
+        if (totalSum == 0) return sortedNonZero.ToDictionary(kv => kv.Key, kv => kv.Value);
+
+        var thresholdValue = totalSum * thresholdPercent;
+
+        // Если общее число категорий превышает maxSlices, сохраняем (maxSlices - 1) категорий + 1 место под "Другое"
+        var maxKeep = sortedNonZero.Count > maxSlices ? maxSlices - 1 : sortedNonZero.Count;
+
+        // Находим индекс первой категории, значение которой строго меньше порога thresholdValue
+        var thresholdIndex = sortedNonZero.FindIndex(kv => kv.Value < thresholdValue);
+
+        // Определяем точку разделения основных секторов и сектора "Другое"
+        var splitIndex = thresholdIndex != -1 
+            ? Math.Min(maxKeep, thresholdIndex) 
+            : maxKeep;
+
+        var itemsToGroup = sortedNonZero.Count - splitIndex;
+
+        // Каноническое правило: "Другое" имеет смысл, только если сворачиваем 2 и более элементов
+        if (itemsToGroup < 2)
         {
-            return nonZero
-                .OrderByDescending(kv => kv.Value)
-                .ToDictionary(kv => kv.Key, kv => kv.Value);
+            return sortedNonZero.ToDictionary(kv => kv.Key, kv => kv.Value);
         }
 
-        var result = new Dictionary<string, int>();
+        Dictionary<string, int> result = new();
 
-        foreach (var kv in nonZero.Where(kv => !groupedKeys.Contains(kv.Key)))
+        // Добавляем основные категории
+        for (var i = 0; i < splitIndex; i++)
         {
-            result[kv.Key] = kv.Value;
+            result[sortedNonZero[i].Key] = sortedNonZero[i].Value;
+        }
+
+        // Суммируем категории для "Другое"
+        var otherSum = 0;
+        for (var i = splitIndex; i < sortedNonZero.Count; i++)
+        {
+            otherSum += sortedNonZero[i].Value;
         }
 
         if (otherSum > 0)
@@ -61,6 +77,7 @@ public static class PieChartGroupingHelper
             result[otherLabel] = otherSum;
         }
 
-        return result.OrderByDescending(kv => kv.Value).ToDictionary(kv => kv.Key, kv => kv.Value);
+        return result;
     }
 }
+
