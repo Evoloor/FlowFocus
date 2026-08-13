@@ -139,6 +139,19 @@ public class DashboardUiTests : IntegrationTestBase
     }
 
     [Fact]
+    public void DistributionPieChart_RendersTitleAndLegendValues()
+    {
+        var data = new Dictionary<string, int> { { "TagA", 12 }, { "TagB", 8 } };
+        var cut = _ctx.Render<DistributionPieChart>(p => p
+            .Add(x => x.Title, "Тестовое распределение")
+            .Add(x => x.Data, data));
+
+        cut.Find(".chart-title").TextContent.Should().Contain("Тестовое распределение");
+        cut.FindAll(".legend-item").Should().HaveCount(2);
+    }
+
+
+    [Fact]
     public void DashboardPage_EntityScopeSelect_FiltersByTag_HidesTagChart()
     {
         TagRepo.Add(new Tag { Name = "Work" });

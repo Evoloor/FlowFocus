@@ -627,5 +627,39 @@ public class DashboardAnalyticsServiceTests
         metrics.WeekdayAverages.Values.Should().OnlyContain(v => v == 0.0);
     }
 
+    [Fact]
+    public void DistributionHelper_CalculateDistribution_ReturnsCorrectCounts()
+    {
+        var tasks = new List<TaskItem>
+        {
+            new TaskItem { Status = TaskStatus.Planned },
+            new TaskItem { Status = TaskStatus.Planned },
+            new TaskItem { Status = TaskStatus.Completed }
+        };
+
+        var result = DistributionHelper.CalculateDistribution(tasks, t => t.Status);
+
+        result[TaskStatus.Planned].Should().Be(2);
+        result[TaskStatus.Completed].Should().Be(1);
+    }
+
+    [Fact]
+    public void DistributionHelper_CalculateCollectionDistribution_ReturnsCorrectCounts()
+    {
+        var tag1 = new Tag { Id = 1, Name = "Work" };
+        var tag2 = new Tag { Id = 2, Name = "Home" };
+
+        var tasks = new List<TaskItem>
+        {
+            new TaskItem { Tags = new List<TaskTag> { new TaskTag { Tag = tag1 }, new TaskTag { Tag = tag2 } } },
+            new TaskItem { Tags = new List<TaskTag> { new TaskTag { Tag = tag1 } } }
+        };
+
+        var result = DistributionHelper.CalculateCollectionDistribution(tasks, t => t.Tags?.Where(tt => tt.Tag != null).Select(tt => tt.Tag!.Name));
+
+        result["Work"].Should().Be(2);
+        result["Home"].Should().Be(1);
+    }
+
     #endregion
 }

@@ -1,4 +1,5 @@
 using FlowFocus.Core.Enums;
+using FlowFocus.Core.Helpers;
 using FlowFocus.Core.Models;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
@@ -317,25 +318,14 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         }
 
         // === Task Structure & Types ===
-        dto.StatusDistribution = scopeFiltered
-            .GroupBy(t => t.Status)
-            .ToDictionary(g => g.Key, g => g.Count());
-
-        dto.DateSourceDistribution = scopeFiltered
-            .GroupBy(t => t.DateSource)
-            .ToDictionary(g => g.Key, g => g.Count());
-
-        dto.TagsDistribution = scopeFiltered
-            .SelectMany(t => t.Tags ?? [])
-            .Where(tt => tt.Tag != null)
-            .GroupBy(tt => tt.Tag!.Name)
-            .ToDictionary(g => g.Key, g => g.Count());
-
-        dto.ConditionsDistribution = scopeFiltered
-            .SelectMany(t => t.Conditions ?? [])
-            .Where(tc => tc.Condition != null)
-            .GroupBy(tc => tc.Condition!.Name)
-            .ToDictionary(g => g.Key, g => g.Count());
+        dto.StatusDistribution = DistributionHelper.CalculateDistribution(scopeFiltered, t => t.Status);
+        dto.DateSourceDistribution = DistributionHelper.CalculateDistribution(scopeFiltered, t => t.DateSource);
+        dto.TagsDistribution = DistributionHelper.CalculateCollectionDistribution(
+            scopeFiltered,
+            t => t.Tags?.Where(tt => tt.Tag != null).Select(tt => tt.Tag!.Name));
+        dto.ConditionsDistribution = DistributionHelper.CalculateCollectionDistribution(
+            scopeFiltered,
+            t => t.Conditions?.Where(tc => tc.Condition != null).Select(tc => tc.Condition!.Name));
 
         // === Deep Analytics Grid ===
         dto.FilteredCount = scopeFiltered.Count;
