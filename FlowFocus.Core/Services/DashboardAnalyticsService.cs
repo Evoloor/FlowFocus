@@ -377,6 +377,12 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         dto.Records = CalculateRecords(scopeFiltered);
         dto.InterestPriorityDistribution = CalculateInterestPriorityDistribution(scopeFiltered);
 
+        // === Metric Histograms ===
+        dto.InterestHistogram = CalculateInterestHistogram(scopeFiltered);
+        dto.ComplexityHistogram = CalculateComplexityHistogram(scopeFiltered);
+        dto.PriorityHistogram = CalculatePriorityHistogram(scopeFiltered);
+        dto.TimeHistogram = CalculateTimeHistogram(scopeFiltered);
+
         return dto;
     }
 
@@ -562,5 +568,103 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
             count += GetSubtasksCountRecursive(sub);
         }
         return count;
+    }
+
+    private static Dictionary<string, int> CalculateInterestHistogram(List<TaskItem> tasks)
+    {
+        var interestTasks = tasks.Where(t => t.Interest.HasValue).ToList();
+        if (interestTasks.Count == 0) return new();
+
+        return interestTasks
+            .GroupBy(t => t.Interest!.Value)
+            .OrderBy(g => g.Key)
+            .ToDictionary(g => g.Key.ToString(), g => g.Count());
+    }
+
+    private static Dictionary<string, int> CalculateComplexityHistogram(List<TaskItem> tasks)
+    {
+        var compTasks = tasks.Where(t => t.Complexity.HasValue).ToList();
+        if (compTasks.Count == 0) return new();
+
+        var values = compTasks.Select(t => t.Complexity!.Value).OrderBy(v => v).ToList();
+        var distinctValues = values.Distinct().ToList();
+
+        // Если уникальных значений мало (<= 8), группируем по точным значениям
+        if (distinctValues.Count <= 8)
+        {
+            return compTasks
+                .GroupBy(t => t.Complexity!.Value)
+                .OrderBy(g => g.Key)
+                .ToDictionary(g => g.Key.ToString(), g => g.Count());
+        }
+
+        // Иначе динамически группируем по диапазонным бакетам на основе min и max имеющихся БД-значений
+        var minVal = values.Min();
+        var maxVal = values.Max();
+        var binCount = 5;
+        var step = Math.Max(1, (int)Math.Ceiling((double)(maxVal - minVal + 1) / binCount));
+
+        Dictionary<string, int> result = new();
+        for (var i = 0; i < binCount; i++)
+        {
+            var start = minVal + i * step;
+            var end = i == binCount - 1 ? maxVal : Math.Min(maxVal, start + step - 1);
+            if (start > maxVal) break;
+
+            var label = start == end ? $"{start}" : $"{start}–{end}";
+            var count = values.Count(v => v >= start && v <= end);
+            if (count > 0 || result.Count > 0)
+            {
+                result[label] = count;
+            }
+
+            if (end >= maxVal) break;
+        }
+
+        return result;
+    }
+
+    private static Dictionary<string, int> CalculatePriorityHistogram(List<TaskItem> tasks)
+    {
+        var priorityTasks = tasks
+            .Where(t => t.Priority != null || t.PriorityId.HasValue)
+            .ToList();
+
+        if (priorityTasks.Count == 0) return new();
+
+        return priorityTasks
+            .GroupBy(t => t.Priority?.Name ?? "Не указан")
+            .OrderBy(g => g.First().Priority?.Order ?? int.MaxValue)
+            .ToDictionary(g => g.Key, g => g.Count());
+    }
+
+    private static Dictionary<string, int> CalculateTimeHistogram(List<TaskItem> tasks)
+    {
+        var timeTasks = tasks.Where(t => t.EstimatedMinutes.HasValue).ToList();
+        if (timeTasks.Count == 0) return new();
+
+        // Группировка времени по человекопонятным интервалам
+        var ranges = new (string Label, Func<int, bool> Match)[]
+        {
+            ("≤15 мин", m => m <= 15),
+            ("16–30 мин", m => m is > 15 and <= 30),
+            ("31–60 мин", m => m is > 30 and <= 60),
+            ("1–2 ч", m => m is > 60 and <= 120),
+            ("2–4 ч", m => m is > 120 and <= 240),
+            ("4–8 ч", m => m is > 240 and <= 480),
+            (">8 ч", m => m > 480)
+        };
+
+        Dictionary<string, int> result = new();
+        foreach (var range in ranges)
+        {
+            var count = timeTasks.Count(t => range.Match(t.EstimatedMinutes!.Value));
+            if (count > 0)
+            {
+                result[range.Label] = count;
+            }
+        }
+
+        return result;
     }
 }

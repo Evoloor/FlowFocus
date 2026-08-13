@@ -691,5 +691,75 @@ public class DashboardAnalyticsServiceTests
     }
 
     #endregion
+
+    #region Metric Histogram Tests
+
+    [Fact]
+    public void CalculateMetrics_CalculatesHistogramsForInterestComplexityPriorityAndTime()
+    {
+        var priorityHigh = new PriorityLevel { Id = 1, Order = 1, Name = "Высокий" };
+        var priorityLow = new PriorityLevel { Id = 2, Order = 2, Name = "Низкий" };
+
+        List<TaskItem> tasks =
+        [
+            new() { Id = 1, Title = "Task 1", Interest = 8, Complexity = 10, EstimatedMinutes = 15, Priority = priorityHigh },
+            new() { Id = 2, Title = "Task 2", Interest = 8, Complexity = 20, EstimatedMinutes = 45, Priority = priorityHigh },
+            new() { Id = 3, Title = "Task 3", Interest = 5, Complexity = 10, EstimatedMinutes = 120, Priority = priorityLow }
+        ];
+
+        DashboardFilter filter = new() { Scope = EntityScopeType.All };
+        var metrics = _service.CalculateMetrics(tasks, filter);
+
+        // Interest
+        metrics.InterestHistogram.Should().ContainKey("8").WhoseValue.Should().Be(2);
+        metrics.InterestHistogram.Should().ContainKey("5").WhoseValue.Should().Be(1);
+
+        // Complexity (3 tasks with <=8 unique values -> exact value grouping)
+        metrics.ComplexityHistogram.Should().ContainKey("10").WhoseValue.Should().Be(2);
+        metrics.ComplexityHistogram.Should().ContainKey("20").WhoseValue.Should().Be(1);
+
+        // Priority
+        metrics.PriorityHistogram.Should().ContainKey("Высокий").WhoseValue.Should().Be(2);
+        metrics.PriorityHistogram.Should().ContainKey("Низкий").WhoseValue.Should().Be(1);
+
+        // Time
+        metrics.TimeHistogram.Should().ContainKey("≤15 мин").WhoseValue.Should().Be(1);
+        metrics.TimeHistogram.Should().ContainKey("31–60 мин").WhoseValue.Should().Be(1);
+        metrics.TimeHistogram.Should().ContainKey("1–2 ч").WhoseValue.Should().Be(1);
+    }
+
+    [Fact]
+    public void CalculateMetrics_ComplexityHistogram_DynamicGroupingWhenManyUniqueValues()
+    {
+        // 10 tasks with distinct complexity values from 1 to 90
+        List<TaskItem> tasks = [];
+        for (int i = 1; i <= 10; i++)
+        {
+            tasks.Add(new TaskItem { Id = i, Title = $"Task {i}", Complexity = i * 9 });
+        }
+
+        DashboardFilter filter = new() { Scope = EntityScopeType.All };
+        var metrics = _service.CalculateMetrics(tasks, filter);
+
+        metrics.ComplexityHistogram.Should().NotBeEmpty();
+        metrics.ComplexityHistogram.Values.Sum().Should().Be(10);
+    }
+
+    [Fact]
+    public void CalculateMetrics_EmptyTasks_HistogramDictionariesAreEmpty()
+    {
+        List<TaskItem> tasks = [];
+        DashboardFilter filter = new() { Scope = EntityScopeType.All };
+
+        var metrics = _service.CalculateMetrics(tasks, filter);
+
+        metrics.InterestHistogram.Should().BeEmpty();
+        metrics.ComplexityHistogram.Should().BeEmpty();
+        metrics.PriorityHistogram.Should().BeEmpty();
+        metrics.TimeHistogram.Should().BeEmpty();
+    }
+
+    #endregion
 }
+
 

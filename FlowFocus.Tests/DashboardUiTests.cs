@@ -234,4 +234,42 @@ public class DashboardUiTests : IntegrationTestBase
             .Single(r => r.Title == "Самая длинная цепочка блокировок")
             .Value.Should().Be("2 связей");
     }
+
+    [Fact]
+    public void MetricHistogramCard_RendersSuccessfully_OnDashboard()
+    {
+        var task = new TaskItemBuilder()
+            .WithId(0)
+            .WithTitle("Task with Interest")
+            .WithInterest(8)
+            .Build();
+        TaskRepo.Add(task);
+
+        var cut = _ctx.Render<Dashboard>();
+
+        var histogramCard = cut.FindComponent<MetricHistogramCard>();
+        histogramCard.Should().NotBeNull();
+        histogramCard.Markup.Should().Contain("Распределение параметров задач");
+    }
+
+    [Fact]
+    public void MetricHistogramCard_EvaluatesDisabledOptions_WhenDataMissing()
+    {
+        var metrics = new DashboardMetricsDto
+        {
+            InterestHistogram = new() { { "8", 2 } },
+            ComplexityHistogram = new(), // empty -> disabled
+            PriorityHistogram = new(),   // empty -> disabled
+            TimeHistogram = new()        // empty -> disabled
+        };
+
+        var cut = _ctx.Render<MetricHistogramCard>(p => p.Add(x => x.Metrics, metrics));
+
+        cut.Instance.IsInterestDisabled.Should().BeFalse();
+        cut.Instance.IsComplexityDisabled.Should().BeTrue();
+        cut.Instance.IsPriorityDisabled.Should().BeTrue();
+        cut.Instance.IsTimeDisabled.Should().BeTrue();
+
+        cut.Instance.SelectedMetric.Should().Be(HistogramMetricType.Interest);
+    }
 }

@@ -91,6 +91,19 @@ public class DashboardMetricsDto
     /// <summary>Распределение среднего приоритета в зависимости от интересности (1..10)</summary>
     public Dictionary<int, double> InterestPriorityDistribution { get; set; } = new();
 
+    // === Metric Histogram Data ===
+    /// <summary>Гистограмма распределения по интересности (1-10)</summary>
+    public Dictionary<string, int> InterestHistogram { get; set; } = new();
+
+    /// <summary>Гистограмма распределения по сложности (сгруппированная по БД-значениям)</summary>
+    public Dictionary<string, int> ComplexityHistogram { get; set; } = new();
+
+    /// <summary>Гистограмма распределения по приоритетам</summary>
+    public Dictionary<string, int> PriorityHistogram { get; set; } = new();
+
+    /// <summary>Гистограмма распределения по времени (сгруппированная по БД-значениям)</summary>
+    public Dictionary<string, int> TimeHistogram { get; set; } = new();
+
     /// <summary>Флаг пустого состояния (когда нет задач)</summary>
     public bool IsEmpty => TotalTasksCount == 0 && FilteredCount == 0;
 }
