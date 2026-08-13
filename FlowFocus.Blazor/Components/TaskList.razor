@@ -1,5 +1,3 @@
-@implements IDisposable
-
 <div class="task-list">
     @* Заголовок и элементы управления *@
     @if (ShowTitle || ShowSearch || ShowSortDropdown || ShowFilters || ShowDisplayMode || ShowPagination)
@@ -27,6 +25,8 @@
                     <MudSelect T="SortType" @bind-Value="_sortType" Label="Сортировка"
                                Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true">
                         <MudSelectItem Value="SortType.Relevance">По релевантности</MudSelectItem>
+                        <MudSelectItem Value="SortType.DateCreatedAsc">По дате создания (возр.)</MudSelectItem>
+                        <MudSelectItem Value="SortType.DateCreatedDesc">По дате создания (убыв.)</MudSelectItem>
                         <MudSelectItem Value="SortType.DateAsc">По дате (возр.)</MudSelectItem>
                         <MudSelectItem Value="SortType.DateDesc">По дате (убыв.)</MudSelectItem>
                         <MudSelectItem Value="SortType.ComplexityAsc">По сложности (возр.)</MudSelectItem>

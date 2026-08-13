@@ -104,7 +104,7 @@ public static class TaskDateNormalizer
             }
 
             // Если задача не выполнялась вовсе или рассчитанный очередной срок <= today, значит просрочена/должна выполняться сегодня
-            DateTime targetDate = (nextDate == null || nextDate.Value.Date <= todayDt.Date)
+            var targetDate = (nextDate == null || nextDate.Value.Date <= todayDt.Date)
                 ? todayDt
                 : nextDate.Value.Date;
 

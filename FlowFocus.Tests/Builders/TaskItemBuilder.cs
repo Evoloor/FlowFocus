@@ -237,8 +237,8 @@ public class TaskItemBuilder : EntityBuilder<TaskItem, TaskItemBuilder>
     public static (TaskItem Parent, List<TaskItem> Subtasks) CreateParentWithSubtasks(int subtaskCount, int parentId = 1)
     {
         var parentBuilder = new TaskItemBuilder().WithId(parentId).WithTitle("Parent Task");
-        var subtasks = new List<TaskItem>();
-        for (int i = 1; i <= subtaskCount; i++)
+        List<TaskItem> subtasks = [];
+        for (var i = 1; i <= subtaskCount; i++)
         {
             var subtask = new TaskItemBuilder().WithId(parentId * 100 + i).WithTitle($"Subtask {i}").WithParentTaskId(parentId).Build();
             subtasks.Add(subtask);

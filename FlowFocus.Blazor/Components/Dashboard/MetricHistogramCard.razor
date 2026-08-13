@@ -1,0 +1,152 @@
+@using FlowFocus.Core.Enums
+@using FlowFocus.Core.Models
+
+<MudCard Elevation="3" Class="chart-card glass-card">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <div class="d-flex align-center justify-space-between flex-wrap gap-3">
+                <MudText Typo="Typo.h6" Class="chart-title">Распределение параметров задач</MudText>
+                <MudSelect T="HistogramMetricType"
+                           Value="@SelectedMetric"
+                           ValueChanged="OnMetricChanged"
+                           Label="Параметр"
+                           Variant="Variant.Outlined"
+                           Dense="true"
+                           Class="metric-select">
+                    <MudSelectItem Value="HistogramMetricType.Interest" Disabled="@IsInterestDisabled">
+                        <MudTooltip Text="@(IsInterestDisabled ? "Нет данных по интересности для выбранного фильтра" : "Распределение по интересности (1–10)")"
+                                    Disabled="@(!IsInterestDisabled)">
+                            <span class="d-inline-block w-100">Интересность</span>
+                        </MudTooltip>
+                    </MudSelectItem>
+
+                    <MudSelectItem Value="HistogramMetricType.Complexity" Disabled="@IsComplexityDisabled">
+                        <MudTooltip Text="@(IsComplexityDisabled ? "Нет данных по сложности для выбранного фильтра" : "Распределение по сложности (1–100)")"
+                                    Disabled="@(!IsComplexityDisabled)">
+                            <span class="d-inline-block w-100">Сложность</span>
+                        </MudTooltip>
+                    </MudSelectItem>
+
+                    <MudSelectItem Value="HistogramMetricType.Priority" Disabled="@IsPriorityDisabled">
+                        <MudTooltip Text="@(IsPriorityDisabled ? "Нет данных по приоритету для выбранного фильтра" : "Распределение по приоритетам")"
+                                    Disabled="@(!IsPriorityDisabled)">
+                            <span class="d-inline-block w-100">Приоритет</span>
+                        </MudTooltip>
+                    </MudSelectItem>
+
+                    <MudSelectItem Value="HistogramMetricType.Time" Disabled="@IsTimeDisabled">
+                        <MudTooltip Text="@(IsTimeDisabled ? "Нет данных по времени для выбранного фильтра" : "Распределение по времени выполнения")"
+                                    Disabled="@(!IsTimeDisabled)">
+                            <span class="d-inline-block w-100">Время</span>
+                        </MudTooltip>
+                    </MudSelectItem>
+                </MudSelect>
+            </div>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        @if (CurrentData.Count == 0)
+        {
+            <MudTooltip Text="В выбранном фильтре отсутствуют данные по текущему параметру">
+                <div>
+                    <DashboardEmptyState Message="Нет данных для выбранного параметра" />
+                </div>
+            </MudTooltip>
+        }
+        else
+        {
+            <div class="histogram-chart-container">
+                <MudChart ChartType="ChartType.Bar"
+                          ChartSeries="@Series"
+                          XAxisLabels="@XLabels"
+                          Width="100%"
+                          Height="260px" />
+            </div>
+        }
+    </MudCardContent>
+</MudCard>
+
+<style>
+    .metric-select {
+        min-width: 180px;
+        max-width: 240px;
+    }
+
+    .histogram-chart-container {
+        width: 100%;
+        min-height: 260px;
+    }
+
+    /* Поддержка взаимодействия наведения для заблокированных пунктов выпадающего списка */
+    .mud-select-item-disabled {
+        pointer-events: auto !important;
+        cursor: not-allowed;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public DashboardMetricsDto Metrics { get; set; } = new();
+
+    public HistogramMetricType SelectedMetric { get; set; } = HistogramMetricType.Interest;
+
+    public bool IsInterestDisabled => Metrics.InterestHistogram.Count == 0;
+    public bool IsComplexityDisabled => Metrics.ComplexityHistogram.Count == 0;
+    public bool IsPriorityDisabled => Metrics.PriorityHistogram.Count == 0;
+    public bool IsTimeDisabled => Metrics.TimeHistogram.Count == 0;
+
+    protected override void OnParametersSet()
+    {
+        // Если выбранный параметр становится недоступен, автоматически переключаем на первый доступный
+        if (IsMetricDisabled(SelectedMetric))
+        {
+            if (!IsInterestDisabled) SelectedMetric = HistogramMetricType.Interest;
+            else if (!IsComplexityDisabled) SelectedMetric = HistogramMetricType.Complexity;
+            else if (!IsPriorityDisabled) SelectedMetric = HistogramMetricType.Priority;
+            else if (!IsTimeDisabled) SelectedMetric = HistogramMetricType.Time;
+        }
+    }
+
+    private bool IsMetricDisabled(HistogramMetricType metric) => metric switch
+    {
+        HistogramMetricType.Interest => IsInterestDisabled,
+        HistogramMetricType.Complexity => IsComplexityDisabled,
+        HistogramMetricType.Priority => IsPriorityDisabled,
+        HistogramMetricType.Time => IsTimeDisabled,
+        _ => false
+    };
+
+    private Dictionary<string, int> CurrentData => SelectedMetric switch
+    {
+        HistogramMetricType.Interest => Metrics.InterestHistogram,
+        HistogramMetricType.Complexity => Metrics.ComplexityHistogram,
+        HistogramMetricType.Priority => Metrics.PriorityHistogram,
+        HistogramMetricType.Time => Metrics.TimeHistogram,
+        _ => new()
+    };
+
+    private string MetricName => SelectedMetric switch
+    {
+        HistogramMetricType.Interest => "Интересность",
+        HistogramMetricType.Complexity => "Сложность",
+        HistogramMetricType.Priority => "Приоритет",
+        HistogramMetricType.Time => "Время (мин)",
+        _ => "Количество задач"
+    };
+
+    private string[] XLabels => CurrentData.Keys.ToArray();
+
+    private List<ChartSeries> Series =>
+    [
+        new()
+        {
+            Name = MetricName,
+            Data = CurrentData.Values.Select(v => (double)v).ToArray()
+        }
+    ];
+
+    private void OnMetricChanged(HistogramMetricType metric)
+    {
+        SelectedMetric = metric;
+    }
+}

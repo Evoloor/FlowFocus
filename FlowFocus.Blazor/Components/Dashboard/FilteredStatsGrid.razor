@@ -1,5 +1,3 @@
-@using FlowFocus.Core.Models
-
 <MudCard Elevation="3" Class="analytics-grid-card glass-card">
     <MudCardHeader>
         <CardHeaderContent>
@@ -68,6 +66,18 @@
                     <div class="stat-row">
                         <span class="stat-name">Макс. интересность</span>
                         <span class="stat-val">@(Metrics.FilteredMaxInterest.HasValue ? Metrics.FilteredMaxInterest.Value.ToString() : "—")</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-name">Средний приоритет</span>
+                        <span class="stat-val">@(Metrics.FilteredAvgPriority ?? "—")</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-name">Мин. приоритет</span>
+                        <span class="stat-val">@(Metrics.FilteredMinPriority ?? "—")</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-name">Макс. приоритет</span>
+                        <span class="stat-val">@(Metrics.FilteredMaxPriority ?? "—")</span>
                     </div>
                 </div>
             </div>

@@ -5,7 +5,6 @@
 @inject IDashboardAnalyticsService AnalyticsService
 @inject INotificationService NotificationService
 @using FlowFocus.Blazor.Components.Dashboard
-@using FlowFocus.Core.Enums
 @implements IDisposable
 
 <PageTitle>Дашборд — FlowFocus</PageTitle>
@@ -49,10 +48,6 @@
         {
             <CompletionRateStatCard Value="@_metrics.CompletionRatePercentage" />
         }
-        @if (_metrics.LongestDependencyChainLength > 1)
-        {
-            <LongestChainStatCard ChainLength="@_metrics.LongestDependencyChainLength" />
-        }
         @if (_metrics.CreatedTasksCount.HasValue)
         {
             <CreatedTasksStatCard Count="@_metrics.CreatedTasksCount.Value" />
@@ -91,6 +86,7 @@
         {
             <WeekdayDistributionBarChart Data="@_metrics.WeekdayAverages" />
         }
+        <MetricHistogramCard Metrics="@_metrics" />
         <InterestPriorityChart Data="@_metrics.InterestPriorityDistribution" />
         <DashboardRecordsCard Records="@_metrics.Records" />
     </div>
@@ -149,10 +145,10 @@
 
 @code {
     private DashboardFilter _filter = new();
-    private List<TaskItem> _allTasks = new();
-    private List<Tag> _tags = new();
+    private List<TaskItem> _allTasks = [];
+    private List<Tag> _tags = [];
     private Dictionary<int, int> _tagTaskCounts = new();
-    private List<ExternalCondition> _conditions = new();
+    private List<ExternalCondition> _conditions = [];
     private Dictionary<int, int> _conditionTaskCounts = new();
     private DashboardMetricsDto _metrics = new();
 

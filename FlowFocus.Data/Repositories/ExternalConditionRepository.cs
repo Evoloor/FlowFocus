@@ -66,7 +66,7 @@ public class ExternalConditionRepository(
             Context.SaveChanges();
 
             // Пересчитываем статусы всех заблокированных/запланированных задач
-            var planner = new PriorityEscalationPlanner(new TaskRepository(Context, NotificationService, _recurrenceService));
+            PriorityEscalationPlanner planner = new(new TaskRepository(Context, NotificationService, _recurrenceService));
             planner.UpdateBlockedStatuses();
 
             Context.SaveChanges();
@@ -93,7 +93,7 @@ public class ExternalConditionRepository(
             Context.SaveChanges();
 
             // Пересчитываем статусы освободившихся задач
-            var planner = new PriorityEscalationPlanner(new TaskRepository(Context, NotificationService, _recurrenceService));
+            PriorityEscalationPlanner planner = new(new TaskRepository(Context, NotificationService, _recurrenceService));
             planner.UpdateBlockedStatuses();
 
             Context.SaveChanges();

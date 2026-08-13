@@ -42,20 +42,20 @@
 
     private double TotalSum => Data.Values.Sum();
 
-    private string[] XLabels => new[] { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" };
+    private string[] XLabels => ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
 
-    private ChartOptions Options => new ChartOptions
+    private ChartOptions Options => new()
     {
         YAxisTicks = 1,
         LineStrokeWidth = 3
     };
 
-    private List<ChartSeries> Series => new()
-    {
-        new ChartSeries
+    private List<ChartSeries> Series =>
+    [
+        new()
         {
             Name = "Ср. уровень приоритета",
             Data = Enumerable.Range(1, 10).Select(i => Data.GetValueOrDefault(i, 0.0)).ToArray()
         }
-    };
+    ];
 }

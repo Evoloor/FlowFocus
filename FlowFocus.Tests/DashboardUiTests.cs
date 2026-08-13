@@ -5,14 +5,11 @@ using FlowFocus.Core;
 using FlowFocus.Core.Enums;
 using FlowFocus.Core.Models;
 using FlowFocus.Core.Services;
-using FlowFocus.Data.Repositories;
 using FlowFocus.Tests.Builders;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
 using MudBlazor.Services;
-using NSubstitute;
-using Xunit;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Tests;
@@ -24,7 +21,7 @@ public class DashboardUiTests : IntegrationTestBase
 
     public DashboardUiTests()
     {
-        _ctx = new BunitContext();
+        _ctx = new();
         _ctx.Services.AddMudServices();
 
         _analyticsService = new DashboardAnalyticsService();
@@ -68,7 +65,7 @@ public class DashboardUiTests : IntegrationTestBase
         cut.FindComponents<ActivityMetricCard>().Should().NotBeEmpty();
 
         var scopeSelect = cut.FindComponent<EntityScopeSelect>();
-        cut.InvokeAsync(() => scopeSelect.Instance.FilterChanged.InvokeAsync(new DashboardFilter
+        cut.InvokeAsync(() => scopeSelect.Instance.FilterChanged.InvokeAsync(new()
         {
             Scope = EntityScopeType.Active
         }));
@@ -78,7 +75,7 @@ public class DashboardUiTests : IntegrationTestBase
         cut.FindComponents<ActivityMetricCard>().Should().BeEmpty();
         cut.FindComponents<WeekdayDistributionBarChart>().Should().BeEmpty();
 
-        cut.InvokeAsync(() => scopeSelect.Instance.FilterChanged.InvokeAsync(new DashboardFilter
+        cut.InvokeAsync(() => scopeSelect.Instance.FilterChanged.InvokeAsync(new()
         {
             Scope = EntityScopeType.Completed
         }));
@@ -128,31 +125,44 @@ public class DashboardUiTests : IntegrationTestBase
     public void PieChart_HidesWhenLessThanTwoSlices()
     {
         // Tag pie chart with only 1 tag -> slice count = 1 (< 2)
-        var dataSingle = new Dictionary<string, int> { { "Work", 10 } };
+        Dictionary<string, int> dataSingle = new() { { "Work", 10 } };
         var cutSingle = _ctx.Render<TagsPieChart>(p => p.Add(x => x.Data, dataSingle));
         cutSingle.Markup.Trim().Should().BeEmpty();
 
         // Tag pie chart with 2 tags -> slice count = 2 (>= 2)
-        var dataDouble = new Dictionary<string, int> { { "Work", 10 }, { "Home", 5 } };
+        Dictionary<string, int> dataDouble = new() { { "Work", 10 }, { "Home", 5 } };
         var cutDouble = _ctx.Render<TagsPieChart>(p => p.Add(x => x.Data, dataDouble));
         cutDouble.Markup.Trim().Should().NotBeEmpty();
     }
 
     [Fact]
+    public void DistributionPieChart_RendersTitleAndLegendValues()
+    {
+        Dictionary<string, int> data = new() { { "TagA", 12 }, { "TagB", 8 } };
+        var cut = _ctx.Render<DistributionPieChart>(p => p
+            .Add(x => x.Title, "Тестовое распределение")
+            .Add(x => x.Data, data));
+
+        cut.Find(".chart-title").TextContent.Should().Contain("Тестовое распределение");
+        cut.FindAll(".legend-item").Should().HaveCount(2);
+    }
+
+
+    [Fact]
     public void DashboardPage_EntityScopeSelect_FiltersByTag_HidesTagChart()
     {
-        TagRepo.Add(new Tag { Name = "Work" });
-        TagRepo.Add(new Tag { Name = "Home" });
+        TagRepo.Add(new() { Name = "Work" });
+        TagRepo.Add(new() { Name = "Home" });
 
         var tagWork = TagRepo.GetByName("Work")!;
         var tagHome = TagRepo.GetByName("Home")!;
 
         var workTask = new TaskItemBuilder().WithId(0).WithTitle("Work Task").WithStatus(TaskStatus.Planned).Build();
-        workTask.Tags.Add(new TaskTag { TagId = tagWork.Id });
+        workTask.Tags.Add(new() { TagId = tagWork.Id });
         TaskRepo.Add(workTask);
 
         var homeTask = new TaskItemBuilder().WithId(0).WithTitle("Home Task").WithStatus(TaskStatus.Planned).Build();
-        homeTask.Tags.Add(new TaskTag { TagId = tagHome.Id });
+        homeTask.Tags.Add(new() { TagId = tagHome.Id });
         TaskRepo.Add(homeTask);
 
         var cut = _ctx.Render<Dashboard>();
@@ -160,7 +170,7 @@ public class DashboardUiTests : IntegrationTestBase
         cut.FindComponents<TagsPieChart>().Should().NotBeEmpty();
 
         var scopeSelect = cut.FindComponent<EntityScopeSelect>();
-        cut.InvokeAsync(() => scopeSelect.Instance.FilterChanged.InvokeAsync(new DashboardFilter
+        cut.InvokeAsync(() => scopeSelect.Instance.FilterChanged.InvokeAsync(new()
         {
             Scope = EntityScopeType.Tag,
             TagId = tagWork.Id
@@ -173,11 +183,11 @@ public class DashboardUiTests : IntegrationTestBase
     [Fact]
     public void DashboardPage_EntityScopeSelect_FiltersByCondition_HidesConditionChart()
     {
-        ConditionRepo.Add(new ExternalCondition { Name = "Rainy" });
+        ConditionRepo.Add(new() { Name = "Rainy" });
         var condition = ConditionRepo.GetAll().First(c => c.Name == "Rainy");
 
         var taskWithCondition = new TaskItemBuilder().WithId(0).WithTitle("Rainy Task").WithStatus(TaskStatus.Planned).Build();
-        taskWithCondition.Conditions.Add(new TaskCondition { ConditionId = condition.Id });
+        taskWithCondition.Conditions.Add(new() { ConditionId = condition.Id });
         TaskRepo.Add(taskWithCondition);
 
         var otherTask = new TaskItemBuilder().WithId(0).WithTitle("Sunny Task").WithStatus(TaskStatus.Planned).Build();
@@ -188,7 +198,7 @@ public class DashboardUiTests : IntegrationTestBase
         cut.FindComponents<ConditionsPieChart>().Should().NotBeEmpty();
 
         var scopeSelect = cut.FindComponent<EntityScopeSelect>();
-        cut.InvokeAsync(() => scopeSelect.Instance.FilterChanged.InvokeAsync(new DashboardFilter
+        cut.InvokeAsync(() => scopeSelect.Instance.FilterChanged.InvokeAsync(new()
         {
             Scope = EntityScopeType.Condition,
             ConditionId = condition.Id
@@ -199,14 +209,16 @@ public class DashboardUiTests : IntegrationTestBase
     }
 
     [Fact]
-    public void LongestChainCard_HiddenWhenLengthIsOneOrLess_ShownWhenGreaterThanOne()
+    public void BlockingChainRecord_DashWhenNoChain_ShowsLinksWhenChainExists()
     {
         var singleTask = new TaskItemBuilder().WithId(0).WithTitle("Single Task").Build();
         TaskRepo.Add(singleTask);
 
         var cut = _ctx.Render<Dashboard>();
 
-        cut.FindComponents<LongestChainStatCard>().Should().BeEmpty();
+        cut.FindComponent<DashboardRecordsCard>().Instance.Records
+            .Single(r => r.Title == "Самая длинная цепочка блокировок")
+            .Value.Should().Be("-");
 
         var taskC = new TaskItemBuilder().WithId(103).WithTitle("Task C").Build();
         var taskB = new TaskItemBuilder().WithId(102).WithTitle("Task B").WithRelation(taskC, RelationType.Blocks).Build();
@@ -218,7 +230,46 @@ public class DashboardUiTests : IntegrationTestBase
 
         var cut2 = _ctx.Render<Dashboard>();
 
-        cut2.FindComponents<LongestChainStatCard>().Should().NotBeEmpty();
-        cut2.FindComponent<LongestChainStatCard>().Instance.ChainLength.Should().Be(2);
+        cut2.FindComponent<DashboardRecordsCard>().Instance.Records
+            .Single(r => r.Title == "Самая длинная цепочка блокировок")
+            .Value.Should().Be("2 связей");
+    }
+
+    [Fact]
+    public void MetricHistogramCard_RendersSuccessfully_OnDashboard()
+    {
+        var task = new TaskItemBuilder()
+            .WithId(0)
+            .WithTitle("Task with Interest")
+            .WithInterest(8)
+            .Build();
+        TaskRepo.Add(task);
+
+        var cut = _ctx.Render<Dashboard>();
+
+        var histogramCard = cut.FindComponent<MetricHistogramCard>();
+        histogramCard.Should().NotBeNull();
+        histogramCard.Markup.Should().Contain("Распределение параметров задач");
+    }
+
+    [Fact]
+    public void MetricHistogramCard_EvaluatesDisabledOptions_WhenDataMissing()
+    {
+        var metrics = new DashboardMetricsDto
+        {
+            InterestHistogram = new() { { "8", 2 } },
+            ComplexityHistogram = new(), // empty -> disabled
+            PriorityHistogram = new(),   // empty -> disabled
+            TimeHistogram = new()        // empty -> disabled
+        };
+
+        var cut = _ctx.Render<MetricHistogramCard>(p => p.Add(x => x.Metrics, metrics));
+
+        cut.Instance.IsInterestDisabled.Should().BeFalse();
+        cut.Instance.IsComplexityDisabled.Should().BeTrue();
+        cut.Instance.IsPriorityDisabled.Should().BeTrue();
+        cut.Instance.IsTimeDisabled.Should().BeTrue();
+
+        cut.Instance.SelectedMetric.Should().Be(HistogramMetricType.Interest);
     }
 }

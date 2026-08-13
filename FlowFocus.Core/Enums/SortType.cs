@@ -11,6 +11,10 @@ public enum SortType
     DateAsc,
     /// <summary>По дате назначения (убыв.)</summary>
     DateDesc,
+    /// <summary>По дате создания (возр.)</summary>
+    DateCreatedAsc,
+    /// <summary>По дате создания (убыв.)</summary>
+    DateCreatedDesc,
     /// <summary>По сложности (возр.)</summary>
     ComplexityAsc,
     /// <summary>По сложности (убыв.)</summary>

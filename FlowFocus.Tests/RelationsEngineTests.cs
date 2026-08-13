@@ -40,10 +40,10 @@ public class RelationsEngineTests : IntegrationTestBase
         // Заблокированная (низкий приоритет, но с правилом повышения СЕГОДНЯ)
         var blocked = new TaskItemBuilder().WithId(12).WithPriorityId(low.Id)
             .WithEstimatedMinutes(120).WithDateSource(DateSource.AutoFlexible).WithStatus(TaskStatus.Planned).Build();
-        blocked.PriorityEscalations.Add(new PriorityEscalation { TargetPriorityId = critical.Id, EscalationDate = TodoDay.Today.ToDateTime() });
+        blocked.PriorityEscalations.Add(new() { TargetPriorityId = critical.Id, EscalationDate = TodoDay.Today.ToDateTime() });
 
         Context.Tasks.AddRange(fillerTask, blocker, blocked);
-        Context.TaskRelations.Add(new TaskRelation { SourceTaskId = 11, TargetTaskId = 12, Type = RelationType.Blocks });
+        Context.TaskRelations.Add(new() { SourceTaskId = 11, TargetTaskId = 12, Type = RelationType.Blocks });
         Context.SaveChanges();
 
         var settings = new UserSettingsBuilder().WithDailyTimeLimit(240).Build();
@@ -89,9 +89,9 @@ public class RelationsEngineTests : IntegrationTestBase
     public void CompleteSoleBlocker_RemovesBlockedStatusFromTargetTask()
     {
         // Arrange
-        var (blocker, blocked) = TaskItemBuilder.CreateBlockedChain(101, 102);
+        (var blocker, var blocked) = TaskItemBuilder.CreateBlockedChain(101, 102);
         Context.Tasks.AddRange(blocker, blocked);
-        Context.TaskRelations.Add(new TaskRelation { Id = 1001, SourceTaskId = blocker.Id, TargetTaskId = blocked.Id, Type = RelationType.Blocks });
+        Context.TaskRelations.Add(new() { Id = 1001, SourceTaskId = blocker.Id, TargetTaskId = blocked.Id, Type = RelationType.Blocks });
         Context.SaveChanges();
 
         // Act
@@ -115,8 +115,8 @@ public class RelationsEngineTests : IntegrationTestBase
         TaskItem taskB = new() { Id = 202, Title = "Blocked B", Status = TaskStatus.Planned };
         Context.Tasks.AddRange(taskA, taskC, taskB);
 
-        Context.TaskRelations.Add(new TaskRelation { Id = 2001, SourceTaskId = taskA.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
-        Context.TaskRelations.Add(new TaskRelation { Id = 2002, SourceTaskId = taskC.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
+        Context.TaskRelations.Add(new() { Id = 2001, SourceTaskId = taskA.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
+        Context.TaskRelations.Add(new() { Id = 2002, SourceTaskId = taskC.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
         Context.SaveChanges();
 
         // Act
@@ -139,7 +139,7 @@ public class RelationsEngineTests : IntegrationTestBase
         TaskItem taskB = new() { Id = 302, Title = "Task B", Status = TaskStatus.Planned };
         Context.Tasks.AddRange(taskA, taskB);
 
-        Context.TaskRelations.Add(new TaskRelation { Id = 3001, SourceTaskId = taskA.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
+        Context.TaskRelations.Add(new() { Id = 3001, SourceTaskId = taskA.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
         Context.SaveChanges();
 
         // Act
@@ -163,7 +163,7 @@ public class RelationsEngineTests : IntegrationTestBase
         Context.SaveChanges();
 
         var taskA = new TaskItemBuilder().WithId(601).WithTitle("Source A").Build();
-        taskA.Relations.Add(new TaskRelation { SourceTaskId = 601, TargetTaskId = 602, Type = RelationType.Blocks });
+        taskA.Relations.Add(new() { SourceTaskId = 601, TargetTaskId = 602, Type = RelationType.Blocks });
 
         // Act
         var act = () => TaskRepo.Add(taskA);
@@ -199,7 +199,7 @@ public class RelationsEngineTests : IntegrationTestBase
             .Build();
 
         Context.Tasks.AddRange(taskABlocker, taskBBlocked);
-        Context.TaskRelations.Add(new TaskRelation { SourceTaskId = taskABlocker.Id, TargetTaskId = taskBBlocked.Id, Type = RelationType.Blocks });
+        Context.TaskRelations.Add(new() { SourceTaskId = taskABlocker.Id, TargetTaskId = taskBBlocked.Id, Type = RelationType.Blocks });
         Context.SaveChanges();
 
         taskABlocker.EstimatedMinutes = 45;
@@ -231,8 +231,8 @@ public class RelationsEngineTests : IntegrationTestBase
         TaskItem taskB = new() { Id = 703, Title = "Blocked Task B", Status = TaskStatus.Planned };
 
         Context.Tasks.AddRange(taskA1, taskA2, taskB);
-        Context.TaskRelations.Add(new TaskRelation { Id = 7001, SourceTaskId = taskA1.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
-        Context.TaskRelations.Add(new TaskRelation { Id = 7002, SourceTaskId = taskA2.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
+        Context.TaskRelations.Add(new() { Id = 7001, SourceTaskId = taskA1.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
+        Context.TaskRelations.Add(new() { Id = 7002, SourceTaskId = taskA2.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
         Context.SaveChanges();
 
         // Act
@@ -272,7 +272,7 @@ public class RelationsEngineTests : IntegrationTestBase
         };
         Context.Tasks.AddRange(taskA, taskB);
 
-        Context.TaskRelations.Add(new TaskRelation { Id = 2001, SourceTaskId = taskA.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
+        Context.TaskRelations.Add(new() { Id = 2001, SourceTaskId = taskA.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
         Context.SaveChanges();
 
         UserSettings settings = new() { DailyTimeLimit = 300, DailyComplexityLimit = 100, DailyTaskLimit = 10 };
@@ -311,7 +311,7 @@ public class RelationsEngineTests : IntegrationTestBase
         };
         Context.Tasks.AddRange(taskA, taskB);
 
-        Context.TaskRelations.Add(new TaskRelation { Id = 3001, SourceTaskId = taskA.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
+        Context.TaskRelations.Add(new() { Id = 3001, SourceTaskId = taskA.Id, TargetTaskId = taskB.Id, Type = RelationType.Blocks });
         Context.SaveChanges();
 
         UserSettings settings = new() { DailyTimeLimit = 300, DailyComplexityLimit = 100, DailyTaskLimit = 10 };
@@ -338,7 +338,7 @@ public class RelationsEngineTests : IntegrationTestBase
         var notConfiguredTask = new TaskItemBuilder().WithId(202).WithStatus(TaskStatus.NotConfigured).Build();
 
         Context.Tasks.AddRange(blocker, notConfiguredTask);
-        Context.TaskRelations.Add(new TaskRelation { SourceTaskId = blocker.Id, TargetTaskId = notConfiguredTask.Id, Type = RelationType.Blocks });
+        Context.TaskRelations.Add(new() { SourceTaskId = blocker.Id, TargetTaskId = notConfiguredTask.Id, Type = RelationType.Blocks });
         Context.SaveChanges();
 
         // Act 1: Verify relation addition did not automatically alter status
@@ -371,11 +371,10 @@ public class RelationsEngineTests : IntegrationTestBase
             .WithStatus(TaskStatus.Planned).Build();
         var blocked = new TaskItemBuilder().WithId(502).WithPriorityId(low.Id)
             .WithStatus(TaskStatus.Planned).Build();
-        blocked.PriorityEscalations.Add(new PriorityEscalation
-            { TargetPriorityId = critical.Id, EscalationDate = TodoDay.Today.ToDateTime() });
+        blocked.PriorityEscalations.Add(new() { TargetPriorityId = critical.Id, EscalationDate = TodoDay.Today.ToDateTime() });
 
         Context.Tasks.AddRange(blocker, blocked);
-        Context.TaskRelations.Add(new TaskRelation { SourceTaskId = blocker.Id, TargetTaskId = blocked.Id, Type = RelationType.Blocks });
+        Context.TaskRelations.Add(new() { SourceTaskId = blocker.Id, TargetTaskId = blocked.Id, Type = RelationType.Blocks });
         Context.SaveChanges();
 
         // Act

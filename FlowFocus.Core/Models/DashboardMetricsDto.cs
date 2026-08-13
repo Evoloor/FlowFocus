@@ -21,9 +21,6 @@ public class DashboardMetricsDto
     /// <summary>Процент оставшихся (активных) задач</summary>
     public double CompletionRatePercentage { get; set; }
 
-    /// <summary>Самая длинная цепочка блокировок (переходов в графе)</summary>
-    public int LongestDependencyChainLength { get; set; }
-
     /// <summary>Создано задач за выбранный период (null если за все время)</summary>
     public int? CreatedTasksCount { get; set; }
 
@@ -74,16 +71,38 @@ public class DashboardMetricsDto
     /// <summary>Максимальная интересность с учётом Scope (только non-null)</summary>
     public int? FilteredMaxInterest { get; set; }
 
+    /// <summary>Средний приоритет с учётом Scope (только non-null)</summary>
+    public string? FilteredAvgPriority { get; set; }
+
+    /// <summary>Минимальный приоритет с учётом Scope (только non-null)</summary>
+    public string? FilteredMinPriority { get; set; }
+
+    /// <summary>Максимальный приоритет с учётом Scope (только non-null)</summary>
+    public string? FilteredMaxPriority { get; set; }
+
     // === Weekday Analytics ===
     /// <summary>Среднее распределение выполненных дел по дням недели (Пн-Вс)</summary>
     public Dictionary<DayOfWeek, double> WeekdayAverages { get; set; } = new();
 
     // === Records & Analytics ===
     /// <summary>Список рекордов</summary>
-    public List<DashboardRecordItem> Records { get; set; } = new();
+    public List<DashboardRecordItem> Records { get; set; } = [];
 
     /// <summary>Распределение среднего приоритета в зависимости от интересности (1..10)</summary>
     public Dictionary<int, double> InterestPriorityDistribution { get; set; } = new();
+
+    // === Metric Histogram Data ===
+    /// <summary>Гистограмма распределения по интересности (1-10)</summary>
+    public Dictionary<string, int> InterestHistogram { get; set; } = new();
+
+    /// <summary>Гистограмма распределения по сложности (сгруппированная по БД-значениям)</summary>
+    public Dictionary<string, int> ComplexityHistogram { get; set; } = new();
+
+    /// <summary>Гистограмма распределения по приоритетам</summary>
+    public Dictionary<string, int> PriorityHistogram { get; set; } = new();
+
+    /// <summary>Гистограмма распределения по времени (сгруппированная по БД-значениям)</summary>
+    public Dictionary<string, int> TimeHistogram { get; set; } = new();
 
     /// <summary>Флаг пустого состояния (когда нет задач)</summary>
     public bool IsEmpty => TotalTasksCount == 0 && FilteredCount == 0;

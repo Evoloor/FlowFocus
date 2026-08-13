@@ -1,49 +1,13 @@
-@using FlowFocus.Core.Helpers
-
-@if (ProcessedData.Count >= 2)
-{
-    <MudCard Elevation="3" Class="chart-card glass-card">
-        <MudCardHeader>
-            <CardHeaderContent>
-                <MudText Typo="Typo.h6" Class="chart-title">Распределение по тегам</MudText>
-            </CardHeaderContent>
-        </MudCardHeader>
-        <MudCardContent>
-            <div class="chart-wrapper">
-                <MudChart ChartType="ChartType.Donut"
-                          InputData="@ChartData"
-                          InputLabels="@ChartLabels"
-                          Width="220px"
-                          Height="220px" />
-                <div class="chart-legend-grid">
-                    @for (int i = 0; i < ChartLabels.Length; i++)
-                    {
-                        var index = i;
-                        <div class="legend-item">
-                            <span class="legend-badge" style="background-color: @GetColor(index)"></span>
-                            <span class="legend-label text-truncate">@ChartLabels[index]</span>
-                            <span class="legend-value">@ChartData[index]</span>
-                        </div>
-                    }
-                </div>
-            </div>
-        </MudCardContent>
-    </MudCard>
-}
+<DistributionPieChart Title="Распределение по тегам"
+                      Data="@Data"
+                      Palette="@Palette" />
 
 @code {
     [Parameter]
     public Dictionary<string, int> Data { get; set; } = new();
 
-    private Dictionary<string, int> ProcessedData => PieChartGroupingHelper.GroupSmallSlices(Data, "Другое");
-
-    private double[] ChartData => ProcessedData.Values.Select(v => (double)v).ToArray();
-    private string[] ChartLabels => ProcessedData.Keys.ToArray();
-
-    private static readonly string[] Palette = new[]
-    {
+    private static readonly string[] Palette =
+    [
         "#6366f1", "#06b6d4", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#3b82f6", "#94a3b8"
-    };
-
-    private static string GetColor(int index) => Palette[index % Palette.Length];
+    ];
 }

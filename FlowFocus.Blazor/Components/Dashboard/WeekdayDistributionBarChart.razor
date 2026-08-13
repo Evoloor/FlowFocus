@@ -35,20 +35,20 @@
 
     private double TotalSum => Data.Values.Sum();
 
-    private static readonly DayOfWeek[] OrderedDays = new[]
-    {
+    private static readonly DayOfWeek[] OrderedDays =
+    [
         DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
         DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
-    };
+    ];
 
-    private string[] XLabels => new[] { "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс" };
+    private string[] XLabels => ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
-    private List<ChartSeries> Series => new()
-    {
-        new ChartSeries
+    private List<ChartSeries> Series =>
+    [
+        new()
         {
             Name = "Ср. кол-во выполненных задач",
             Data = OrderedDays.Select(d => Data.GetValueOrDefault(d, 0.0)).ToArray()
         }
-    };
+    ];
 }

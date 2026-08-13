@@ -1,6 +1,7 @@
 using FluentAssertions;
 using FlowFocus.Core;
 using FlowFocus.Core.Enums;
+using FlowFocus.Core.Models;
 using FlowFocus.Core.Validation;
 using FlowFocus.Data.Services;
 using FlowFocus.Tests.Builders;
@@ -100,7 +101,7 @@ public class RecurringTasksEngineTests : IntegrationTestBase
         var nextDate = recurrenceService.CalculateNextRecurrenceDate(task);
 
         // Assert
-        nextDate.Should().Be(new DateTime(2026, 9, 3));
+        nextDate.Should().Be(new(2026, 9, 3));
     }
 
     /// <summary>
@@ -124,7 +125,7 @@ public class RecurringTasksEngineTests : IntegrationTestBase
         var nextDate = recurrenceService.CalculateNextRecurrenceDate(task);
 
         // Assert
-        nextDate.Should().Be(new DateTime(2026, 2, 28));
+        nextDate.Should().Be(new(2026, 2, 28));
     }
 
     /// <summary>
@@ -148,7 +149,7 @@ public class RecurringTasksEngineTests : IntegrationTestBase
         var nextDate = recurrenceService.CalculateNextRecurrenceDate(task);
 
         // Assert
-        nextDate.Should().Be(new DateTime(2027, 8, 3));
+        nextDate.Should().Be(new(2027, 8, 3));
     }
 
     /// <summary>
@@ -158,7 +159,7 @@ public class RecurringTasksEngineTests : IntegrationTestBase
     public void CompleteRecurringTask_CascadesSubtasksToNewCopyInRepository()
     {
         // Arrange
-        var (parent, _) = TaskItemBuilder.CreateParentWithSubtasks(2, 500);
+        (var parent, _) = TaskItemBuilder.CreateParentWithSubtasks(2, 500);
         parent.IsRecurring = true;
         parent.RecurrenceType = RecurrenceType.Daily;
         parent.ScheduledDate = TodoDay.Today.ToDateTime();

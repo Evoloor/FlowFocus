@@ -71,8 +71,8 @@ public static class TaskRelationValidator
     /// </summary>
     public static void CheckCircularBlocks(TaskItem source, TaskItem target, IEnumerable<TaskRelation>? relationsGraph = null)
     {
-        var visited = new HashSet<int>();
-        var queue = new Queue<int>();
+        HashSet<int> visited = [];
+        Queue<int> queue = new();
         queue.Enqueue(target.Id);
 
         var graph = relationsGraph?.ToList() ?? [];

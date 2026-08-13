@@ -1,5 +1,3 @@
-@using FlowFocus.Core.Models
-
 <MudCard Elevation="3" Class="records-card glass-card">
     <MudCardHeader>
         <CardHeaderContent>
@@ -102,7 +100,7 @@
 
 @code {
     [Parameter]
-    public List<DashboardRecordItem> Records { get; set; } = new();
+    public List<DashboardRecordItem> Records { get; set; } = [];
 
     private IEnumerable<DashboardRecordItem> SortedRecords => Records
         .OrderByDescending(r => r.Date ?? DateTime.MinValue);

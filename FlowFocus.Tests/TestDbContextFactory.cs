@@ -19,7 +19,7 @@ public static class TestDbContextFactory
 
     public static (StorageContext Context, SqliteConnection Connection) CreateSqliteContext()
     {
-        var connection = new SqliteConnection("DataSource=:memory:");
+        SqliteConnection connection = new("DataSource=:memory:");
         connection.Open();
 
         var options = new DbContextOptionsBuilder<StorageContext>()

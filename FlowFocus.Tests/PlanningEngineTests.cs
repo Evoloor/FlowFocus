@@ -173,7 +173,7 @@ public class PlanningEngineTests : IntegrationTestBase
     {
         // Arrange
         var urgentPriority = Context.Priorities.First(p => p.Order == 1);
-        var (parentTask, subtasks) = TaskItemBuilder.CreateParentWithSubtasks(2, 10);
+        (var parentTask, var subtasks) = TaskItemBuilder.CreateParentWithSubtasks(2, 10);
         parentTask.PriorityId = urgentPriority.Id;
         parentTask.EstimatedMinutes = 30;
         parentTask.DateSource = DateSource.AutoFlexible;
@@ -287,7 +287,7 @@ public class PlanningEngineTests : IntegrationTestBase
     public void DailyTaskLimit_ExcludesSubtasksFromCount()
     {
         // Arrange
-        var (parentTask, _) = TaskItemBuilder.CreateParentWithSubtasks(2, 900);
+        (var parentTask, _) = TaskItemBuilder.CreateParentWithSubtasks(2, 900);
         parentTask.DateSource = DateSource.AutoFlexible;
         parentTask.Status = TaskStatus.Planned;
 
@@ -422,7 +422,7 @@ public class PlanningEngineTests : IntegrationTestBase
         };
         Context.Tasks.AddRange(blockerA, blockedB);
 
-        Context.TaskRelations.Add(new TaskRelation { Id = 6001, SourceTaskId = blockerA.Id, TargetTaskId = blockedB.Id, Type = RelationType.Blocks });
+        Context.TaskRelations.Add(new() { Id = 6001, SourceTaskId = blockerA.Id, TargetTaskId = blockedB.Id, Type = RelationType.Blocks });
         Context.SaveChanges();
 
         var settings = new UserSettingsBuilder().WithDailyTimeLimit(200).Build();
@@ -555,8 +555,7 @@ public class PlanningEngineTests : IntegrationTestBase
         var task = new TaskItemBuilder()
             .WithId(4001).WithPriorityId(currentPriority.Id).WithStatus(TaskStatus.Planned).Build();
 
-        task.PriorityEscalations.Add(new PriorityEscalation
-            { TargetPriorityId = targetPriority.Id, EscalationDate = tomorrow });
+        task.PriorityEscalations.Add(new() { TargetPriorityId = targetPriority.Id, EscalationDate = tomorrow });
         TaskRepo.Add(task);
         Context.SaveChanges();
 

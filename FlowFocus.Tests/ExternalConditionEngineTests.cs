@@ -3,7 +3,6 @@ using FlowFocus.Core.Enums;
 using FlowFocus.Core.Models;
 using FlowFocus.Tests.Builders;
 using FluentAssertions;
-using Xunit;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Tests;
@@ -32,7 +31,7 @@ public class ExternalConditionEngineTests : IntegrationTestBase
     public void NewCondition_IsInactiveByDefault()
     {
         // Arrange & Act
-        var conditionModel = new ExternalCondition { Name = "Новое условие" };
+        ExternalCondition conditionModel = new() { Name = "Новое условие" };
         var repoCondition = ConditionRepo.GetOrCreate("Условие из репозитория");
 
         // Assert
@@ -53,7 +52,7 @@ public class ExternalConditionEngineTests : IntegrationTestBase
             .WithStatus(TaskStatus.Planned)
             .Build();
 
-        task.Conditions.Add(new TaskCondition { TaskId = task.Id, ConditionId = condition.Id });
+        task.Conditions.Add(new() { TaskId = task.Id, ConditionId = condition.Id });
         Context.Tasks.Add(task);
         Context.SaveChanges();
 
@@ -86,8 +85,8 @@ public class ExternalConditionEngineTests : IntegrationTestBase
         var completedTask = new TaskItemBuilder().WithId(102).WithStatus(TaskStatus.Completed).Build();
         var irrelevantTask = new TaskItemBuilder().WithId(103).WithStatus(TaskStatus.Irrelevant).Build();
 
-        completedTask.Conditions.Add(new TaskCondition { TaskId = completedTask.Id, ConditionId = condition.Id });
-        irrelevantTask.Conditions.Add(new TaskCondition { TaskId = irrelevantTask.Id, ConditionId = condition.Id });
+        completedTask.Conditions.Add(new() { TaskId = completedTask.Id, ConditionId = condition.Id });
+        irrelevantTask.Conditions.Add(new() { TaskId = irrelevantTask.Id, ConditionId = condition.Id });
 
         Context.Tasks.AddRange(completedTask, irrelevantTask);
         Context.SaveChanges();
@@ -113,8 +112,8 @@ public class ExternalConditionEngineTests : IntegrationTestBase
         ConditionRepo.ToggleConditionActive(condB.Id, true);
 
         var task = new TaskItemBuilder().WithId(104).WithStatus(TaskStatus.Planned).Build();
-        task.Conditions.Add(new TaskCondition { TaskId = task.Id, ConditionId = condA.Id });
-        task.Conditions.Add(new TaskCondition { TaskId = task.Id, ConditionId = condB.Id });
+        task.Conditions.Add(new() { TaskId = task.Id, ConditionId = condA.Id });
+        task.Conditions.Add(new() { TaskId = task.Id, ConditionId = condB.Id });
 
         Context.Tasks.Add(task);
         Context.SaveChanges();
@@ -150,7 +149,7 @@ public class ExternalConditionEngineTests : IntegrationTestBase
             .WithDateSource(DateSource.AutoFlexible)
             .Build();
 
-        task.Conditions.Add(new TaskCondition { TaskId = task.Id, ConditionId = condition.Id });
+        task.Conditions.Add(new() { TaskId = task.Id, ConditionId = condition.Id });
         Context.Tasks.Add(task);
         Context.SaveChanges();
 
@@ -178,7 +177,7 @@ public class ExternalConditionEngineTests : IntegrationTestBase
             .WithScheduledDate(manualDate, DateSource.Manual)
             .Build();
 
-        task.Conditions.Add(new TaskCondition { TaskId = task.Id, ConditionId = condition.Id });
+        task.Conditions.Add(new() { TaskId = task.Id, ConditionId = condition.Id });
         Context.Tasks.Add(task);
         Context.SaveChanges();
 
@@ -208,7 +207,7 @@ public class ExternalConditionEngineTests : IntegrationTestBase
             .WithScheduledDate(todayDate, DateSource.AutoFixed)
             .Build();
 
-        recurringTask.Conditions.Add(new TaskCondition { TaskId = recurringTask.Id, ConditionId = condition.Id });
+        recurringTask.Conditions.Add(new() { TaskId = recurringTask.Id, ConditionId = condition.Id });
         Context.Tasks.Add(recurringTask);
         Context.SaveChanges();
 
@@ -243,10 +242,10 @@ public class ExternalConditionEngineTests : IntegrationTestBase
         var blockerTask = new TaskItemBuilder().WithId(201).WithStatus(TaskStatus.Planned).Build();
         var targetTask = new TaskItemBuilder().WithId(202).WithStatus(TaskStatus.Planned).Build();
 
-        targetTask.Conditions.Add(new TaskCondition { TaskId = targetTask.Id, ConditionId = cond1.Id });
+        targetTask.Conditions.Add(new() { TaskId = targetTask.Id, ConditionId = cond1.Id });
 
         Context.Tasks.AddRange(blockerTask, targetTask);
-        Context.TaskRelations.Add(new TaskRelation { SourceTaskId = blockerTask.Id, TargetTaskId = targetTask.Id, Type = RelationType.Blocks });
+        Context.TaskRelations.Add(new() { SourceTaskId = blockerTask.Id, TargetTaskId = targetTask.Id, Type = RelationType.Blocks });
         Context.SaveChanges();
 
         // Target task has BOTH condition block and task relation block
@@ -271,7 +270,7 @@ public class ExternalConditionEngineTests : IntegrationTestBase
         ConditionRepo.IncrementUsage(condition.Id);
 
         var task = new TaskItemBuilder().WithId(301).WithStatus(TaskStatus.Planned).Build();
-        task.Conditions.Add(new TaskCondition { TaskId = task.Id, ConditionId = condition.Id });
+        task.Conditions.Add(new() { TaskId = task.Id, ConditionId = condition.Id });
         Context.Tasks.Add(task);
         Context.SaveChanges();
 
@@ -290,14 +289,14 @@ public class ExternalConditionEngineTests : IntegrationTestBase
     public void TaskFilterEvaluator_FiltersByConditionId_And_WithoutConditionsOption()
     {
         // Arrange
-        var cond1 = new ExternalCondition { Id = 10, Name = "Город А" };
-        var cond2 = new ExternalCondition { Id = 20, Name = "Офис" };
+        ExternalCondition cond1 = new() { Id = 10, Name = "Город А" };
+        ExternalCondition cond2 = new() { Id = 20, Name = "Офис" };
 
         var taskWithCond1 = new TaskItemBuilder().WithId(401).WithTitle("Задача в Городе А").Build();
-        taskWithCond1.Conditions.Add(new TaskCondition { TaskId = 401, ConditionId = 10, Condition = cond1 });
+        taskWithCond1.Conditions.Add(new() { TaskId = 401, ConditionId = 10, Condition = cond1 });
 
         var taskWithCond2 = new TaskItemBuilder().WithId(402).WithTitle("Задача в Офисе").Build();
-        taskWithCond2.Conditions.Add(new TaskCondition { TaskId = 402, ConditionId = 20, Condition = cond2 });
+        taskWithCond2.Conditions.Add(new() { TaskId = 402, ConditionId = 20, Condition = cond2 });
 
         var taskWithoutCond = new TaskItemBuilder().WithId(403).WithTitle("Задача без условий").Build();
 
@@ -328,6 +327,6 @@ public class ExternalConditionEngineTests : IntegrationTestBase
 
         // Assert 3: Возвращает задачи 402 и 403
         filteredComb.Should().HaveCount(2);
-        filteredComb.Select(t => t.Id).Should().BeEquivalentTo(new[] { 402, 403 });
+        filteredComb.Select(t => t.Id).Should().BeEquivalentTo([402, 403]);
     }
 }
