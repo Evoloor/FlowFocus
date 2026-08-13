@@ -114,6 +114,9 @@ public static class TaskFilterEvaluator
             SortType.DateAsc => tasks.OrderBy(t => t.ScheduledDate ?? DateTime.MaxValue),
             SortType.DateDesc => tasks.OrderByDescending(t => t.ScheduledDate ?? DateTime.MinValue),
 
+            SortType.DateCreatedAsc => tasks.OrderBy(t => t.CreatedDate),
+            SortType.DateCreatedDesc => tasks.OrderByDescending(t => t.CreatedDate),
+
             SortType.ComplexityAsc => tasks.OrderBy(t => t.Complexity ?? 0),
             SortType.ComplexityDesc => tasks.OrderByDescending(t => t.Complexity ?? 0),
 
