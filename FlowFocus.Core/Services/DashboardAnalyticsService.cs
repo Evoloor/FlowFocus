@@ -365,6 +365,21 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
             dto.FilteredMaxInterest = tasksWithInterest.Max();
         }
 
+        var tasksWithPriority = scopeFiltered.Where(t => t.Priority != null).ToList();
+        if (tasksWithPriority.Count > 0)
+        {
+            var maxPriorityTask = tasksWithPriority.MinBy(t => t.Priority!.Order);
+            var minPriorityTask = tasksWithPriority.MaxBy(t => t.Priority!.Order);
+
+            dto.FilteredMaxPriority = maxPriorityTask?.Priority!.Name;
+            dto.FilteredMinPriority = minPriorityTask?.Priority!.Name;
+
+            double avgOrder = tasksWithPriority.Average(t => t.Priority!.Order);
+            var distinctPriorities = tasksWithPriority.Select(t => t.Priority!).DistinctBy(p => p.Id).ToList();
+            var avgPriority = distinctPriorities.MinBy(p => Math.Abs(p.Order - avgOrder));
+            dto.FilteredAvgPriority = avgPriority?.Name;
+        }
+
         // === Weekday Distribution ===
         dto.WeekdayAverages = CalculateWeekdayDistribution(scopeFiltered);
 

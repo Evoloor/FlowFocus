@@ -464,6 +464,29 @@ public class DashboardAnalyticsServiceTests
     }
 
     [Fact]
+    public void test_filtered_stats_priority_textual_metrics()
+    {
+        var critical = new PriorityLevel { Id = 1, Order = 1, Name = "Критический" };
+        var high = new PriorityLevel { Id = 2, Order = 2, Name = "Высокий" };
+        var low = new PriorityLevel { Id = 3, Order = 5, Name = "Низкий" };
+
+        var tasks = new List<TaskItem>
+        {
+            new TaskItem { Id = 1, Priority = critical, PriorityId = critical.Id },
+            new TaskItem { Id = 2, Priority = high, PriorityId = high.Id },
+            new TaskItem { Id = 3, Priority = low, PriorityId = low.Id },
+            new TaskItem { Id = 4, Priority = null, PriorityId = null }
+        };
+
+        var filter = new DashboardFilter { Scope = EntityScopeType.All };
+        var metrics = _service.CalculateMetrics(tasks, filter);
+
+        metrics.FilteredMaxPriority.Should().Be("Критический");
+        metrics.FilteredMinPriority.Should().Be("Низкий");
+        metrics.FilteredAvgPriority.Should().Be("Высокий");
+    }
+
+    [Fact]
     public void test_pie_chart_grouping_helper()
     {
         // Total sum = 100. A = 55 (55%), B = 30 (30%), C = 8 (8%), D = 7 (7%)

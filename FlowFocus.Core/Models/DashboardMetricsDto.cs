@@ -71,6 +71,15 @@ public class DashboardMetricsDto
     /// <summary>Максимальная интересность с учётом Scope (только non-null)</summary>
     public int? FilteredMaxInterest { get; set; }
 
+    /// <summary>Средний приоритет с учётом Scope (только non-null)</summary>
+    public string? FilteredAvgPriority { get; set; }
+
+    /// <summary>Минимальный приоритет с учётом Scope (только non-null)</summary>
+    public string? FilteredMinPriority { get; set; }
+
+    /// <summary>Максимальный приоритет с учётом Scope (только non-null)</summary>
+    public string? FilteredMaxPriority { get; set; }
+
     // === Weekday Analytics ===
     /// <summary>Среднее распределение выполненных дел по дням недели (Пн-Вс)</summary>
     public Dictionary<DayOfWeek, double> WeekdayAverages { get; set; } = new();
