@@ -86,7 +86,7 @@ public class DashboardMetricsDto
 
     // === Records & Analytics ===
     /// <summary>Список рекордов</summary>
-    public List<DashboardRecordItem> Records { get; set; } = new();
+    public List<DashboardRecordItem> Records { get; set; } = [];
 
     /// <summary>Распределение среднего приоритета в зависимости от интересности (1..10)</summary>
     public Dictionary<int, double> InterestPriorityDistribution { get; set; } = new();

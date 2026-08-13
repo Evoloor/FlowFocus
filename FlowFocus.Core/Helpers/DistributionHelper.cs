@@ -13,7 +13,7 @@ public static class DistributionHelper
         Func<T, TKey> keySelector)
         where TKey : notnull
     {
-        if (items == null) return new Dictionary<TKey, int>();
+        if (items == null) return new();
 
         return items
             .GroupBy(keySelector)
@@ -28,10 +28,10 @@ public static class DistributionHelper
         Func<T, IEnumerable<TKey>?> collectionSelector)
         where TKey : notnull
     {
-        if (items == null) return new Dictionary<TKey, int>();
+        if (items == null) return new();
 
         return items
-            .SelectMany(t => collectionSelector(t) ?? Array.Empty<TKey>())
+            .SelectMany(t => collectionSelector(t) ?? [])
             .GroupBy(k => k)
             .ToDictionary(g => g.Key, g => g.Count());
     }

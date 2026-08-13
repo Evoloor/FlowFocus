@@ -1,6 +1,3 @@
-@using FlowFocus.Core.Enums
-@using FlowFocus.Core.Models
-
 <div class="entity-scope-group">
     <MudSelect T="EntityScopeType"
                Value="@Filter.Scope"
@@ -25,7 +22,7 @@
                    Class="scope-sub-select">
             @foreach (var tag in SortedTags)
             {
-                int count = TagTaskCounts.GetValueOrDefault(tag.Id, 0);
+                var count = TagTaskCounts.GetValueOrDefault(tag.Id, 0);
                 <MudSelectItem Value="@((int?)tag.Id)">@tag.Name (@count)</MudSelectItem>
             }
         </MudSelect>
@@ -40,7 +37,7 @@
                    Class="scope-sub-select">
             @foreach (var condition in SortedConditions)
             {
-                int count = ConditionTaskCounts.GetValueOrDefault(condition.Id, 0);
+                var count = ConditionTaskCounts.GetValueOrDefault(condition.Id, 0);
                 <MudSelectItem Value="@((int?)condition.Id)">@condition.Name (@count)</MudSelectItem>
             }
         </MudSelect>
@@ -69,13 +66,13 @@
     public DashboardFilter Filter { get; set; } = new();
 
     [Parameter]
-    public List<Tag> Tags { get; set; } = new();
+    public List<Tag> Tags { get; set; } = [];
 
     [Parameter]
     public Dictionary<int, int> TagTaskCounts { get; set; } = new();
 
     [Parameter]
-    public List<ExternalCondition> Conditions { get; set; } = new();
+    public List<ExternalCondition> Conditions { get; set; } = [];
 
     [Parameter]
     public Dictionary<int, int> ConditionTaskCounts { get; set; } = new();

@@ -16,7 +16,7 @@
                           Width="220px"
                           Height="220px" />
                 <div class="chart-legend-grid">
-                    @for (int i = 0; i < ChartLabels.Length; i++)
+                    @for (var i = 0; i < ChartLabels.Length; i++)
                     {
                         var index = i;
                         var label = ChartLabels[index];
@@ -99,15 +99,21 @@
     [Parameter]
     public Func<string, int, string>? ColorResolver { get; set; }
 
-    private Dictionary<string, int> ProcessedData => PieChartGroupingHelper.GroupSmallSlices(Data ?? new(), OtherLabel);
+    [Parameter]
+    public int MaxSlices { get; set; } = 10;
+
+    [Parameter]
+    public double ThresholdPercent { get; set; } = 0.025;
+
+    private Dictionary<string, int> ProcessedData => PieChartGroupingHelper.GroupSmallSlices(Data ?? new(), OtherLabel, MaxSlices, ThresholdPercent);
 
     private double[] ChartData => ProcessedData.Values.Select(v => (double)v).ToArray();
     private string[] ChartLabels => ProcessedData.Keys.ToArray();
 
-    private static readonly string[] DefaultPalette = new[]
-    {
+    private static readonly string[] DefaultPalette =
+    [
         "#6366f1", "#06b6d4", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#3b82f6", "#94a3b8"
-    };
+    ];
 
     private string GetColor(string label, int index)
     {

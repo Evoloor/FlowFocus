@@ -46,7 +46,7 @@ public static class TaskGraphSyncHelper
 
             if (relation.TargetTaskId == 0)
             {
-                entity.Relations[i] = new TaskRelation
+                entity.Relations[i] = new()
                 {
                     Id = relation.Id > 0 ? relation.Id : 0,
                     SourceTaskId = relation.SourceTaskId == 0 ? entity.Id : relation.SourceTaskId,
@@ -93,7 +93,7 @@ public static class TaskGraphSyncHelper
 
         foreach (var sourceTag in source.Tags.Where(st => !trackedTagIds.Contains(st.TagId)))
         {
-            context.TaskTags.Add(new TaskTag
+            context.TaskTags.Add(new()
             {
                 TaskId = tracked.Id,
                 TagId = sourceTag.TagId
@@ -118,7 +118,7 @@ public static class TaskGraphSyncHelper
 
         foreach (var sourceCondition in source.Conditions.Where(sc => !trackedConditionIds.Contains(sc.ConditionId)))
         {
-            context.TaskConditions.Add(new TaskCondition
+            context.TaskConditions.Add(new()
             {
                 TaskId = tracked.Id,
                 ConditionId = sourceCondition.ConditionId

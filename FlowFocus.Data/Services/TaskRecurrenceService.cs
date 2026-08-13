@@ -102,7 +102,7 @@ public class TaskRecurrenceService : ITaskRecurrenceService
         var interval = monthsInterval <= 0 ? 1 : monthsInterval;
         var target = baseDate.AddMonths(interval);
         var daysInTarget = DateTime.DaysInMonth(target.Year, target.Month);
-        return new DateTime(target.Year, target.Month, Math.Min(baseDate.Day, daysInTarget));
+        return new(target.Year, target.Month, Math.Min(baseDate.Day, daysInTarget));
     }
 
     private static DateTime CalculateNextYearDate(DateTime baseDate, int yearsInterval)
@@ -110,7 +110,7 @@ public class TaskRecurrenceService : ITaskRecurrenceService
         var interval = yearsInterval <= 0 ? 1 : yearsInterval;
         var targetYear = baseDate.Year + interval;
         var daysInTarget = DateTime.DaysInMonth(targetYear, baseDate.Month);
-        return new DateTime(targetYear, baseDate.Month, Math.Min(baseDate.Day, daysInTarget));
+        return new(targetYear, baseDate.Month, Math.Min(baseDate.Day, daysInTarget));
     }
 
     private static DateTime CalculateNextWeekDayDate(DateTime baseDate, int weekDaysMask)

@@ -20,8 +20,8 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         }
 
         var currentDate = (now ?? DateTime.UtcNow).Date;
-        int daysWindow = mode == DateRangeMode.Recent ? 14 : 90;
-        int minTargetCount = mode == DateRangeMode.Recent ? 100 : 300;
+        var daysWindow = mode == DateRangeMode.Recent ? 14 : 90;
+        var minTargetCount = mode == DateRangeMode.Recent ? 100 : 300;
         var thresholdDate = currentDate.AddDays(-daysWindow);
 
         // Фильтрация задач за окно дней (по дате завершения, последнего изменения, планирования или создания)
@@ -111,7 +111,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
             totalDays = Math.Max(1, (currentDate - earliestDate).Days + 1);
         }
 
-        double percentage = ((double)completedDates.Count / totalDays) * 100.0;
+        var percentage = ((double)completedDates.Count / totalDays) * 100.0;
         return Math.Round(percentage, 1);
     }
 
@@ -122,8 +122,8 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         if (tasksList.Count == 0) return 0;
 
         // Построение графа зависимостей: A blocks B => A -> B
-        var adj = new Dictionary<int, HashSet<int>>();
-        var allNodes = new HashSet<int>(tasksList.Select(t => t.Id));
+        Dictionary<int, HashSet<int>> adj = new();
+        HashSet<int> allNodes = new(tasksList.Select(t => t.Id));
 
         foreach (var task in tasksList)
         {
@@ -144,13 +144,13 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
             }
         }
 
-        int maxLength = 0;
+        var maxLength = 0;
 
         foreach (var nodeId in allNodes)
         {
-            var visitingPath = new HashSet<int>();
-            var memo = new Dictionary<int, int>();
-            int chainLength = GetMaxDepthDFS(nodeId, adj, visitingPath, memo);
+            HashSet<int> visitingPath = [];
+            Dictionary<int, int> memo = new();
+            var chainLength = GetMaxDepthDFS(nodeId, adj, visitingPath, memo);
             if (chainLength > maxLength)
             {
                 maxLength = chainLength;
@@ -162,8 +162,8 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
 
     private static void AddRelationEdge(Dictionary<int, HashSet<int>> adj, TaskRelation rel, int currentTaskId)
     {
-        int sourceId = rel.SourceTaskId != 0 ? rel.SourceTaskId : currentTaskId;
-        int targetId = rel.TargetTaskId != 0 ? rel.TargetTaskId : currentTaskId;
+        var sourceId = rel.SourceTaskId != 0 ? rel.SourceTaskId : currentTaskId;
+        var targetId = rel.TargetTaskId != 0 ? rel.TargetTaskId : currentTaskId;
 
         if (sourceId == targetId) return;
 
@@ -171,7 +171,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         {
             if (!adj.TryGetValue(sourceId, out var set))
             {
-                set = new HashSet<int>();
+                set = [];
                 adj[sourceId] = set;
             }
             set.Add(targetId);
@@ -180,7 +180,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         {
             if (!adj.TryGetValue(targetId, out var set))
             {
-                set = new HashSet<int>();
+                set = [];
                 adj[targetId] = set;
             }
             set.Add(sourceId);
@@ -201,7 +201,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
 
         visitingPath.Add(nodeId);
 
-        int maxChildDepth = 0;
+        var maxChildDepth = 0;
         if (adj.TryGetValue(nodeId, out var neighbors))
         {
             foreach (var neighbor in neighbors)
@@ -211,7 +211,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
                     continue;
                 }
 
-                int depth = 1 + GetMaxDepthDFS(neighbor, adj, visitingPath, memo);
+                var depth = 1 + GetMaxDepthDFS(neighbor, adj, visitingPath, memo);
                 if (depth > maxChildDepth)
                 {
                     maxChildDepth = depth;
@@ -228,7 +228,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
     /// <inheritdoc />
     public Dictionary<DayOfWeek, double> CalculateWeekdayDistribution(IEnumerable<TaskItem> tasks)
     {
-        var result = new Dictionary<DayOfWeek, double>
+        Dictionary<DayOfWeek, double> result = new()
         {
             { DayOfWeek.Monday, 0.0 },
             { DayOfWeek.Tuesday, 0.0 },
@@ -258,8 +258,8 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         {
             var weekday = group.Key;
             var activeDates = group.ToList();
-            int totalTasksForWeekday = activeDates.Sum(d => tasksByDate[d]);
-            int activeDaysCount = activeDates.Count;
+            var totalTasksForWeekday = activeDates.Sum(d => tasksByDate[d]);
+            var activeDaysCount = activeDates.Count;
 
             if (activeDaysCount > 0)
             {
@@ -281,7 +281,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         // 2. Фильтрация по Scope
         var scopeFiltered = ApplyEntityScope(dateFiltered, filter);
 
-        var dto = new DashboardMetricsDto();
+        DashboardMetricsDto dto = new();
 
         if (scopeFiltered.Count == 0)
         {
@@ -299,8 +299,8 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         dto.TotalTasksCount = topLevelTasks.Count > 0 ? topLevelTasks.Count : scopeFiltered.Count;
         dto.TotalSubtasksCount = scopeFiltered.Sum(t => t.Subtasks != null ? GetSubtasksCountRecursive(t) : 0);
 
-        int activeTasksCount = scopeFiltered.Count(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant);
-        int totalForCompletion = scopeFiltered.Count;
+        var activeTasksCount = scopeFiltered.Count(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant);
+        var totalForCompletion = scopeFiltered.Count;
         dto.CompletionRatePercentage = totalForCompletion > 0
             ? Math.Round(((double)activeTasksCount / totalForCompletion) * 100.0, 1)
             : 0.0;
@@ -308,7 +308,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         if (filter.DateRange != DateRangeMode.AllTime)
         {
             var currentDate = (now ?? DateTime.UtcNow).Date;
-            int daysWindow = filter.DateRange == DateRangeMode.Recent ? 14 : 90;
+            var daysWindow = filter.DateRange == DateRangeMode.Recent ? 14 : 90;
             var thresholdDate = currentDate.AddDays(-daysWindow);
             dto.CreatedTasksCount = allList.Count(t => t.CreatedDate.Date >= thresholdDate);
         }
@@ -364,7 +364,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
             dto.FilteredMaxPriority = maxPriorityTask?.Priority!.Name;
             dto.FilteredMinPriority = minPriorityTask?.Priority!.Name;
 
-            double avgOrder = tasksWithPriority.Average(t => t.Priority!.Order);
+            var avgOrder = tasksWithPriority.Average(t => t.Priority!.Order);
             var distinctPriorities = tasksWithPriority.Select(t => t.Priority!).DistinctBy(p => p.Id).ToList();
             var avgPriority = distinctPriorities.MinBy(p => Math.Abs(p.Order - avgOrder));
             dto.FilteredAvgPriority = avgPriority?.Name;
@@ -382,7 +382,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
 
     private List<DashboardRecordItem> CalculateRecords(List<TaskItem> tasks)
     {
-        var rawRecords = new List<DashboardRecordItem>();
+        List<DashboardRecordItem> rawRecords = [];
         var completed = tasks.Where(t => t.Status == TaskStatus.Completed && t.CompletedDate.HasValue).ToList();
         var byDate = completed.GroupBy(t => t.CompletedDate!.Value.Date).ToList();
 
@@ -390,7 +390,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         if (byDate.Count > 0)
         {
             var maxCountGroup = byDate.OrderByDescending(g => g.Count()).First();
-            rawRecords.Add(new DashboardRecordItem
+            rawRecords.Add(new()
             {
                 Title = "Макс. завершённых задач за день",
                 Value = $"{maxCountGroup.Count()} задач",
@@ -399,15 +399,15 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         }
         else
         {
-            rawRecords.Add(new DashboardRecordItem { Title = "Макс. завершённых задач за день", Value = "-", Date = null });
+            rawRecords.Add(new() { Title = "Макс. завершённых задач за день", Value = "-", Date = null });
         }
 
         // 2. Больше всего сумма времени в завершённых за день дел
         if (byDate.Count > 0 && byDate.Any(g => g.Sum(t => t.EstimatedMinutes ?? 0) > 0))
         {
             var maxTimeGroup = byDate.OrderByDescending(g => g.Sum(t => t.EstimatedMinutes ?? 0)).First();
-            int totalMins = maxTimeGroup.Sum(t => t.EstimatedMinutes ?? 0);
-            rawRecords.Add(new DashboardRecordItem
+            var totalMins = maxTimeGroup.Sum(t => t.EstimatedMinutes ?? 0);
+            rawRecords.Add(new()
             {
                 Title = "Макс. сумма времени за день",
                 Value = FormatMinutes(totalMins),
@@ -416,7 +416,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         }
         else
         {
-            rawRecords.Add(new DashboardRecordItem { Title = "Макс. сумма времени за день", Value = "-", Date = null });
+            rawRecords.Add(new() { Title = "Макс. сумма времени за день", Value = "-", Date = null });
         }
 
         // Дни с >= 3 завершенными задачами и имеющие оценки интересности
@@ -430,9 +430,9 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
             var minInterestGroup = eligibleInterestGroups
                 .OrderBy(g => g.Where(t => t.Interest.HasValue).Average(t => t.Interest!.Value))
                 .First();
-            double avgInt = minInterestGroup.Where(t => t.Interest.HasValue).Average(t => t.Interest!.Value);
+            var avgInt = minInterestGroup.Where(t => t.Interest.HasValue).Average(t => t.Interest!.Value);
 
-            rawRecords.Add(new DashboardRecordItem
+            rawRecords.Add(new()
             {
                 Title = "Мин. интересность за день (≥3 задач)",
                 Value = avgInt.ToString("F1"),
@@ -441,7 +441,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         }
         else
         {
-            rawRecords.Add(new DashboardRecordItem { Title = "Мин. интересность за день (≥3 задач)", Value = "-", Date = null });
+            rawRecords.Add(new() { Title = "Мин. интересность за день (≥3 задач)", Value = "-", Date = null });
         }
 
         // 4. Максимальная интересность выполненных за день (>= 3 задач)
@@ -450,9 +450,9 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
             var maxInterestGroup = eligibleInterestGroups
                 .OrderByDescending(g => g.Where(t => t.Interest.HasValue).Average(t => t.Interest!.Value))
                 .First();
-            double avgInt = maxInterestGroup.Where(t => t.Interest.HasValue).Average(t => t.Interest!.Value);
+            var avgInt = maxInterestGroup.Where(t => t.Interest.HasValue).Average(t => t.Interest!.Value);
 
-            rawRecords.Add(new DashboardRecordItem
+            rawRecords.Add(new()
             {
                 Title = "Макс. интересность за день (≥3 задач)",
                 Value = avgInt.ToString("F1"),
@@ -461,14 +461,14 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         }
         else
         {
-            rawRecords.Add(new DashboardRecordItem { Title = "Макс. интересность за день (≥3 задач)", Value = "-", Date = null });
+            rawRecords.Add(new() { Title = "Макс. интересность за день (≥3 задач)", Value = "-", Date = null });
         }
 
         // 5. Макс сложность выполненной задачи
         var maxCompTask = completed.Where(t => t.Complexity.HasValue).OrderByDescending(t => t.Complexity!.Value).FirstOrDefault();
         if (maxCompTask != null)
         {
-            rawRecords.Add(new DashboardRecordItem
+            rawRecords.Add(new()
             {
                 Title = "Макс. сложность выполненной задачи",
                 Value = $"{maxCompTask.Complexity} ({maxCompTask.Title})",
@@ -477,14 +477,14 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         }
         else
         {
-            rawRecords.Add(new DashboardRecordItem { Title = "Макс. сложность выполненной задачи", Value = "-", Date = null });
+            rawRecords.Add(new() { Title = "Макс. сложность выполненной задачи", Value = "-", Date = null });
         }
 
         // 6. Макс продолжительность выполненной задачи
         var maxDurTask = completed.Where(t => t.EstimatedMinutes.HasValue).OrderByDescending(t => t.EstimatedMinutes!.Value).FirstOrDefault();
         if (maxDurTask != null)
         {
-            rawRecords.Add(new DashboardRecordItem
+            rawRecords.Add(new()
             {
                 Title = "Макс. продолжительность задачи",
                 Value = $"{FormatMinutes(maxDurTask.EstimatedMinutes!.Value)} ({maxDurTask.Title})",
@@ -493,14 +493,14 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         }
         else
         {
-            rawRecords.Add(new DashboardRecordItem { Title = "Макс. продолжительность задачи", Value = "-", Date = null });
+            rawRecords.Add(new() { Title = "Макс. продолжительность задачи", Value = "-", Date = null });
         }
 
         // 7. Самая длинная цепочка блокировок
         var chainLength = CalculateLongestDependencyChain(tasks);
         if (chainLength > 1)
         {
-            rawRecords.Add(new DashboardRecordItem
+            rawRecords.Add(new()
             {
                 Title = "Самая длинная цепочка блокировок",
                 Value = $"{chainLength} связей",
@@ -509,7 +509,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         }
         else
         {
-            rawRecords.Add(new DashboardRecordItem { Title = "Самая длинная цепочка блокировок", Value = "-", Date = null });
+            rawRecords.Add(new() { Title = "Самая длинная цепочка блокировок", Value = "-", Date = null });
         }
 
         // Сортировка по убыванию даты (если дата null, идут в конец)
@@ -522,9 +522,9 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
 
     private static Dictionary<int, double> CalculateInterestPriorityDistribution(List<TaskItem> tasks)
     {
-        var result = new Dictionary<int, double>();
+        Dictionary<int, double> result = new();
 
-        for (int interest = 1; interest <= 10; interest++)
+        for (var interest = 1; interest <= 10; interest++)
         {
             var matchingTasks = tasks
                 .Where(t => t.Interest == interest && (t.Priority != null || t.PriorityId.HasValue))
@@ -532,7 +532,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
 
             if (matchingTasks.Count > 0)
             {
-                double avgPriority = matchingTasks.Average(t => t.Priority?.Order ?? t.PriorityId ?? 0);
+                var avgPriority = matchingTasks.Average(t => t.Priority?.Order ?? t.PriorityId ?? 0);
                 result[interest] = Math.Round(avgPriority, 1);
             }
             else
@@ -556,7 +556,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
     private static int GetSubtasksCountRecursive(TaskItem task)
     {
         if (task.Subtasks == null || task.Subtasks.Count == 0) return 0;
-        int count = task.Subtasks.Count;
+        var count = task.Subtasks.Count;
         foreach (var sub in task.Subtasks)
         {
             count += GetSubtasksCountRecursive(sub);

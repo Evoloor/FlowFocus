@@ -58,14 +58,14 @@ public class TaskDistributionPlanner(ITaskRepository taskRepository)
             .Where(t => t.ParentTaskId == null)
             .ToList();
 
-        var dailyStatsMap = new Dictionary<TodoDay, DailyStats>();
+        Dictionary<TodoDay, DailyStats> dailyStatsMap = new();
 
         DailyStats GetStatsForDay(TodoDay day)
         {
             if (dailyStatsMap.TryGetValue(day, out var existing))
                 return existing;
 
-            var stats = new DailyStats();
+            DailyStats stats = new();
             foreach (var t in allRootTasks)
             {
                 var isInactive = t.Status is TaskStatus.Completed or TaskStatus.Irrelevant;

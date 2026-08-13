@@ -9,7 +9,6 @@ using FlowFocus.Core.Services;
 using FlowFocus.Data.Repositories;
 using FlowFocus.Tests.Builders;
 using FluentAssertions;
-using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
 using MudBlazor.Services;
@@ -28,7 +27,7 @@ public class TaskEditDialogTests : IntegrationTestBase
 
     public TaskEditDialogTests()
     {
-        _ctx = new BunitContext();
+        _ctx = new();
         _ctx.Services.AddMudServices();
 
         _settingsRepo = Substitute.For<ISettingsRepository>();
@@ -112,7 +111,7 @@ public class TaskEditDialogTests : IntegrationTestBase
         // Add relation to Task B via private field _relations
         var relationsField = typeof(TaskEditDialog).GetField("_relations", BindingFlags.Instance | BindingFlags.NonPublic);
         var relations = (List<RelationDto>)relationsField!.GetValue(dialogInstance)!;
-        relations.Add(new RelationDto
+        relations.Add(new()
         {
             Type = RelationType.RelatedTo,
             TargetTask = taskB
@@ -178,7 +177,7 @@ public class TaskEditDialogTests : IntegrationTestBase
         // Add relation to Task B via private field _relations
         var relationsField = typeof(TaskEditDialog).GetField("_relations", BindingFlags.Instance | BindingFlags.NonPublic);
         var relations = (List<RelationDto>)relationsField!.GetValue(dialogInstance)!;
-        relations.Add(new RelationDto
+        relations.Add(new()
         {
             Type = RelationType.RelatedTo,
             TargetTask = taskB
@@ -209,7 +208,7 @@ public class TaskEditDialogTests : IntegrationTestBase
         TaskRepo.Add(taskB);
 
         // Link Task B to Task A (Source = Task B, Target = Task A)
-        var relation = new TaskRelation
+        TaskRelation relation = new()
         {
             SourceTaskId = taskB.Id,
             TargetTaskId = taskA.Id,

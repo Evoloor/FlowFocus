@@ -1,3 +1,4 @@
+using FlowFocus.Core.Models;
 using FluentAssertions;
 using FlowFocus.Core.Validation;
 using FlowFocus.Tests.Builders;
@@ -48,7 +49,7 @@ public class SubtasksEngineTests : IntegrationTestBase
     public void RepositoryRootQuery_ExcludesSubtasksWithNonNullParentId()
     {
         // Arrange
-        var (mainTask, _) = TaskItemBuilder.CreateParentWithSubtasks(1, 200);
+        (var mainTask, _) = TaskItemBuilder.CreateParentWithSubtasks(1, 200);
 
         TaskRepo.Add(mainTask);
 

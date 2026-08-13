@@ -18,7 +18,7 @@ public class TaskRepositoryTests : IntegrationTestBase
     public void HardDeleteTask_WithExclusiveTag_RemovesOrphanedTag()
     {
         // Arrange: Жизненный цикл тегов - удаление "сирот"
-        var tag = new Tag { Id = 10, Name = "Одноразовый", UsageCount = 1 };
+        Tag tag = new() { Id = 10, Name = "Одноразовый", UsageCount = 1 };
         Context.Tags.Add(tag);
 
         var task = new TaskItemBuilder()
@@ -28,7 +28,7 @@ public class TaskRepositoryTests : IntegrationTestBase
             .Build();
 
         TaskRepo.Add(task);
-        Context.TaskTags.Add(new TaskTag { TaskId = task.Id, TagId = tag.Id });
+        Context.TaskTags.Add(new() { TaskId = task.Id, TagId = tag.Id });
         Context.SaveChanges();
 
         // Act: Безвозвратное удаление задачи из БД
@@ -46,7 +46,7 @@ public class TaskRepositoryTests : IntegrationTestBase
     public void HardDeleteTask_WithSharedTag_KeepsTagForOtherTasks()
     {
         // Arrange: Проверка негативного сценария - не удаляем тег, если он нужен другим
-        var sharedTag = new Tag { Id = 11, Name = "Общий", UsageCount = 2 };
+        Tag sharedTag = new() { Id = 11, Name = "Общий", UsageCount = 2 };
         Context.Tags.Add(sharedTag);
 
         var taskToDelete = new TaskItemBuilder().WithId(998).Build();
@@ -55,8 +55,8 @@ public class TaskRepositoryTests : IntegrationTestBase
         TaskRepo.Add(taskToDelete);
         TaskRepo.Add(taskToKeep);
 
-        Context.TaskTags.Add(new TaskTag { TaskId = taskToDelete.Id, TagId = sharedTag.Id });
-        Context.TaskTags.Add(new TaskTag { TaskId = taskToKeep.Id, TagId = sharedTag.Id });
+        Context.TaskTags.Add(new() { TaskId = taskToDelete.Id, TagId = sharedTag.Id });
+        Context.TaskTags.Add(new() { TaskId = taskToKeep.Id, TagId = sharedTag.Id });
         Context.SaveChanges();
 
         // Act

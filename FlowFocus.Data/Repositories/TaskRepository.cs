@@ -24,7 +24,7 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
         ITaskRecurrenceService? recurrenceService = null)
         : base(context, notificationService)
     {
-        _tagRepository = new Lazy<TagRepository>(() => new TagRepository(context, notificationService));
+        _tagRepository = new(() => new(context, notificationService));
         _recurrenceService = recurrenceService ?? new TaskRecurrenceService();
         notificationService.OnTasksChanged += RefreshCache;
     }
@@ -64,14 +64,14 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
             }
 
             var trackedEntity = GetTrackedQuery()
-                .Include(t => t.Tags)
-                .Include(t => t.Conditions).ThenInclude(tc => tc.Condition)
-                .Include(t => t.Subtasks)
-                .Include(t => t.Relations)
-                .Include(t => t.InverseRelations)
-                .Include(t => t.PriorityEscalations)
-                .FirstOrDefault(e => e.Id == entity.Id)
-                ?? throw new InvalidOperationException($"Entity with ID {entity.Id} not found");
+                                    .Include(t => t.Tags)
+                                    .Include(t => t.Conditions).ThenInclude(tc => tc.Condition)
+                                    .Include(t => t.Subtasks)
+                                    .Include(t => t.Relations)
+                                    .Include(t => t.InverseRelations)
+                                    .Include(t => t.PriorityEscalations)
+                                    .FirstOrDefault(e => e.Id == entity.Id)
+                                ?? throw new InvalidOperationException($"Entity with ID {entity.Id} not found");
 
             if (trackedEntity.ParentTaskId != null)
             {

@@ -5,7 +5,6 @@
 @inject IDashboardAnalyticsService AnalyticsService
 @inject INotificationService NotificationService
 @using FlowFocus.Blazor.Components.Dashboard
-@using FlowFocus.Core.Enums
 @implements IDisposable
 
 <PageTitle>Дашборд — FlowFocus</PageTitle>
@@ -145,10 +144,10 @@
 
 @code {
     private DashboardFilter _filter = new();
-    private List<TaskItem> _allTasks = new();
-    private List<Tag> _tags = new();
+    private List<TaskItem> _allTasks = [];
+    private List<Tag> _tags = [];
     private Dictionary<int, int> _tagTaskCounts = new();
-    private List<ExternalCondition> _conditions = new();
+    private List<ExternalCondition> _conditions = [];
     private Dictionary<int, int> _conditionTaskCounts = new();
     private DashboardMetricsDto _metrics = new();
 

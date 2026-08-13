@@ -1,6 +1,7 @@
 using FluentAssertions;
 using FlowFocus.Core;
 using FlowFocus.Core.Enums;
+using FlowFocus.Core.Models;
 using FlowFocus.Tests.Builders;
 using JetBrains.Annotations;
 using TaskStatus = FlowFocus.Core.Enums.TaskStatus;

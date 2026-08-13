@@ -266,7 +266,7 @@ public class UiAndUxEngineTests : IntegrationTestBase
 
         // Assert
         filtered.Should().HaveCount(3);
-        filtered.Select(t => t.Id).Should().BeEquivalentTo(new[] { 1, 2, 3 });
+        filtered.Select(t => t.Id).Should().BeEquivalentTo([1, 2, 3]);
     }
 
     /// <summary>
@@ -328,7 +328,7 @@ public class UiAndUxEngineTests : IntegrationTestBase
     public void PrivacyMode_PersistsInSettingsRepository()
     {
         // Arrange
-        var settingsRepo = new SettingsRepository(Context, NotificationService);
+        SettingsRepository settingsRepo = new(Context, NotificationService);
         var settings = settingsRepo.GetUserSettings();
         settings.HideTaskTitlesDefault = true;
 

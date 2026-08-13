@@ -27,7 +27,7 @@ public static class SubtaskHierarchyValidator
                 var taskPriority = task.Priority ?? (task.PriorityId.HasValue ? priorities.FirstOrDefault(p => p.Id == task.PriorityId) : null);
                 var parentPriority = parentTask.Priority ?? (parentTask.PriorityId.HasValue ? priorities.FirstOrDefault(p => p.Id == parentTask.PriorityId) : null);
 
-                var taskWrapper = new TaskItem
+                TaskItem taskWrapper = new()
                 {
                     Id = task.Id,
                     Title = task.Title,
@@ -37,7 +37,7 @@ public static class SubtaskHierarchyValidator
                     ParentTaskId = task.ParentTaskId
                 };
 
-                var parentWrapper = new TaskItem
+                TaskItem parentWrapper = new()
                 {
                     Id = parentTask.Id,
                     Title = parentTask.Title,
@@ -60,7 +60,7 @@ public static class SubtaskHierarchyValidator
         if (existingTracked?.Subtasks != null)
         {
             var taskPriority = task.Priority ?? (task.PriorityId.HasValue ? priorities.FirstOrDefault(p => p.Id == task.PriorityId) : null);
-            var parentWrapper = new TaskItem
+            TaskItem parentWrapper = new()
             {
                 Id = task.Id,
                 Title = task.Title,
@@ -75,7 +75,7 @@ public static class SubtaskHierarchyValidator
                     continue;
 
                 var subPriority = sub.Priority ?? (sub.PriorityId.HasValue ? priorities.FirstOrDefault(p => p.Id == sub.PriorityId) : null);
-                var subWrapper = new TaskItem
+                TaskItem subWrapper = new()
                 {
                     Id = sub.Id,
                     Title = sub.Title,
