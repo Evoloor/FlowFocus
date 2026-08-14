@@ -26,10 +26,10 @@ public class DashboardMetricsDto
 
     // === Task Structure & Types ===
     /// <summary>Распределение по статусам</summary>
-    public Dictionary<TaskStatus, int> StatusDistribution { get; set; } = new();
+    public StatusDistribution StatusDistribution { get; set; } = new();
 
     /// <summary>Распределение по источникам даты</summary>
-    public Dictionary<DateSource, int> DateSourceDistribution { get; set; } = new();
+    public DateSourceDistribution DateSourceDistribution { get; set; } = new();
 
     /// <summary>Распределение по тегам</summary>
     public Dictionary<string, int> TagsDistribution { get; set; } = new();

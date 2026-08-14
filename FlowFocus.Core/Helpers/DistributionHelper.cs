@@ -1,3 +1,5 @@
+using FlowFocus.Core.Models;
+
 namespace FlowFocus.Core.Helpers;
 
 /// <summary>
@@ -18,6 +20,24 @@ public static class DistributionHelper
         return items
             .GroupBy(keySelector)
             .ToDictionary(g => g.Key, g => g.Count());
+    }
+
+    /// <summary>
+    /// Расчет частотного распределения по enum-ключу с возвратом строгой модели BaseEnumDistribution
+    /// </summary>
+    public static TDistribution CalculateEnumDistribution<T, TEnum, TDistribution>(
+        IEnumerable<T> items,
+        Func<T, TEnum> keySelector)
+        where TEnum : struct, Enum
+        where TDistribution : BaseEnumDistribution<TEnum>, new()
+    {
+        var dict = CalculateDistribution(items, keySelector);
+        var distribution = new TDistribution();
+        foreach (var (key, count) in dict)
+        {
+            distribution[key] = count;
+        }
+        return distribution;
     }
 
     /// <summary>

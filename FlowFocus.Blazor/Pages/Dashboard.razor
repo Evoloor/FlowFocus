@@ -62,7 +62,7 @@
     <div class="structure-grid">
         @if (_filter.Scope != EntityScopeType.Active && _filter.Scope != EntityScopeType.Completed)
         {
-            <StatusPieChart Data="@_metrics.StatusDistribution" />
+            <StatusDistributionCard Data="@_metrics.StatusDistribution" />
         }
         <DateTypeDistributionCard Data="@_metrics.DateSourceDistribution" />
         @if (_filter.Scope != EntityScopeType.Tag)

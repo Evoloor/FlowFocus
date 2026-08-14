@@ -272,4 +272,49 @@ public class DashboardUiTests : IntegrationTestBase
 
         cut.Instance.SelectedMetric.Should().Be(HistogramMetricType.Interest);
     }
+
+    [Fact]
+    public void StatusDistributionCard_RendersTitleCountsAndPercentages_InheritingFromBaseEnumDistributionCard()
+    {
+        var data = new StatusDistribution
+        {
+            [TaskStatus.Planned] = 3,
+            [TaskStatus.Completed] = 1
+        };
+
+        var cut = _ctx.Render<StatusDistributionCard>(p => p.Add(x => x.Data, data));
+
+        cut.Find(".chart-title").TextContent.Should().Contain("Распределение по статусам");
+        cut.Markup.Should().Contain("Запланирована");
+        cut.Markup.Should().Contain("Завершена");
+        cut.Markup.Should().Contain("75%");
+        cut.Markup.Should().Contain("25%");
+    }
+
+    [Fact]
+    public void StatusDistributionCard_RendersEmptyState_WhenTotalCountIsZero()
+    {
+        var data = new StatusDistribution();
+
+        var cut = _ctx.Render<StatusDistributionCard>(p => p.Add(x => x.Data, data));
+
+        cut.Markup.Should().Contain("Нет распределения по статусам");
+    }
+
+    [Fact]
+    public void DateTypeDistributionCard_RendersTitleCountsAndPercentages_InheritingFromBaseEnumDistributionCard()
+    {
+        var data = new DateSourceDistribution
+        {
+            [DateSource.Manual] = 2,
+            [DateSource.AutoFixed] = 2
+        };
+
+        var cut = _ctx.Render<DateTypeDistributionCard>(p => p.Add(x => x.Data, data));
+
+        cut.Find(".chart-title").TextContent.Should().Contain("Назначение дат");
+        cut.Markup.Should().Contain("Manual (Ручная)");
+        cut.Markup.Should().Contain("Autofixed (Повтор)");
+        cut.Markup.Should().Contain("50%");
+    }
 }

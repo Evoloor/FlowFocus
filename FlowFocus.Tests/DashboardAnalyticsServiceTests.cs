@@ -690,6 +690,48 @@ public class DashboardAnalyticsServiceTests
         result["Home"].Should().Be(1);
     }
 
+    [Fact]
+    public void BaseEnumDistribution_CalculatesTotalCountAndPercentageCorrectly()
+    {
+        var statusDist = new StatusDistribution
+        {
+            [TaskStatus.Planned] = 3,
+            [TaskStatus.Completed] = 1
+        };
+
+        statusDist.TotalCount.Should().Be(4);
+        statusDist.GetCount(TaskStatus.Planned).Should().Be(3);
+        statusDist.GetCount(TaskStatus.Completed).Should().Be(1);
+        statusDist.GetCount(TaskStatus.Blocked).Should().Be(0);
+
+        statusDist.GetPercentage(TaskStatus.Planned).Should().Be(75.0);
+        statusDist.GetPercentage(TaskStatus.Completed).Should().Be(25.0);
+        statusDist.GetPercentage(TaskStatus.Blocked).Should().Be(0.0);
+    }
+
+    [Fact]
+    public void CalculateEnumDistribution_ReturnsStronglyTypedEnumDistributionModel()
+    {
+        List<TaskItem> tasks =
+        [
+            new() { Status = TaskStatus.Planned, DateSource = DateSource.Manual },
+            new() { Status = TaskStatus.Planned, DateSource = DateSource.AutoFixed },
+            new() { Status = TaskStatus.Completed, DateSource = DateSource.AutoFlexible }
+        ];
+
+        var statusResult = DistributionHelper.CalculateEnumDistribution<TaskItem, TaskStatus, StatusDistribution>(tasks, t => t.Status);
+        statusResult.Should().BeOfType<StatusDistribution>();
+        statusResult.TotalCount.Should().Be(3);
+        statusResult.GetPercentage(TaskStatus.Planned).Should().Be(66.7);
+        statusResult.GetPercentage(TaskStatus.Completed).Should().Be(33.3);
+
+        var dateSourceResult = DistributionHelper.CalculateEnumDistribution<TaskItem, DateSource, DateSourceDistribution>(tasks, t => t.DateSource);
+        dateSourceResult.Should().BeOfType<DateSourceDistribution>();
+        dateSourceResult.TotalCount.Should().Be(3);
+        dateSourceResult.GetCount(DateSource.Manual).Should().Be(1);
+        dateSourceResult.GetPercentage(DateSource.Manual).Should().Be(33.3);
+    }
+
     #endregion
 
     #region Metric Histogram Tests

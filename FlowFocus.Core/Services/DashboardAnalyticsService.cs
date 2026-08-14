@@ -318,8 +318,8 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         }
 
         // === Task Structure & Types ===
-        dto.StatusDistribution = DistributionHelper.CalculateDistribution(scopeFiltered, t => t.Status);
-        dto.DateSourceDistribution = DistributionHelper.CalculateDistribution(scopeFiltered, t => t.DateSource);
+        dto.StatusDistribution = DistributionHelper.CalculateEnumDistribution<TaskItem, TaskStatus, StatusDistribution>(scopeFiltered, t => t.Status);
+        dto.DateSourceDistribution = DistributionHelper.CalculateEnumDistribution<TaskItem, DateSource, DateSourceDistribution>(scopeFiltered, t => t.DateSource);
         dto.TagsDistribution = DistributionHelper.CalculateCollectionDistribution(
             scopeFiltered,
             t => t.Tags?.Where(tt => tt.Tag != null).Select(tt => tt.Tag!.Name));
