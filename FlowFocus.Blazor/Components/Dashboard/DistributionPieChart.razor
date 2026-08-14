@@ -5,25 +5,39 @@
     <MudCard Elevation="3" Class="chart-card glass-card">
         <MudCardHeader>
             <CardHeaderContent>
-                <MudText Typo="Typo.h6" Class="chart-title">@Title</MudText>
+                <div class="d-flex align-center justify-space-between width-100">
+                    <MudText Typo="Typo.h6" Class="chart-title">@Title</MudText>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Secondary" Class="total-chip">
+                        Всего: @TotalCount
+                    </MudChip>
+                </div>
             </CardHeaderContent>
         </MudCardHeader>
         <MudCardContent>
             <div class="chart-wrapper">
-                <MudChart ChartType="ChartType.Donut"
-                          InputData="@ChartData"
-                          InputLabels="@ChartLabels"
-                          Width="220px"
-                          Height="220px" />
+                <div class="chart-donut-container">
+                    <MudChart ChartType="ChartType.Donut"
+                              InputData="@ChartData"
+                              InputLabels="@ChartLabels"
+                              ChartOptions="@ChartOptions"
+                              Width="180px"
+                              Height="180px" />
+                </div>
+
                 <div class="chart-legend-grid">
                     @for (var i = 0; i < ChartLabels.Length; i++)
                     {
                         var index = i;
                         var label = ChartLabels[index];
+                        var count = (int)ChartData[index];
+                        var percent = TotalCount > 0 ? Math.Round((double)count / TotalCount * 100, 1) : 0;
+                        var color = ResolvedPalette[index % ResolvedPalette.Length];
+
                         <div class="legend-item">
-                            <span class="legend-badge" style="background-color: @GetColor(label, index)"></span>
+                            <span class="legend-badge" style="background-color: @color"></span>
                             <span class="legend-label text-truncate">@label</span>
-                            <span class="legend-value">@ChartData[index]</span>
+                            <span class="legend-value">@count</span>
+                            <span class="legend-percent">(@percent%)</span>
                         </div>
                     }
                 </div>
@@ -45,11 +59,27 @@
             font-size: 1.05rem;
         }
 
+        .total-chip {
+            font-weight: 600;
+            opacity: 0.85;
+        }
+
         .chart-wrapper {
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 16px;
+            width: 100%;
+        }
+
+        .chart-wrapper .mud-chart-legend {
+            display: none !important;
+        }
+
+        .chart-donut-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
         .chart-legend-grid {
@@ -57,19 +87,26 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
             gap: 8px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
         }
 
         .legend-item {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             font-size: 0.85rem;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 6px 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.04);
         }
 
         .legend-badge {
             width: 10px;
             height: 10px;
             border-radius: 50%;
+            flex-shrink: 0;
         }
 
         .legend-label {
@@ -79,6 +116,13 @@
 
         .legend-value {
             font-weight: 700;
+            color: var(--mud-palette-text-primary);
+        }
+
+        .legend-percent {
+            font-size: 0.75rem;
+            color: var(--mud-palette-text-secondary);
+            opacity: 0.8;
         }
     </style>
 }
@@ -109,20 +153,38 @@
 
     private double[] ChartData => ProcessedData.Values.Select(v => (double)v).ToArray();
     private string[] ChartLabels => ProcessedData.Keys.ToArray();
+    private int TotalCount => ProcessedData.Values.Sum();
 
     private static readonly string[] DefaultPalette =
     [
         "#6366f1", "#06b6d4", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#3b82f6", "#94a3b8"
     ];
 
-    private string GetColor(string label, int index)
+    private string[] ResolvedPalette => GetResolvedPalette();
+
+    private ChartOptions ChartOptions => new()
     {
-        if (ColorResolver != null)
+        ChartPalette = ResolvedPalette
+    };
+
+    private string[] GetResolvedPalette()
+    {
+        var keys = ProcessedData.Keys.ToArray();
+        var colors = new string[keys.Length];
+        var basePalette = Palette != null && Palette.Length > 0 ? Palette : DefaultPalette;
+
+        for (int i = 0; i < keys.Length; i++)
         {
-            return ColorResolver(label, index);
+            if (ColorResolver != null)
+            {
+                colors[i] = ColorResolver(keys[i], i);
+            }
+            else
+            {
+                colors[i] = basePalette[i % basePalette.Length];
+            }
         }
 
-        var activePalette = Palette != null && Palette.Length > 0 ? Palette : DefaultPalette;
-        return activePalette[index % activePalette.Length];
+        return colors;
     }
 }

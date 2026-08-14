@@ -145,6 +145,10 @@ public class DashboardUiTests : IntegrationTestBase
 
         cut.Find(".chart-title").TextContent.Should().Contain("Тестовое распределение");
         cut.FindAll(".legend-item").Should().HaveCount(2);
+        cut.Markup.Should().Contain("12");
+        cut.Markup.Should().Contain("8");
+        cut.Markup.Should().Contain("60%");
+        cut.Markup.Should().Contain("40%");
     }
 
 
