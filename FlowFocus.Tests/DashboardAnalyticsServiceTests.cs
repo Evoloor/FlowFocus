@@ -212,6 +212,42 @@ public class DashboardAnalyticsServiceTests
     }
 
     [Fact]
+    public void CalculateActivityMetric_RecentMode_ExcludesHistoricalTasksOutsideWindow()
+    {
+        DateTime now = new(2026, 8, 12);
+        List<TaskItem> tasks =
+        [
+            new() { Id = 1, Status = TaskStatus.Completed, CompletedDate = now.AddDays(-2) }
+        ];
+
+        for (var i = 0; i < 30; i++)
+        {
+            tasks.Add(new() { Id = i + 2, Status = TaskStatus.Completed, CompletedDate = now.AddDays(-30 - i) });
+        }
+
+        var activity = _service.CalculateActivityMetric(tasks, DateRangeMode.Recent, now);
+
+        // Only 1 date (now-2) is inside the 14-day window [now-14, now]
+        activity.Should().Be(Math.Round((1.0 / 14.0) * 100.0, 1));
+    }
+
+    [Fact]
+    public void CalculateActivityMetric_RecentMode_CapsAt100Percent()
+    {
+        DateTime now = new(2026, 8, 12);
+        List<TaskItem> tasks = [];
+
+        for (var i = 0; i <= 14; i++)
+        {
+            tasks.Add(new() { Id = i + 1, Status = TaskStatus.Completed, CompletedDate = now.AddDays(-i) });
+        }
+
+        var activity = _service.CalculateActivityMetric(tasks, DateRangeMode.Recent, now);
+
+        activity.Should().Be(100.0);
+    }
+
+    [Fact]
     public void CalculateMetrics_CompletionRate_ReturnsCorrectPercentage()
     {
         List<TaskItem> tasks = [];

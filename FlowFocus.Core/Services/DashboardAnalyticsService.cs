@@ -80,39 +80,54 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
     public double CalculateActivityMetric(IEnumerable<TaskItem> tasks, DateRangeMode mode, DateTime? now = null)
     {
         var tasksList = tasks.ToList();
-        var completedDates = tasksList
+        var currentDate = (now ?? DateTime.UtcNow).Date;
+        int totalDays;
+        DateTime? thresholdDate = null;
+
+        if (mode == DateRangeMode.Recent)
+        {
+            totalDays = 14;
+            thresholdDate = currentDate.AddDays(-14);
+        }
+        else if (mode == DateRangeMode.Representative)
+        {
+            totalDays = 90;
+            thresholdDate = currentDate.AddDays(-90);
+        }
+        else // AllTime
+        {
+            var earliestDate = tasksList
+                .Select(t => t.CompletedDate ?? t.CreatedDate)
+                .DefaultIfEmpty(currentDate)
+                .Min().Date;
+
+            totalDays = Math.Max(1, (currentDate - earliestDate).Days + 1);
+        }
+
+        var completedDatesQuery = tasksList
             .Where(t => t.Status == TaskStatus.Completed && t.CompletedDate.HasValue)
-            .Select(t => t.CompletedDate!.Value.Date)
-            .Distinct()
-            .ToHashSet();
+            .Select(t => t.CompletedDate!.Value.Date);
+
+        if (thresholdDate.HasValue)
+        {
+            completedDatesQuery = completedDatesQuery
+                .Where(d => d >= thresholdDate.Value && d <= currentDate);
+        }
+        else
+        {
+            completedDatesQuery = completedDatesQuery
+                .Where(d => d <= currentDate);
+        }
+
+        var completedDates = completedDatesQuery.Distinct().ToHashSet();
 
         if (completedDates.Count == 0)
         {
             return 0.0;
         }
 
-        var currentDate = (now ?? DateTime.UtcNow).Date;
-        int totalDays;
-
-        if (mode == DateRangeMode.Recent)
-        {
-            totalDays = 14;
-        }
-        else if (mode == DateRangeMode.Representative)
-        {
-            totalDays = 90;
-        }
-        else // AllTime
-        {
-            var earliestDate = tasksList
-                .Select(t => t.CompletedDate ?? t.CreatedDate)
-                .Min().Date;
-
-            totalDays = Math.Max(1, (currentDate - earliestDate).Days + 1);
-        }
-
         var percentage = ((double)completedDates.Count / totalDays) * 100.0;
-        return Math.Round(percentage, 1);
+        return Math.Min(100.0, Math.Round(percentage, 1));
     }
 
     /// <inheritdoc />
