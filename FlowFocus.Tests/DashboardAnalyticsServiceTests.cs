@@ -638,21 +638,34 @@ public class DashboardAnalyticsServiceTests
     }
 
     [Fact]
-    public void CalculateMetrics_InterestAndPriority_CalculatesDistributionMatrix()
+    public void CalculateMetrics_InterestAndPriority_CalculatesPriorityInterestHistogram()
     {
-        PriorityLevel priorityHigh = new() { Id = 1, Order = 1, Name = "High" };
-        PriorityLevel priorityLow = new() { Id = 2, Order = 5, Name = "Low" };
+        PriorityLevel priorityHigh = new() { Id = 1, Order = 1, Name = "Критический", Color = "#FF4444" };
+        PriorityLevel priorityLow = new() { Id = 2, Order = 5, Name = "Низкий", Color = "#4CAF50" };
 
         List<TaskItem> tasks =
         [
-            new() { Id = 1, Interest = 8, Priority = priorityHigh, PriorityId = 1 },
-            new() { Id = 2, Interest = 8, Priority = priorityLow, PriorityId = 2 }
+            new() { Id = 1, Interest = 9, Priority = priorityHigh, PriorityId = 1 },
+            new() { Id = 2, Interest = 7, Priority = priorityHigh, PriorityId = 1 },
+            new() { Id = 3, Interest = 4, Priority = priorityLow, PriorityId = 2 }
         ];
 
         var metrics = _service.CalculateMetrics(tasks, new());
 
-        metrics.InterestPriorityDistribution.Should().ContainKey(8);
-        metrics.InterestPriorityDistribution[8].Should().Be(3.0);
+        metrics.PriorityInterestHistogram.Should().HaveCount(2);
+        // Order 1 (Критический) comes FIRST
+        metrics.PriorityInterestHistogram[0].PriorityName.Should().Be("Критический");
+        metrics.PriorityInterestHistogram[0].PriorityOrder.Should().Be(1);
+        metrics.PriorityInterestHistogram[0].Color.Should().Be("#FF4444");
+        metrics.PriorityInterestHistogram[0].AverageInterest.Should().Be(8.0);
+        metrics.PriorityInterestHistogram[0].TaskCount.Should().Be(2);
+
+        // Order 5 (Низкий) comes SECOND
+        metrics.PriorityInterestHistogram[1].PriorityName.Should().Be("Низкий");
+        metrics.PriorityInterestHistogram[1].PriorityOrder.Should().Be(5);
+        metrics.PriorityInterestHistogram[1].Color.Should().Be("#4CAF50");
+        metrics.PriorityInterestHistogram[1].AverageInterest.Should().Be(4.0);
+        metrics.PriorityInterestHistogram[1].TaskCount.Should().Be(1);
     }
 
     #endregion

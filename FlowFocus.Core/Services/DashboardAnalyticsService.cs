@@ -397,6 +397,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         dto.ComplexityHistogram = CalculateComplexityHistogram(scopeFiltered);
         dto.PriorityHistogram = CalculatePriorityHistogram(scopeFiltered);
         dto.TimeHistogram = CalculateTimeHistogram(scopeFiltered);
+        dto.PriorityInterestHistogram = CalculatePriorityInterestHistogram(scopeFiltered);
 
         return dto;
     }
@@ -681,5 +682,36 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         }
 
         return result;
+    }
+
+    public static List<PriorityInterestItemDto> CalculatePriorityInterestHistogram(List<TaskItem> tasks)
+    {
+        var priorityTasks = tasks
+            .Where(t => (t.Priority != null || t.PriorityId.HasValue) && t.Interest.HasValue)
+            .ToList();
+
+        if (priorityTasks.Count == 0) return [];
+
+        var grouped = priorityTasks
+            .GroupBy(t => t.Priority?.Name ?? "Не указан")
+            .Select(g =>
+            {
+                var firstPriority = g.First().Priority;
+                var order = firstPriority?.Order ?? int.MaxValue;
+                var color = !string.IsNullOrWhiteSpace(firstPriority?.Color) ? firstPriority.Color : "#808080";
+                var avgInterest = Math.Round(g.Average(t => (double)t.Interest!.Value), 1);
+                return new PriorityInterestItemDto
+                {
+                    PriorityName = g.Key,
+                    PriorityOrder = order,
+                    Color = color,
+                    AverageInterest = avgInterest,
+                    TaskCount = g.Count()
+                };
+            })
+            .OrderBy(item => item.PriorityOrder)
+            .ToList();
+
+        return grouped;
     }
 }

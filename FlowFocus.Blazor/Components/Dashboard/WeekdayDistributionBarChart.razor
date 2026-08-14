@@ -12,11 +12,7 @@
         else
         {
             <div class="weekday-bar-container">
-                <MudChart ChartType="ChartType.Bar"
-                          ChartSeries="@Series"
-                          XAxisLabels="@XLabels"
-                          Width="100%"
-                          Height="260px" />
+                <DashboardHistogramChart Items="@Items" DefaultColor="#6366f1" Unit="вып. задач" />
             </div>
         }
     </MudCardContent>
@@ -25,7 +21,7 @@
 <style>
     .weekday-bar-container {
         width: 100%;
-        min-height: 260px;
+        min-height: 250px;
     }
 </style>
 
@@ -35,20 +31,22 @@
 
     private double TotalSum => Data.Values.Sum();
 
-    private static readonly DayOfWeek[] OrderedDays =
+    private static readonly (DayOfWeek Day, string Label)[] OrderedDays =
     [
-        DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
-        DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
+        (DayOfWeek.Monday, "Пн"),
+        (DayOfWeek.Tuesday, "Вт"),
+        (DayOfWeek.Wednesday, "Ср"),
+        (DayOfWeek.Thursday, "Чт"),
+        (DayOfWeek.Friday, "Пт"),
+        (DayOfWeek.Saturday, "Сб"),
+        (DayOfWeek.Sunday, "Вс")
     ];
 
-    private string[] XLabels => ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
-
-    private List<ChartSeries> Series =>
-    [
-        new()
+    private List<DashboardHistogramChart.HistogramItem> Items => OrderedDays
+        .Select(d => new DashboardHistogramChart.HistogramItem
         {
-            Name = "Ср. кол-во выполненных задач",
-            Data = OrderedDays.Select(d => Data.GetValueOrDefault(d, 0.0)).ToArray()
-        }
-    ];
+            Label = d.Label,
+            Value = Data.GetValueOrDefault(d.Day, 0.0)
+        })
+        .ToList();
 }

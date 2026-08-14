@@ -85,7 +85,7 @@ public class DashboardUiTests : IntegrationTestBase
     }
 
     [Fact]
-    public void DashboardPage_RendersRecordsAndInterestPriorityCharts()
+    public void DashboardPage_RendersRecordsAndHistogramCharts()
     {
         var task1 = new TaskItemBuilder().WithId(0).WithTitle("Task 1").WithStatus(TaskStatus.Completed).WithCompletedDate(DateTime.UtcNow).WithInterest(8).Build();
         TaskRepo.Add(task1);
@@ -93,7 +93,8 @@ public class DashboardUiTests : IntegrationTestBase
         var cut = _ctx.Render<Dashboard>();
 
         cut.FindComponents<DashboardRecordsCard>().Should().NotBeEmpty();
-        cut.FindComponents<InterestPriorityChart>().Should().NotBeEmpty();
+        cut.FindComponents<MetricHistogramCard>().Should().NotBeEmpty();
+        cut.FindComponents<PriorityHistogramCard>().Should().NotBeEmpty();
     }
 
     [Fact]
@@ -263,7 +264,6 @@ public class DashboardUiTests : IntegrationTestBase
         {
             InterestHistogram = new() { { "8", 2 } },
             ComplexityHistogram = new(), // empty -> disabled
-            PriorityHistogram = new(),   // empty -> disabled
             TimeHistogram = new()        // empty -> disabled
         };
 
@@ -271,10 +271,24 @@ public class DashboardUiTests : IntegrationTestBase
 
         cut.Instance.IsInterestDisabled.Should().BeFalse();
         cut.Instance.IsComplexityDisabled.Should().BeTrue();
-        cut.Instance.IsPriorityDisabled.Should().BeTrue();
         cut.Instance.IsTimeDisabled.Should().BeTrue();
 
         cut.Instance.SelectedMetric.Should().Be(HistogramMetricType.Interest);
+    }
+
+    [Fact]
+    public void PriorityHistogramCard_EvaluatesDisabledOptions_WhenDataMissing()
+    {
+        var metrics = new DashboardMetricsDto
+        {
+            PriorityHistogram = new(),         // empty -> disabled
+            PriorityInterestHistogram = new() // empty -> disabled
+        };
+
+        var cut = _ctx.Render<PriorityHistogramCard>(p => p.Add(x => x.Metrics, metrics));
+
+        cut.Instance.IsPriorityDisabled.Should().BeTrue();
+        cut.Instance.IsInterestPriorityDisabled.Should().BeTrue();
     }
 
     [Fact]

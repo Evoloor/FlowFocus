@@ -15,5 +15,8 @@ public enum HistogramMetricType
     Priority,
 
     /// <summary>Время выполнения в минутах</summary>
-    Time
+    Time,
+
+    /// <summary>Интересность по приоритетам</summary>
+    InterestPriority
 }

@@ -5,7 +5,10 @@
     <MudCardHeader>
         <CardHeaderContent>
             <div class="d-flex align-center justify-space-between flex-wrap gap-3">
-                <MudText Typo="Typo.h6" Class="chart-title">Распределение параметров задач</MudText>
+                <div class="d-flex align-center gap-2">
+                    <MudIcon Icon="@Icons.Material.Filled.LowPriority" Size="Size.Medium" Style="color: #a855f7;" />
+                    <MudText Typo="Typo.h6" Class="chart-title">Аналитика приоритетов</MudText>
+                </div>
                 <MudSelect T="HistogramMetricType"
                            Value="@SelectedMetric"
                            ValueChanged="OnMetricChanged"
@@ -38,9 +41,10 @@
         {
             <div class="histogram-chart-container">
                 <DashboardHistogramChart Items="@CurrentItems"
-                                        DefaultColor="@CurrentDefaultColor"
-                                        Unit="задач"
-                                        IsHorizontal="false" />
+                                        DefaultColor="#a855f7"
+                                        Unit="@CurrentUnit"
+                                        IsHorizontal="true"
+                                        MaxValue="@CurrentMaxValue" />
             </div>
         }
     </MudCardContent>
@@ -48,8 +52,8 @@
 
 <style>
     .metric-select {
-        min-width: 180px;
-        max-width: 240px;
+        min-width: 220px;
+        max-width: 280px;
     }
 
     .histogram-chart-container {
@@ -67,11 +71,10 @@
     [Parameter]
     public DashboardMetricsDto Metrics { get; set; } = new();
 
-    public HistogramMetricType SelectedMetric { get; set; } = HistogramMetricType.Interest;
+    public HistogramMetricType SelectedMetric { get; set; } = HistogramMetricType.Priority;
 
-    public bool IsInterestDisabled => Metrics.InterestHistogram.Count == 0;
-    public bool IsComplexityDisabled => Metrics.ComplexityHistogram.Count == 0;
-    public bool IsTimeDisabled => Metrics.TimeHistogram.Count == 0;
+    public bool IsPriorityDisabled => Metrics.PriorityHistogram.Count == 0;
+    public bool IsInterestPriorityDisabled => Metrics.PriorityInterestHistogram.Count == 0;
 
     private class DropdownOption
     {
@@ -89,24 +92,17 @@
             {
                 new()
                 {
-                    Metric = HistogramMetricType.Interest,
-                    Label = "Интересность",
-                    TooltipText = IsInterestDisabled ? "Нет данных по интересности для выбранного фильтра" : "Распределение по интересности (1–10)",
-                    IsDisabled = IsInterestDisabled
+                    Metric = HistogramMetricType.Priority,
+                    Label = "Количество задач",
+                    TooltipText = IsPriorityDisabled ? "Нет данных по приоритету для выбранного фильтра" : "Распределение по приоритетам",
+                    IsDisabled = IsPriorityDisabled
                 },
                 new()
                 {
-                    Metric = HistogramMetricType.Complexity,
-                    Label = "Сложность",
-                    TooltipText = IsComplexityDisabled ? "Нет данных по сложности для выбранного фильтра" : "Распределение по сложности (1–100)",
-                    IsDisabled = IsComplexityDisabled
-                },
-                new()
-                {
-                    Metric = HistogramMetricType.Time,
-                    Label = "Время",
-                    TooltipText = IsTimeDisabled ? "Нет данных по времени для выбранного фильтра" : "Распределение по времени выполнения",
-                    IsDisabled = IsTimeDisabled
+                    Metric = HistogramMetricType.InterestPriority,
+                    Label = "Средняя интересность",
+                    TooltipText = IsInterestPriorityDisabled ? "Нет данных по соотнесению интересности к приоритетам" : "Интересность по приоритетам (1–10)",
+                    IsDisabled = IsInterestPriorityDisabled
                 }
             };
 
@@ -129,37 +125,49 @@
 
     private bool IsMetricDisabled(HistogramMetricType metric) => metric switch
     {
-        HistogramMetricType.Interest => IsInterestDisabled,
-        HistogramMetricType.Complexity => IsComplexityDisabled,
-        HistogramMetricType.Time => IsTimeDisabled,
+        HistogramMetricType.Priority => IsPriorityDisabled,
+        HistogramMetricType.InterestPriority => IsInterestPriorityDisabled,
         _ => false
     };
 
-    private string CurrentDefaultColor => SelectedMetric switch
+    private string CurrentUnit => SelectedMetric switch
     {
-        HistogramMetricType.Interest => "#f59e0b",
-        HistogramMetricType.Complexity => "#ec4899",
-        HistogramMetricType.Time => "#10b981",
-        _ => "#6366f1"
+        HistogramMetricType.InterestPriority => string.Empty,
+        _ => "задач"
+    };
+
+    private double? CurrentMaxValue => SelectedMetric switch
+    {
+        HistogramMetricType.InterestPriority => 10,
+        _ => null
     };
 
     private List<DashboardHistogramChart.HistogramItem> CurrentItems
     {
         get
         {
-            Dictionary<string, int> sourceDict = SelectedMetric switch
+            if (SelectedMetric == HistogramMetricType.InterestPriority)
             {
-                HistogramMetricType.Interest => Metrics.InterestHistogram,
-                HistogramMetricType.Complexity => Metrics.ComplexityHistogram,
-                HistogramMetricType.Time => Metrics.TimeHistogram,
-                _ => new()
-            };
+                return Metrics.PriorityInterestHistogram
+                    .Select(p => new DashboardHistogramChart.HistogramItem
+                    {
+                        Label = p.PriorityName,
+                        Value = p.AverageInterest,
+                        Color = p.Color
+                    })
+                    .ToList();
+            }
 
-            return sourceDict
+            // Metric == Priority
+            var priorityColorMap = Metrics.PriorityInterestHistogram
+                .ToDictionary(p => p.PriorityName, p => p.Color);
+
+            return Metrics.PriorityHistogram
                 .Select(kvp => new DashboardHistogramChart.HistogramItem
                 {
                     Label = kvp.Key,
-                    Value = kvp.Value
+                    Value = kvp.Value,
+                    Color = priorityColorMap.GetValueOrDefault(kvp.Key)
                 })
                 .ToList();
         }

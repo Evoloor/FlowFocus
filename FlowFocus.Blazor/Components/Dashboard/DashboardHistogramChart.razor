@@ -1,0 +1,266 @@
+@using System.Globalization
+
+<div class="dashboard-histogram-wrapper">
+    @if (Items == null || Items.Count == 0)
+    {
+        <DashboardEmptyState Message="Нет данных для отображения" />
+    }
+    else
+    {
+        <div class="histogram-bars-container @(IsHorizontal ? "horizontal-layout" : "vertical-layout")">
+            @for (var i = 0; i < Items.Count; i++)
+            {
+                var item = Items[i];
+                var barColor = !string.IsNullOrWhiteSpace(item.Color) ? item.Color : DefaultColor;
+                var percentage = CalculatedMax > 0 ? Math.Min(100, Math.Max(2, (item.Value / CalculatedMax) * 100)) : 0;
+                var displayVal = item.Value % 1 == 0 ? item.Value.ToString("F0") : item.Value.ToString("F1", CultureInfo.InvariantCulture);
+
+                if (IsHorizontal)
+                {
+                    <div class="histogram-horizontal-row">
+                        <div class="row-label" title="@item.Label">
+                            <span class="label-badge-dot" style="background-color: @barColor"></span>
+                            <span class="row-label-text text-truncate">@item.Label</span>
+                        </div>
+                        <div class="row-bar-track">
+                            <div class="row-bar-fill" style="width: @(percentage.ToString("F1", CultureInfo.InvariantCulture))%; background: @GetBarStyle(barColor);" title="@item.Label: @displayVal @Unit"></div>
+                        </div>
+                        <div class="row-bar-value">@displayVal @Unit</div>
+                    </div>
+                }
+                else
+                {
+                    <div class="histogram-vertical-col">
+                        <div class="col-bar-value">@displayVal</div>
+                        <div class="col-bar-track">
+                            <div class="col-bar-fill" style="height: @(percentage.ToString("F1", CultureInfo.InvariantCulture))%; background: @GetBarStyle(barColor);" title="@item.Label: @displayVal @Unit">
+                            </div>
+                        </div>
+                        <div class="col-label" title="@item.Label">@item.Label</div>
+                    </div>
+                }
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .dashboard-histogram-wrapper {
+        width: 100%;
+        padding: 12px 4px;
+    }
+
+    /* Vertical Layout Styles */
+    .histogram-bars-container.vertical-layout {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-around;
+        gap: 12px;
+        height: 240px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .histogram-vertical-col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex: 1;
+        height: 100%;
+        min-width: 32px;
+        max-width: 72px;
+    }
+
+    .col-bar-value {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: var(--mud-palette-text-primary);
+        margin-bottom: 6px;
+        height: 20px;
+        line-height: 20px;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .col-bar-track {
+        flex: 1;
+        width: 100%;
+        max-width: 44px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px 8px 4px 4px;
+        display: flex;
+        align-items: flex-end;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .col-bar-fill {
+        width: 100%;
+        border-radius: 6px 6px 0 0;
+        transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1), filter 0.2s ease;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .col-bar-fill:hover {
+        filter: brightness(1.2);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+    }
+
+    .col-label {
+        margin-top: 8px;
+        height: 36px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--mud-palette-text-primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        width: 100%;
+        line-height: 1.1;
+        word-break: break-word;
+        overflow: hidden;
+    }
+
+    /* Horizontal Layout Styles */
+    .histogram-bars-container.horizontal-layout {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: 100%;
+        min-height: 220px;
+    }
+
+    .histogram-horizontal-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+    }
+
+    .row-label {
+        flex: 0 0 140px;
+        width: 140px;
+        min-width: 140px;
+        max-width: 140px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: var(--mud-palette-text-primary);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        overflow: hidden;
+    }
+
+    .row-label-text {
+        flex: 1;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .label-badge-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+        flex-shrink: 0;
+    }
+
+    .row-bar-track {
+        flex: 1;
+        height: 24px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .row-bar-fill {
+        height: 100%;
+        border-radius: 8px;
+        transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), filter 0.2s ease;
+    }
+
+    .row-bar-fill:hover {
+        filter: brightness(1.2);
+    }
+
+    .row-bar-value {
+        flex: 0 0 65px;
+        width: 65px;
+        min-width: 65px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: var(--mud-palette-text-primary);
+        white-space: nowrap;
+        text-align: left;
+    }
+</style>
+
+@code {
+    public class HistogramItem
+    {
+        public string Label { get; set; } = string.Empty;
+        public double Value { get; set; }
+        public string? Color { get; set; }
+    }
+
+    [Parameter]
+    public List<HistogramItem> Items { get; set; } = [];
+
+    [Parameter]
+    public string DefaultColor { get; set; } = "#6366f1";
+
+    [Parameter]
+    public string Unit { get; set; } = "";
+
+    [Parameter]
+    public bool IsHorizontal { get; set; } = false;
+
+    [Parameter]
+    public double? MaxValue { get; set; }
+
+    private double CalculatedMax
+    {
+        get
+        {
+            if (MaxValue.HasValue && MaxValue.Value > 0) return MaxValue.Value;
+            if (Items == null || Items.Count == 0) return 100;
+            var max = Items.Max(i => i.Value);
+            return max > 0 ? max : 1;
+        }
+    }
+
+    private string GetBarStyle(string colorHex)
+    {
+        if (colorHex.StartsWith("linear-gradient")) return colorHex;
+        return $"linear-gradient(135deg, {colorHex} 0%, {AdjustColorBrightness(colorHex, -20)} 100%)";
+    }
+
+    private static string AdjustColorBrightness(string hex, int percent)
+    {
+        try
+        {
+            if (hex.StartsWith("#")) hex = hex.Substring(1);
+            if (hex.Length == 6)
+            {
+                int r = int.Parse(hex.Substring(0, 2), NumberStyles.HexNumber);
+                int g = int.Parse(hex.Substring(2, 2), NumberStyles.HexNumber);
+                int b = int.Parse(hex.Substring(4, 2), NumberStyles.HexNumber);
+
+                r = Math.Clamp(r + (r * percent / 100), 0, 255);
+                g = Math.Clamp(g + (g * percent / 100), 0, 255);
+                b = Math.Clamp(b + (b * percent / 100), 0, 255);
+
+                return $"#{r:X2}{g:X2}{b:X2}";
+            }
+        }
+        catch { }
+        return hex;
+    }
+}

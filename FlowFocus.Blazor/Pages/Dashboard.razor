@@ -75,20 +75,28 @@
         }
     </div>
 
-    <!-- 4. Глубокая статистика и аналитика (Deep Analytics Panel) -->
+    <!-- 4. Глубокая статистика и рекорды (Deep Statistics & Records) -->
     <div class="section-title mt-6">
         <MudIcon Icon="@Icons.Material.Filled.Analytics" Size="Size.Small" />
-        <span>Глубокая аналитика и рекорды</span>
+        <span>Глубокая статистика и рекорды</span>
     </div>
-    <div class="analytics-grid">
+    <div class="deep-stats-records-grid">
         <FilteredStatsGrid Metrics="@_metrics" />
+        <DashboardRecordsCard Records="@_metrics.Records" />
+    </div>
+
+    <!-- 5. Аналитические гистограммы (Histograms Panel) -->
+    <div class="section-title mt-6">
+        <MudIcon Icon="@Icons.Material.Filled.BarChart" Size="Size.Small" />
+        <span>Аналитические гистограммы</span>
+    </div>
+    <div class="histograms-grid">
         @if (_filter.Scope != EntityScopeType.Active)
         {
             <WeekdayDistributionBarChart Data="@_metrics.WeekdayAverages" />
         }
         <MetricHistogramCard Metrics="@_metrics" />
-        <InterestPriorityChart Data="@_metrics.InterestPriorityDistribution" />
-        <DashboardRecordsCard Records="@_metrics.Records" />
+        <PriorityHistogramCard Metrics="@_metrics" />
     </div>
 </div>
 
@@ -201,9 +209,15 @@
         gap: 16px;
     }
 
-    .analytics-grid {
+    .deep-stats-records-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+        gap: 16px;
+    }
+
+    .histograms-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
         gap: 16px;
     }
 </style>

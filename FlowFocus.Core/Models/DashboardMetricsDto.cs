@@ -104,6 +104,21 @@ public class DashboardMetricsDto
     /// <summary>Гистограмма распределения по времени (сгруппированная по БД-значениям)</summary>
     public Dictionary<string, int> TimeHistogram { get; set; } = new();
 
+    /// <summary>Гистограмма интересности по приоритетам</summary>
+    public List<PriorityInterestItemDto> PriorityInterestHistogram { get; set; } = [];
+
     /// <summary>Флаг пустого состояния (когда нет задач)</summary>
     public bool IsEmpty => TotalTasksCount == 0 && FilteredCount == 0;
+}
+
+/// <summary>
+/// Элемент гистограммы соотнесения интересности и приоритета
+/// </summary>
+public class PriorityInterestItemDto
+{
+    public string PriorityName { get; set; } = string.Empty;
+    public int PriorityOrder { get; set; }
+    public string Color { get; set; } = "#808080";
+    public double AverageInterest { get; set; }
+    public int TaskCount { get; set; }
 }
