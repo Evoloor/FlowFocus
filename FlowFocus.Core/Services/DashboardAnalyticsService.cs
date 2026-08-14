@@ -314,10 +314,10 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         dto.TotalTasksCount = topLevelTasks.Count > 0 ? topLevelTasks.Count : scopeFiltered.Count;
         dto.TotalSubtasksCount = scopeFiltered.Sum(t => t.Subtasks != null ? GetSubtasksCountRecursive(t) : 0);
 
-        var activeTasksCount = scopeFiltered.Count(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant);
+        var completedTasksCount = scopeFiltered.Count(t => t.Status == TaskStatus.Completed);
         var totalForCompletion = scopeFiltered.Count;
         dto.CompletionRatePercentage = totalForCompletion > 0
-            ? Math.Round(((double)activeTasksCount / totalForCompletion) * 100.0, 1)
+            ? Math.Round(((double)completedTasksCount / totalForCompletion) * 100.0, 1)
             : 0.0;
 
         if (filter.DateRange != DateRangeMode.AllTime)

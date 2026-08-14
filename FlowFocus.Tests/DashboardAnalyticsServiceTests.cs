@@ -264,7 +264,7 @@ public class DashboardAnalyticsServiceTests
 
         var metrics = _service.CalculateMetrics(tasks, new());
 
-        metrics.CompletionRatePercentage.Should().Be(25.0);
+        metrics.CompletionRatePercentage.Should().Be(75.0);
     }
 
     [Fact]
