@@ -5,13 +5,15 @@ namespace FlowFocus.Blazor.EditDialogContents;
 
 public static class RelationModule
 {
-    public static List<TaskRelation> SyncRelationsToTask(List<RelationDto> dtos, TaskItem task, TaskItem? existingTask)
+    public static (List<TaskRelation> Outgoing, List<TaskRelation> Incoming) SyncRelationsToTask(List<RelationDto> dtos, TaskItem task, TaskItem? existingTask)
     {
         // Отбрасываем невалидные записи: нет цели или цель является повторяющейся задачей (нельзя ссылаться на recurring)
         var validRelations = dtos.Where(r => r.TargetTask is not null && !r.TargetTask.IsRecurring).ToList();
         var existingRelationsSource = existingTask?.Relations ?? [];
         var existingRelationsInverse = existingTask?.InverseRelations ?? [];
-        List<TaskRelation> resultRelations = [];
+
+        List<TaskRelation> outgoingRelations = [];
+        List<TaskRelation> incomingRelations = [];
 
         foreach (var dto in validRelations)
         {
@@ -23,16 +25,16 @@ public static class RelationModule
                 continue;
             }
 
-            // Нормализуем типы связей для хранения в БД:
-            // - Для логики блокировок в БД храним только RelationType.Blocks, где SourceTask блокирует TargetTask.
-            // - Если пользователь указал BlockedBy (т.е. текущая задача блокируется другой), то в БД сохраняем запись с Source = другая задача, Target = текущая задача и Type = Blocks.
-            // - Если пользователь указал Blocks (текущая задача блокирует другую), то в БД сохраняем запись с Source = текущая задача, Target = другая и Type = Blocks.
-            // - Для прочих типов (RelatedTo, Subtask) сохраняем тип как есть, с Source = текущая задача.
+            // Исключаем связывание задачи с самой собой
+            if (task.Id > 0 && targetId == task.Id)
+            {
+                continue;
+            }
 
-            // Определяем желаемую целевую запись в БД
             RelationType dbType;
             int dbSourceId;
             int dbTargetId;
+            bool isIncoming;
 
             switch (dto.Type)
             {
@@ -41,11 +43,13 @@ public static class RelationModule
                     dbType = RelationType.Blocks;
                     dbSourceId = targetId; // Другой таск является source
                     dbTargetId = task.Id > 0 ? task.Id : 0; // Текущий таск является целью
+                    isIncoming = true;
                     break;
                 case RelationType.Blocks:
                     dbType = RelationType.Blocks;
                     dbSourceId = task.Id > 0 ? task.Id : 0;
                     dbTargetId = targetId;
+                    isIncoming = false;
                     break;
                 case RelationType.RelatedTo:
                 case RelationType.Subtask:
@@ -54,6 +58,7 @@ public static class RelationModule
                     dbType = dto.Type;
                     dbSourceId = task.Id > 0 ? task.Id : 0;
                     dbTargetId = targetId;
+                    isIncoming = false;
                     break;
             }
 
@@ -82,6 +87,11 @@ public static class RelationModule
                         finalType = dbType;
                     }
 
+                    if (finalSourceId > 0 && finalSourceId == finalTargetId)
+                    {
+                        continue;
+                    }
+
                     TaskRelation updatedRelation = new()
                     {
                         Id = existing.Id,
@@ -90,7 +100,12 @@ public static class RelationModule
                         Type = finalType,
                         LastChangesOn = DateTime.UtcNow
                     };
-                    resultRelations.Add(updatedRelation);
+
+                    if (isIncoming)
+                        incomingRelations.Add(updatedRelation);
+                    else
+                        outgoingRelations.Add(updatedRelation);
+
                     continue;
                 }
             }
@@ -103,9 +118,13 @@ public static class RelationModule
                 Type = dbType,
                 LastChangesOn = DateTime.UtcNow
             };
-            resultRelations.Add(newRelation);
+
+            if (isIncoming)
+                incomingRelations.Add(newRelation);
+            else
+                outgoingRelations.Add(newRelation);
         }
 
-        return resultRelations;
+        return (outgoingRelations, incomingRelations);
     }
 }

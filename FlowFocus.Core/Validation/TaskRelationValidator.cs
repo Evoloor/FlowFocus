@@ -24,7 +24,7 @@ public static class TaskRelationValidator
         ArgumentNullException.ThrowIfNull(targetTask);
 
         // 1.3.2 / B 1.1: Запрет ссылки на себя
-        if (sourceTask.Id != 0 && sourceTask.Id == targetTask.Id)
+        if (ReferenceEquals(sourceTask, targetTask) || (sourceTask.Id != 0 && sourceTask.Id == targetTask.Id))
         {
             throw new InvalidOperationException("Задача не может быть связана сама с собой.");
         }

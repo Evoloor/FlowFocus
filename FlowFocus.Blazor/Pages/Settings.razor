@@ -39,57 +39,55 @@
     </MudGrid>
 </MudPaper>
 
-<MudExpansionPanels Class="mb-4" Elevation="1">
-    <MudExpansionPanel Text="Расширенные настройки" Icon="@Icons.Material.Filled.Tune">
-        <MudText Typo="Typo.h6" Class="mb-1">Внешние условия</MudText>
-        <MudText Typo="Typo.body2" Class="text-muted mb-3">
-            Если внешнее условие выключено, все привязанные к нему задачи блокируются. При включении они возвращаются в прежний статус.
-        </MudText>
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudText Typo="Typo.h6" Class="mb-1">Внешние условия</MudText>
+    <MudText Typo="Typo.body2" Class="text-muted mb-3">
+        Если внешнее условие выключено, все привязанные к нему задачи блокируются. При включении они возвращаются в прежний статус.
+    </MudText>
 
-        <div class="d-flex gap-2 align-center mb-4">
-            <MudTextField T="string" @bind-Value="_newConditionName"
-                          Label="Название нового условия (например, «В городе А»)"
-                          Variant="Variant.Outlined"
-                          Margin="Margin.Dense"
-                          Class="flex-grow-1" />
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddCondition" Disabled="@string.IsNullOrWhiteSpace(_newConditionName)">
-                Добавить
-            </MudButton>
-        </div>
+    <div class="d-flex gap-2 align-center mb-4">
+        <MudTextField T="string" @bind-Value="_newConditionName"
+                      Label="Название нового условия (например, «В городе А»)"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      Class="flex-grow-1" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AddCondition" Disabled="@string.IsNullOrWhiteSpace(_newConditionName)">
+            Добавить
+        </MudButton>
+    </div>
 
-        @if (_conditions.Any())
-        {
-            <MudList T="ExternalCondition" Clickable="false" Class="pa-0">
-                @foreach (var cond in _conditions)
-                {
-                    <MudListItem T="ExternalCondition" Class="pa-2 border-bottom">
-                        <div class="d-flex align-center justify-space-between w-100">
-                            <div class="d-flex align-center gap-3">
-                                <MudSwitch T="bool" Value="cond.IsActive"
-                                           ValueChanged="@((bool val) => ToggleConditionActive(cond, val))"
-                                           Color="Color.Success" />
-                                <MudChip T="string" Size="Size.Small"
-                                         Icon="@(cond.IsActive ? Icons.Material.Filled.Check : Icons.Material.Filled.Lock)"
-                                         Style="@($"background-color: {(cond.IsActive ? "#E8F5E9" : "#FFEBEE")}; color: {(cond.IsActive ? "#2E7D32" : "#C62828")}; font-weight: 500;")">
-                                    @cond.Name
-                                </MudChip>
-                            </div>
-                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                           Size="Size.Small"
-                                           Color="Color.Error"
-                                           OnClick="@(() => DeleteConditionWithConfirmation(cond))"
-                                           Title="Удалить условие" />
+    @if (_conditions.Any())
+    {
+        <MudList T="ExternalCondition" Clickable="false" Class="pa-0">
+            @foreach (var cond in _conditions)
+            {
+                <MudListItem T="ExternalCondition" Class="pa-2 border-bottom">
+                    <div class="d-flex align-center justify-space-between w-100">
+                        <div class="d-flex align-center gap-3">
+                            <MudSwitch T="bool" Value="cond.IsActive"
+                                       ValueChanged="@((bool val) => ToggleConditionActive(cond, val))"
+                                       Color="Color.Success" />
+                            <MudChip T="string" Size="Size.Small"
+                                     Icon="@(cond.IsActive ? Icons.Material.Filled.Check : Icons.Material.Filled.Lock)"
+                                     Style="@($"background-color: {(cond.IsActive ? "#E8F5E9" : "#FFEBEE")}; color: {(cond.IsActive ? "#2E7D32" : "#C62828")}; font-weight: 500;")">
+                                @cond.Name
+                            </MudChip>
                         </div>
-                    </MudListItem>
-                }
-            </MudList>
-        }
-        else
-        {
-            <MudText Typo="Typo.body2" Class="text-muted italic">Внешние условия пока не добавлены</MudText>
-        }
-    </MudExpansionPanel>
-</MudExpansionPanels>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Size="Size.Small"
+                                       Color="Color.Error"
+                                       OnClick="@(() => DeleteConditionWithConfirmation(cond))"
+                                       Title="Удалить условие" />
+                    </div>
+                </MudListItem>
+            }
+        </MudList>
+    }
+    else
+    {
+        <MudText Typo="Typo.body2" Class="text-muted italic">Внешние условия пока не добавлены</MudText>
+    }
+</MudPaper>
 
 <MudPaper Class="pa-4 mb-4" Elevation="1">
     <MudText Typo="Typo.h6" Class="mb-3">Приватность</MudText>

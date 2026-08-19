@@ -100,7 +100,7 @@
                     </div>
                 </MudItem>
 
-                @* === ТЕГИ И УСЛОВИЯ === *@
+                @* === ТЕГИ === *@
                 @if (!IsSubtaskMode)
                 {
                     <MudItem xs="12">
@@ -114,14 +114,6 @@
                                                     await RefreshSuggestedTags();
                                                     await InvokeAsync(StateHasChanged);
                                                 })"/>
-                    </MudItem>
-
-                    <MudItem xs="12">
-                        <ConditionInput SuggestedLabels="_suggestedConditions"
-                                        SelectedLabels="_selectedConditions"
-                                        SelectedLabelIds="_selectedConditionIds"
-                                        OnLabelAdded="@(async (ExternalCondition c) => { await RefreshSuggestedConditions(); await InvokeAsync(StateHasChanged); })"
-                                        OnLabelRemoved="@(async (ExternalCondition c) => { await RefreshSuggestedConditions(); await InvokeAsync(StateHasChanged); })" />
                     </MudItem>
                 }
 
@@ -137,6 +129,15 @@
                                               Lines="3"
                                               Variant="Variant.Outlined"
                                               Class="mb-4"/>
+
+                                @* Внешние условия *@
+                                <div class="mb-4">
+                                    <ConditionInput SuggestedLabels="_suggestedConditions"
+                                                    SelectedLabels="_selectedConditions"
+                                                    SelectedLabelIds="_selectedConditionIds"
+                                                    OnLabelAdded="@(async (ExternalCondition c) => { await RefreshSuggestedConditions(); await InvokeAsync(StateHasChanged); })"
+                                                    OnLabelRemoved="@(async (ExternalCondition c) => { await RefreshSuggestedConditions(); await InvokeAsync(StateHasChanged); })" />
+                                </div>
 
                                 @* Подзадачи *@
                                 <SubtasksEditor Subtasks="_subtasks" SubtasksChanged="@OnSubtasksChanged"/>

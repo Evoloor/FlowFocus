@@ -20,6 +20,7 @@ public class PlannerService(ITaskRepository taskRepository) : IPlannerService
 
     public void RecalculateAll(UserSettings settings)
     {
+        taskRepository.NormalizeTaskRelations(saveChanges: false);
         taskRepository.NormalizeTaskDateSources(saveChanges: false);
         ActualizePriorities();
         DistributeTasks(settings);

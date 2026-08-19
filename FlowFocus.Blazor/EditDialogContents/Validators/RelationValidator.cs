@@ -13,9 +13,16 @@ public static class RelationValidator
 
         foreach (var relation in relationList)
         {
-            if (relation.Type is not (Core.Enums.RelationType.Blocks or Core.Enums.RelationType.BlockedBy)) continue;
             var targetTask = relation.TargetTask;
             if (targetTask == null) continue;
+
+            if (ReferenceEquals(targetTask, task) || (targetTask.Id > 0 && task.Id > 0 && targetTask.Id == task.Id))
+            {
+                errors.Add($"Задача \"{task.Title}\" не может создавать связь сама с собой.");
+                continue;
+            }
+
+            if (relation.Type is not (Core.Enums.RelationType.Blocks or Core.Enums.RelationType.BlockedBy)) continue;
 
             TaskItem blocker, blocked;
             if (relation.Type == Core.Enums.RelationType.Blocks)

@@ -18,11 +18,11 @@ public class TaskRelation : IAuditEntity
     public TaskItem? SourceTask { get; init; }
 
     /// <summary>ID целевой задачи</summary>
-    public int TargetTaskId { get; init; }
+    public int TargetTaskId { get; set; }
 
     [ForeignKey(nameof(TargetTaskId))]
     public TaskItem? TargetTask { get; init; }
 
     /// <summary>Тип связи</summary>
-    public RelationType Type { get; init; }
+    public RelationType Type { get; set; }
 }

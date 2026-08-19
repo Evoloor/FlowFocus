@@ -44,20 +44,28 @@ public static class TaskGraphSyncHelper
                 relation.SourceTaskId = entity.Id;
             }
 
+            relation.LastChangesOn = DateTime.UtcNow;
+
+            if (relation.SourceTaskId > 0 && relation.SourceTaskId == relation.TargetTaskId)
+            {
+                throw new InvalidOperationException("Задача не может быть связана сама с собой.");
+            }
+        }
+
+        for (var i = 0; i < entity.InverseRelations.Count; i++)
+        {
+            var relation = entity.InverseRelations[i];
+
             if (relation.TargetTaskId == 0)
             {
-                entity.Relations[i] = new()
-                {
-                    Id = relation.Id > 0 ? relation.Id : 0,
-                    SourceTaskId = relation.SourceTaskId == 0 ? entity.Id : relation.SourceTaskId,
-                    TargetTaskId = entity.Id,
-                    Type = relation.Type,
-                    LastChangesOn = DateTime.UtcNow
-                };
+                relation.TargetTaskId = entity.Id;
             }
-            else
+
+            relation.LastChangesOn = DateTime.UtcNow;
+
+            if (relation.SourceTaskId > 0 && relation.SourceTaskId == relation.TargetTaskId)
             {
-                relation.LastChangesOn = DateTime.UtcNow;
+                throw new InvalidOperationException("Задача не может быть связана сама с собой.");
             }
         }
     }
@@ -162,7 +170,7 @@ public static class TaskGraphSyncHelper
 
     public static void UpdateRelations(StorageContext context, TaskItem tracked, TaskItem source)
     {
-        var desired = source.Relations ?? [];
+        var desired = (source.Relations ?? []).Concat(source.InverseRelations ?? []).ToList();
         var trackedOutgoing = tracked.Relations ?? [];
         var trackedIncoming = tracked.InverseRelations ?? [];
 
@@ -187,6 +195,11 @@ public static class TaskGraphSyncHelper
 
         foreach (var desiredRel in desired)
         {
+            if (desiredRel.SourceTaskId > 0 && desiredRel.SourceTaskId == desiredRel.TargetTaskId)
+            {
+                continue;
+            }
+
             TaskRelation? existing = null;
 
             if (desiredRel.Id > 0)
@@ -211,10 +224,20 @@ public static class TaskGraphSyncHelper
             }
             else
             {
-                if (desiredRel.SourceTaskId == 0)
+                if (desiredRel.SourceTaskId == 0 && desiredRel.TargetTaskId != tracked.Id)
                 {
                     desiredRel.SourceTaskId = tracked.Id;
                 }
+                else if (desiredRel.TargetTaskId == 0 && desiredRel.SourceTaskId != tracked.Id)
+                {
+                    desiredRel.TargetTaskId = tracked.Id;
+                }
+
+                if (desiredRel.SourceTaskId != 0 && desiredRel.SourceTaskId == desiredRel.TargetTaskId)
+                {
+                    continue;
+                }
+
                 context.TaskRelations.Add(desiredRel);
             }
         }

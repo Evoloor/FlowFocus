@@ -322,6 +322,19 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
         }
     }
 
+    public void NormalizeTaskRelations(bool saveChanges = true)
+    {
+        lock (CacheLock)
+        {
+            var hasChanges = RelationNormalizer.NormalizeTaskRelations(Context, _tagRepository.Value);
+            if (hasChanges && saveChanges)
+            {
+                Context.SaveChanges();
+                MarkDirty();
+            }
+        }
+    }
+
     public void UpdateTaskSchedule(int taskId, DateTime? scheduledDate, DateSource? dateSource = null, bool saveChanges = true) =>
         UpdatePartial(taskId, t =>
         {

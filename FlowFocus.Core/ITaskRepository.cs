@@ -58,6 +58,9 @@ public interface ITaskRepository : IRepository<TaskItem>
     /// <summary>Нормализовать источники дат у задач без даты</summary>
     void NormalizeTaskDateSources(bool saveChanges = true);
 
+    /// <summary>Нормализовать связи между задачами и удалить самоблокировки</summary>
+    void NormalizeTaskRelations(bool saveChanges = true);
+
     /// <summary>Обновить расписание и источник даты задачи</summary>
     void UpdateTaskSchedule(int taskId, DateTime? scheduledDate, Enums.DateSource? dateSource = null, bool saveChanges = true);
 

@@ -388,7 +388,9 @@ public partial class TaskEditDialog
                 _relations.RemoveAll(r => r.TargetTask is { IsRecurring: true });
             }
 
-            _task.Relations = RelationModule.SyncRelationsToTask(_relations, _task, existingTracked);
+            var (outgoingRelations, incomingRelations) = RelationModule.SyncRelationsToTask(_relations, _task, existingTracked);
+            _task.Relations = outgoingRelations;
+            _task.InverseRelations = incomingRelations;
 
             if (_relationsToRemove.Count > 0)
             {

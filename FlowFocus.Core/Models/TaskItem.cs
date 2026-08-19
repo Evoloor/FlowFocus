@@ -105,7 +105,7 @@ public class TaskItem : IAuditEntity
     public List<TaskRelation> Relations { get; set; } = [];
 
     /// <summary>Обратные связи (задачи, которые ссылаются на эту)</summary>
-    public List<TaskRelation> InverseRelations { get; init; } = [];
+    public List<TaskRelation> InverseRelations { get; set; } = [];
 
     /// <summary>Правила повышения приоритета</summary>
     public List<PriorityEscalation> PriorityEscalations { get; set; } = [];
