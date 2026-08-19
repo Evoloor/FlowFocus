@@ -286,19 +286,40 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
     }
 
     /// <inheritdoc />
-    public DashboardMetricsDto CalculateMetrics(IEnumerable<TaskItem> allTasks, DashboardFilter filter, DateTime? now = null)
+    public DashboardDataSlices PrepareDataSlices(IEnumerable<TaskItem> allTasks, DashboardFilter filter, DateTime? now = null)
     {
         var allList = allTasks.ToList();
 
         // 1. Фильтрация по временному диапазону
         var dateFiltered = GetTasksForDateRange(allList, filter.DateRange, now);
 
-        // 2. Фильтрация по Scope
-        var scopeFiltered = ApplyEntityScope(dateFiltered, filter);
+        // 2. Фильтрация по области сущностей (Scope)
+        var fullyFiltered = ApplyEntityScope(dateFiltered, filter);
 
-        DashboardMetricsDto dto = new();
+        // 3. Фильтрация созданных задач с учетом Scope
+        List<TaskItem>? createdInScope = null;
+        if (filter.DateRange != DateRangeMode.AllTime)
+        {
+            var currentDate = (now ?? DateTime.UtcNow).Date;
+            var daysWindow = filter.DateRange == DateRangeMode.Recent ? 14 : 90;
+            var thresholdDate = currentDate.AddDays(-daysWindow);
+            createdInScope = fullyFiltered.Where(t => t.CreatedDate.Date >= thresholdDate).ToList();
+        }
 
-        if (scopeFiltered.Count == 0)
+        return new DashboardDataSlices(allList, dateFiltered, fullyFiltered, createdInScope);
+    }
+
+    /// <inheritdoc />
+    public DashboardMetricsDto CalculateMetrics(IEnumerable<TaskItem> allTasks, DashboardFilter filter, DateTime? now = null)
+    {
+        var slices = PrepareDataSlices(allTasks, filter, now);
+
+        DashboardMetricsDto dto = new()
+        {
+            CreatedTasksCount = slices.CreatedInScope?.Count
+        };
+
+        if (slices.FullyFiltered.Count == 0)
         {
             foreach (DayOfWeek dow in Enum.GetValues(typeof(DayOfWeek)))
             {
@@ -308,45 +329,35 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         }
 
         // === Summary Grid Metrics ===
-        dto.ActivityPercentage = CalculateActivityMetric(scopeFiltered, filter.DateRange, now);
+        dto.ActivityPercentage = CalculateActivityMetric(slices.FullyFiltered, filter.DateRange, now);
 
-        var topLevelTasks = scopeFiltered.Where(t => !t.IsSubtask).ToList();
-        dto.TotalTasksCount = topLevelTasks.Count > 0 ? topLevelTasks.Count : scopeFiltered.Count;
-        dto.TotalSubtasksCount = scopeFiltered.Sum(t => t.Subtasks != null ? GetSubtasksCountRecursive(t) : 0);
+        var topLevelTasks = slices.FullyFiltered.Where(t => !t.IsSubtask).ToList();
+        dto.TotalTasksCount = topLevelTasks.Count > 0 ? topLevelTasks.Count : slices.FullyFiltered.Count;
+        dto.TotalSubtasksCount = topLevelTasks.Count > 0
+            ? topLevelTasks.Sum(t => t.Subtasks != null ? GetSubtasksCountRecursive(t) : 0)
+            : slices.FullyFiltered.Sum(t => t.Subtasks != null ? GetSubtasksCountRecursive(t) : 0);
 
-        var completedTasksCount = scopeFiltered.Count(t => t.Status == TaskStatus.Completed);
-        var totalForCompletion = scopeFiltered.Count;
+        var completedTasksCount = slices.FullyFiltered.Count(t => t.Status == TaskStatus.Completed);
+        var totalForCompletion = slices.FullyFiltered.Count;
         dto.CompletionRatePercentage = totalForCompletion > 0
             ? Math.Round(((double)completedTasksCount / totalForCompletion) * 100.0, 1)
             : 0.0;
 
-        if (filter.DateRange != DateRangeMode.AllTime)
-        {
-            var currentDate = (now ?? DateTime.UtcNow).Date;
-            var daysWindow = filter.DateRange == DateRangeMode.Recent ? 14 : 90;
-            var thresholdDate = currentDate.AddDays(-daysWindow);
-            dto.CreatedTasksCount = allList.Count(t => t.CreatedDate.Date >= thresholdDate);
-        }
-        else
-        {
-            dto.CreatedTasksCount = null;
-        }
-
         // === Task Structure & Types ===
-        dto.StatusDistribution = DistributionHelper.CalculateEnumDistribution<TaskItem, TaskStatus, StatusDistribution>(scopeFiltered, t => t.Status);
-        dto.DateSourceDistribution = DistributionHelper.CalculateEnumDistribution<TaskItem, DateSource, DateSourceDistribution>(scopeFiltered, t => t.DateSource);
+        dto.StatusDistribution = DistributionHelper.CalculateEnumDistribution<TaskItem, TaskStatus, StatusDistribution>(slices.FullyFiltered, t => t.Status);
+        dto.DateSourceDistribution = DistributionHelper.CalculateEnumDistribution<TaskItem, DateSource, DateSourceDistribution>(slices.FullyFiltered, t => t.DateSource);
         dto.TagsDistribution = DistributionHelper.CalculateCollectionDistribution(
-            scopeFiltered,
+            slices.FullyFiltered,
             t => t.Tags?.Where(tt => tt.Tag != null).Select(tt => tt.Tag!.Name));
         dto.ConditionsDistribution = DistributionHelper.CalculateCollectionDistribution(
-            scopeFiltered,
+            slices.FullyFiltered,
             t => t.Conditions?.Where(tc => tc.Condition != null).Select(tc => tc.Condition!.Name));
 
         // === Deep Analytics Grid ===
-        dto.FilteredCount = scopeFiltered.Count;
-        dto.FilteredTotalTimeMinutes = scopeFiltered.Sum(t => t.EstimatedMinutes ?? 0);
+        dto.FilteredCount = slices.FullyFiltered.Count;
+        dto.FilteredTotalTimeMinutes = slices.FullyFiltered.Sum(t => t.EstimatedMinutes ?? 0);
 
-        var tasksWithTime = scopeFiltered.Where(t => t.EstimatedMinutes.HasValue).Select(t => t.EstimatedMinutes!.Value).ToList();
+        var tasksWithTime = slices.FullyFiltered.Where(t => t.EstimatedMinutes.HasValue).Select(t => t.EstimatedMinutes!.Value).ToList();
         if (tasksWithTime.Count > 0)
         {
             dto.FilteredAvgTimeMinutes = Math.Round(tasksWithTime.Average(), 1);
@@ -354,7 +365,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
             dto.FilteredMaxTimeMinutes = tasksWithTime.Max();
         }
 
-        var tasksWithComplexity = scopeFiltered.Where(t => t.Complexity.HasValue).Select(t => t.Complexity!.Value).ToList();
+        var tasksWithComplexity = slices.FullyFiltered.Where(t => t.Complexity.HasValue).Select(t => t.Complexity!.Value).ToList();
         if (tasksWithComplexity.Count > 0)
         {
             dto.FilteredAvgComplexity = Math.Round(tasksWithComplexity.Average(), 1);
@@ -362,7 +373,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
             dto.FilteredMaxComplexity = tasksWithComplexity.Max();
         }
 
-        var tasksWithInterest = scopeFiltered.Where(t => t.Interest.HasValue).Select(t => t.Interest!.Value).ToList();
+        var tasksWithInterest = slices.FullyFiltered.Where(t => t.Interest.HasValue).Select(t => t.Interest!.Value).ToList();
         if (tasksWithInterest.Count > 0)
         {
             dto.FilteredAvgInterest = Math.Round(tasksWithInterest.Average(), 1);
@@ -370,7 +381,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
             dto.FilteredMaxInterest = tasksWithInterest.Max();
         }
 
-        var tasksWithPriority = scopeFiltered.Where(t => t.Priority != null).ToList();
+        var tasksWithPriority = slices.FullyFiltered.Where(t => t.Priority != null).ToList();
         if (tasksWithPriority.Count > 0)
         {
             var maxPriorityTask = tasksWithPriority.MinBy(t => t.Priority!.Order);
@@ -386,18 +397,18 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         }
 
         // === Weekday Distribution ===
-        dto.WeekdayAverages = CalculateWeekdayDistribution(scopeFiltered);
+        dto.WeekdayAverages = CalculateWeekdayDistribution(slices.FullyFiltered);
 
         // === Records & Interest-Priority Analytics ===
-        dto.Records = CalculateRecords(scopeFiltered);
-        dto.InterestPriorityDistribution = CalculateInterestPriorityDistribution(scopeFiltered);
+        dto.Records = CalculateRecords(slices.FullyFiltered);
+        dto.InterestPriorityDistribution = CalculateInterestPriorityDistribution(slices.FullyFiltered);
 
         // === Metric Histograms ===
-        dto.InterestHistogram = CalculateInterestHistogram(scopeFiltered);
-        dto.ComplexityHistogram = CalculateComplexityHistogram(scopeFiltered);
-        dto.PriorityHistogram = CalculatePriorityHistogram(scopeFiltered);
-        dto.TimeHistogram = CalculateTimeHistogram(scopeFiltered);
-        dto.PriorityInterestHistogram = CalculatePriorityInterestHistogram(scopeFiltered);
+        dto.InterestHistogram = CalculateInterestHistogram(slices.FullyFiltered);
+        dto.ComplexityHistogram = CalculateComplexityHistogram(slices.FullyFiltered);
+        dto.PriorityHistogram = CalculatePriorityHistogram(slices.FullyFiltered);
+        dto.TimeHistogram = CalculateTimeHistogram(slices.FullyFiltered);
+        dto.PriorityInterestHistogram = CalculatePriorityInterestHistogram(slices.FullyFiltered);
 
         return dto;
     }

@@ -123,6 +123,55 @@ public class DashboardUiTests : IntegrationTestBase
     }
 
     [Fact]
+    public void DashboardPage_EntityScopeSelect_UpdatesCreatedTasksCount()
+    {
+        var activeRecentTask = new TaskItemBuilder()
+            .WithId(0)
+            .WithTitle("Active Recent")
+            .WithStatus(TaskStatus.Planned)
+            .WithScheduledDate(DateTime.UtcNow.AddDays(-2))
+            .Build();
+
+        var completedRecentTask = new TaskItemBuilder()
+            .WithId(0)
+            .WithTitle("Completed Recent")
+            .WithStatus(TaskStatus.Completed)
+            .WithCompletedDate(DateTime.UtcNow.AddDays(-2))
+            .Build();
+
+        TaskRepo.Add(activeRecentTask);
+        TaskRepo.Add(completedRecentTask);
+
+        var cut = _ctx.Render<Dashboard>();
+
+        // Enable Recent date range mode
+        var dateSelect = cut.FindComponent<DateRangeSelect>();
+        cut.InvokeAsync(() => dateSelect.Instance.ValueChanged.InvokeAsync(DateRangeMode.Recent));
+
+        // Scope All -> 2 created tasks
+        cut.FindComponent<CreatedTasksStatCard>().Instance.Count.Should().Be(2);
+
+        // Change scope to Active -> 1 created task
+        var scopeSelect = cut.FindComponent<EntityScopeSelect>();
+        cut.InvokeAsync(() => scopeSelect.Instance.FilterChanged.InvokeAsync(new()
+        {
+            DateRange = DateRangeMode.Recent,
+            Scope = EntityScopeType.Active
+        }));
+
+        cut.FindComponent<CreatedTasksStatCard>().Instance.Count.Should().Be(1);
+
+        // Change scope to Completed -> 1 created task
+        cut.InvokeAsync(() => scopeSelect.Instance.FilterChanged.InvokeAsync(new()
+        {
+            DateRange = DateRangeMode.Recent,
+            Scope = EntityScopeType.Completed
+        }));
+
+        cut.FindComponent<CreatedTasksStatCard>().Instance.Count.Should().Be(1);
+    }
+
+    [Fact]
     public void PieChart_HidesWhenLessThanTwoSlices()
     {
         // Tag pie chart with only 1 tag -> slice count = 1 (< 2)

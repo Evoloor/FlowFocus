@@ -134,6 +134,75 @@ public class DashboardAnalyticsServiceTests
     }
 
     [Fact]
+    public void CalculateMetrics_CreatedTasksCount_AppliesEntityScopeCorrectly()
+    {
+        DateTime now = new(2026, 8, 12);
+        Tag tagWork = new() { Id = 1, Name = "Work" };
+
+        List<TaskItem> tasks =
+        [
+            new() { Id = 1, CreatedDate = now.AddDays(-2), Status = TaskStatus.Planned, Tags = [new() { TagId = 1, Tag = tagWork }] },
+            new() { Id = 2, CreatedDate = now.AddDays(-3), Status = TaskStatus.Completed, Tags = [new() { TagId = 1, Tag = tagWork }] },
+            new() { Id = 3, CreatedDate = now.AddDays(-4), Status = TaskStatus.Planned, Tags = [] },
+            new() { Id = 4, CreatedDate = now.AddDays(-40), Status = TaskStatus.Planned } // outside 14-day window
+        ];
+
+        // Scope = All
+        var metricsAll = _service.CalculateMetrics(tasks, new() { DateRange = DateRangeMode.Recent, Scope = EntityScopeType.All }, now);
+        metricsAll.CreatedTasksCount.Should().Be(3);
+
+        // Scope = Active
+        var metricsActive = _service.CalculateMetrics(tasks, new() { DateRange = DateRangeMode.Recent, Scope = EntityScopeType.Active }, now);
+        metricsActive.CreatedTasksCount.Should().Be(2); // tasks 1 and 3
+
+        // Scope = Completed
+        var metricsCompleted = _service.CalculateMetrics(tasks, new() { DateRange = DateRangeMode.Recent, Scope = EntityScopeType.Completed }, now);
+        metricsCompleted.CreatedTasksCount.Should().Be(1); // task 2
+
+        // Scope = Tag
+        var metricsTag = _service.CalculateMetrics(tasks, new() { DateRange = DateRangeMode.Recent, Scope = EntityScopeType.Tag, TagId = 1 }, now);
+        metricsTag.CreatedTasksCount.Should().Be(2); // tasks 1 and 2
+    }
+
+    [Fact]
+    public void CalculateMetrics_CreatedTasksCount_WhenNoMatchingTasks_ReturnsZeroForRecentMode()
+    {
+        DateTime now = new(2026, 8, 12);
+        List<TaskItem> tasks =
+        [
+            new() { Id = 1, CreatedDate = now.AddDays(-2), Status = TaskStatus.Completed }
+        ];
+
+        // Scope = Active, but only Completed task exists -> scopeFiltered is empty
+        DashboardFilter filter = new() { DateRange = DateRangeMode.Recent, Scope = EntityScopeType.Active };
+        var metrics = _service.CalculateMetrics(tasks, filter, now);
+
+        metrics.CreatedTasksCount.Should().Be(0);
+        metrics.TotalTasksCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void PrepareDataSlices_ReturnsCorrectSlicesAcrossDimensions()
+    {
+        DateTime now = new(2026, 8, 12);
+        List<TaskItem> tasks =
+        [
+            new() { Id = 1, CreatedDate = now.AddDays(-2), Status = TaskStatus.Planned },
+            new() { Id = 2, CreatedDate = now.AddDays(-5), Status = TaskStatus.Completed, CompletedDate = now.AddDays(-5) },
+            new() { Id = 3, CreatedDate = now.AddDays(-50), Status = TaskStatus.Completed, CompletedDate = now.AddDays(-50) }
+        ];
+
+        DashboardFilter filter = new() { DateRange = DateRangeMode.Recent, Scope = EntityScopeType.Active };
+        var slices = _service.PrepareDataSlices(tasks, filter, now);
+
+        slices.All.Should().HaveCount(3);
+        slices.FullyFiltered.Should().HaveCount(1);
+        slices.FullyFiltered[0].Id.Should().Be(1);
+        slices.CreatedInScope.Should().NotBeNull();
+        slices.CreatedInScope.Should().HaveCount(1);
+    }
+
+    [Fact]
     public void ApplyEntityScope_TagScopeFilter_ReturnsOnlyMatchingTasks()
     {
         DateTime now = new(2026, 8, 12);

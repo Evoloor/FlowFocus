@@ -19,6 +19,11 @@ public interface IDashboardAnalyticsService
     List<TaskItem> ApplyEntityScope(IEnumerable<TaskItem> tasks, DashboardFilter filter);
 
     /// <summary>
+    /// Формирование срезов данных для аналитического конвейера дашборда
+    /// </summary>
+    DashboardDataSlices PrepareDataSlices(IEnumerable<TaskItem> allTasks, DashboardFilter filter, DateTime? now = null);
+
+    /// <summary>
     /// Расчет активности (% дней за выбранный период с хотя бы 1 выполненной задачей)
     /// </summary>
     double CalculateActivityMetric(IEnumerable<TaskItem> tasks, DateRangeMode mode, DateTime? now = null);
