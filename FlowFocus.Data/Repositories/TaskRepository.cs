@@ -67,6 +67,7 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
                                     .Include(t => t.Tags)
                                     .Include(t => t.Conditions).ThenInclude(tc => tc.Condition)
                                     .Include(t => t.Subtasks)
+                                    .Include(t => t.ParentTask)
                                     .Include(t => t.Relations)
                                     .Include(t => t.InverseRelations)
                                     .Include(t => t.PriorityEscalations)
@@ -159,7 +160,34 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
             .Include(t => t.Relations).ThenInclude(r => r.TargetTask)
             .Include(t => t.InverseRelations).ThenInclude(r => r.SourceTask)
             .Include(t => t.Subtasks)
+            .Include(t => t.ParentTask)
             .Include(t => t.PriorityEscalations).ThenInclude(pe => pe.TargetPriority);
+
+    public override List<TaskItem> GetAll()
+    {
+        var list = base.GetAll();
+        var dict = list.ToDictionary(t => t.Id);
+        foreach (var item in list)
+        {
+            if (item.ParentTaskId.HasValue && item.ParentTask == null && dict.TryGetValue(item.ParentTaskId.Value, out var parent))
+            {
+                item.ParentTask = parent;
+                if (!parent.Subtasks.Any(s => s.Id == item.Id))
+                {
+                    parent.Subtasks.Add(item);
+                }
+            }
+            if (item.Subtasks != null)
+            {
+                foreach (var sub in item.Subtasks)
+                {
+                    sub.ParentTask = item;
+                    sub.ParentTaskId = item.Id;
+                }
+            }
+        }
+        return list;
+    }
 
     private IEnumerable<TaskItem> GetActiveRootTasks() => GetAll().FilterActiveRootTasks();
 

@@ -1,5 +1,6 @@
 using System.Reflection;
 using Bunit;
+using FlowFocus.Blazor.Components;
 using FlowFocus.Blazor.Dialogs;
 using FlowFocus.Blazor.EditDialogContents;
 using FlowFocus.Core;
@@ -244,6 +245,198 @@ public class TaskEditDialogTests : IntegrationTestBase
 
         var relationsA = Context.TaskRelations.Where(r => r.SourceTaskId == 10 || r.TargetTaskId == 10).ToList();
         relationsA.Should().NotBeEmpty();
+    }
+
+    /// <summary>
+    /// Test 6: Creating a new task with subtasks via TaskEditDialog.
+    /// Subtasks should be bound to parent, have planned status, copy properties, and live-bind ScheduledDate to parent.
+    /// </summary>
+    [Fact]
+    public async Task SaveTask_NewTaskWithSubtasks_CreatesParentAndLiveBoundSubtasks()
+    {
+        // Arrange
+        DateTime initialDate = new(2026, 9, 20);
+        var cut = RenderTaskEditDialog(initialTitle: "Родительская задача с подзадачами");
+        var dialogInstance = cut.Instance;
+
+        var taskField = typeof(TaskEditDialog).GetField("_task", BindingFlags.Instance | BindingFlags.NonPublic);
+        var taskInDialog = (TaskItem)taskField!.GetValue(dialogInstance)!;
+        taskInDialog.ScheduledDate = initialDate;
+        taskInDialog.DateSource = DateSource.AutoFixed;
+
+        var subtasksField = typeof(TaskEditDialog).GetField("_subtasks", BindingFlags.Instance | BindingFlags.NonPublic);
+        var subtasks = (List<FlowFocus.Blazor.EditDialogContents.SubtaskDto>)subtasksField!.GetValue(dialogInstance)!;
+        subtasks.Add(new()
+        {
+            Title = "Подзадача 1",
+            EstimatedMinutes = 25,
+            Complexity = 4,
+            Interest = 7,
+            IsFavorite = true
+        });
+        subtasks.Add(new()
+        {
+            Title = "Подзадача 2",
+            EstimatedMinutes = 40,
+            Complexity = 8,
+            Interest = 3,
+            HideUnderSpoiler = true
+        });
+
+        // Act
+        await cut.InvokeAsync(() => InvokeSaveTaskAsync(dialogInstance));
+
+        // Assert
+        AssertNoSnackbarErrors();
+        var savedParent = TaskRepo.GetAll().FirstOrDefault(t => t.Title == "Родительская задача с подзадачами");
+        savedParent.Should().NotBeNull();
+        savedParent!.ScheduledDate.Should().Be(initialDate);
+        savedParent.Subtasks.Should().HaveCount(2);
+
+        var sub1 = savedParent.Subtasks.FirstOrDefault(s => s.Title == "Подзадача 1");
+        sub1.Should().NotBeNull();
+        sub1!.ParentTaskId.Should().Be(savedParent.Id);
+        sub1.Status.Should().Be(TaskStatus.Planned);
+        sub1.EstimatedMinutes.Should().Be(25);
+        sub1.Complexity.Should().Be(4);
+        sub1.Interest.Should().Be(7);
+        sub1.IsFavorite.Should().BeTrue();
+        sub1.ScheduledDate.Should().Be(initialDate);
+        sub1.DateSource.Should().Be(DateSource.AutoFixed);
+
+        var sub2 = savedParent.Subtasks.FirstOrDefault(s => s.Title == "Подзадача 2");
+        sub2.Should().NotBeNull();
+        sub2!.ParentTaskId.Should().Be(savedParent.Id);
+        sub2.Status.Should().Be(TaskStatus.Planned);
+        sub2.EstimatedMinutes.Should().Be(40);
+        sub2.Complexity.Should().Be(8);
+        sub2.Interest.Should().Be(3);
+        sub2.HideUnderSpoiler.Should().BeTrue();
+        sub2.ScheduledDate.Should().Be(initialDate);
+        sub2.DateSource.Should().Be(DateSource.AutoFixed);
+
+        // Act: verify live-binding when changing parent date
+        DateTime newParentDate = new(2026, 9, 25);
+        TaskRepo.UpdateTaskSchedule(savedParent.Id, newParentDate, DateSource.Manual);
+
+        var refreshedSub1 = TaskRepo.GetById(sub1.Id);
+        refreshedSub1.Should().NotBeNull();
+        refreshedSub1!.ScheduledDate.Should().Be(newParentDate);
+        refreshedSub1.DateSource.Should().Be(DateSource.Manual);
+    }
+
+    /// <summary>
+    /// Test 7: Updating an existing task by adding a new subtask via TaskEditDialog.
+    /// </summary>
+    [Fact]
+    public async Task SaveTask_EditExistingTask_AddNewSubtask_SavesSubtaskAndLiveBindsDate()
+    {
+        // Arrange
+        DateTime initialDate = new(2026, 9, 10);
+        var existing = new TaskItemBuilder()
+            .WithId(100)
+            .WithTitle("Существующая задача")
+            .WithScheduledDate(initialDate, DateSource.Manual)
+            .WithStatus(TaskStatus.Planned)
+            .Build();
+        TaskRepo.Add(existing);
+
+        var dialogTask = TaskRepo.GetById(100)!;
+        var cut = RenderTaskEditDialog(existingTask: dialogTask);
+        var dialogInstance = cut.Instance;
+
+        // Add subtask via private field _subtasks
+        var subtasksField = typeof(TaskEditDialog).GetField("_subtasks", BindingFlags.Instance | BindingFlags.NonPublic);
+        var subtasks = (List<FlowFocus.Blazor.EditDialogContents.SubtaskDto>)subtasksField!.GetValue(dialogInstance)!;
+        subtasks.Add(new()
+        {
+            Title = "Новая добавленная подзадача",
+            EstimatedMinutes = 15,
+            Complexity = 2
+        });
+
+        // Act
+        await cut.InvokeAsync(() => InvokeSaveTaskAsync(dialogInstance));
+
+        // Assert
+        AssertNoSnackbarErrors();
+        var updatedParent = TaskRepo.GetById(100);
+        updatedParent.Should().NotBeNull();
+        updatedParent!.Subtasks.Should().HaveCount(1);
+
+        var addedSubtask = updatedParent.Subtasks.First();
+        addedSubtask.Title.Should().Be("Новая добавленная подзадача");
+        addedSubtask.ParentTaskId.Should().Be(100);
+        addedSubtask.ScheduledDate.Should().Be(initialDate);
+        addedSubtask.DateSource.Should().Be(DateSource.Manual);
+    }
+
+    [Fact]
+    public void TaskEditDialog_WhenEditingSubtask_EntersSubtaskModeAndHidesDatePicker()
+    {
+        // Arrange
+        var parent = new TaskItemBuilder()
+            .WithId(200)
+            .WithTitle("Родитель")
+            .WithScheduledDate(new DateTime(2026, 9, 15))
+            .Build();
+        var subtask = new TaskItemBuilder()
+            .WithId(201)
+            .WithTitle("Подзадача")
+            .WithParentTask(parent)
+            .Build();
+
+        // Act
+        var cut = RenderTaskEditDialog(existingTask: subtask);
+
+        // Assert
+        cut.Instance.IsSubtaskMode.Should().BeTrue();
+        cut.FindComponents<MudDatePicker>().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TaskDateRow_WhenTaskIsSubtask_RendersEmptyMarkup()
+    {
+        // Arrange
+        var parent = new TaskItemBuilder()
+            .WithId(300)
+            .WithTitle("Родитель")
+            .WithScheduledDate(new DateTime(2026, 9, 15))
+            .Build();
+        var subtask = new TaskItemBuilder()
+            .WithId(301)
+            .WithTitle("Подзадача")
+            .WithParentTask(parent)
+            .Build();
+
+        // Act
+        var cut = _ctx.Render<TaskDateRow>(parameters => parameters
+            .Add(p => p.Task, subtask)
+            .Add(p => p.Today, TodoDay.Today)
+        );
+
+        // Assert
+        cut.Markup.Trim().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TaskDateRow_WhenTaskIsRootTask_RendersScheduledDate()
+    {
+        // Arrange
+        var task = new TaskItemBuilder()
+            .WithId(400)
+            .WithTitle("Обычная задача")
+            .WithScheduledDate(new DateTime(2026, 9, 15), DateSource.Manual)
+            .Build();
+
+        // Act
+        var cut = _ctx.Render<TaskDateRow>(parameters => parameters
+            .Add(p => p.Task, task)
+            .Add(p => p.Today, TodoDay.Today)
+        );
+
+        // Assert
+        cut.Markup.Should().Contain("15.09.2026");
     }
 
     protected override void Dispose(bool disposing)

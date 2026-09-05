@@ -19,6 +19,7 @@ public static class TaskGraphSyncHelper
         foreach (var subtask in entity.Subtasks)
         {
             subtask.ParentTaskId ??= entity.Id;
+            subtask.ParentTask ??= entity;
             if (subtask.Id == 0)
             {
                 maxId++;
@@ -35,7 +36,8 @@ public static class TaskGraphSyncHelper
 
     public static void PrepareRelationsForAdd(TaskItem entity)
     {
-        for (var i = 0; i < entity.Relations.Count; i++)
+        for (var i = 0; i < entity.Relations.Count; i++
+)
         {
             var relation = entity.Relations[i];
             
@@ -150,6 +152,7 @@ public static class TaskGraphSyncHelper
         foreach (var sourceSubtask in source.Subtasks)
         {
             sourceSubtask.ParentTaskId ??= tracked.Id;
+            sourceSubtask.ParentTask ??= tracked;
             TaskHierarchyValidator.ValidateSubtaskParent(tracked, sourceSubtask);
 
             if (sourceSubtask.Id > 0)
@@ -157,12 +160,14 @@ public static class TaskGraphSyncHelper
                 var existing = tracked.Subtasks.FirstOrDefault(s => s.Id == sourceSubtask.Id);
                 if (existing != null)
                 {
+                    existing.ParentTask ??= tracked;
                     context.Entry(existing).CurrentValues.SetValues(sourceSubtask);
                 }
             }
             else
             {
                 sourceSubtask.ParentTaskId = tracked.Id;
+                sourceSubtask.ParentTask = tracked;
                 context.Tasks.Add(sourceSubtask);
             }
         }

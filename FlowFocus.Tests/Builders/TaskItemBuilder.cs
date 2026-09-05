@@ -10,6 +10,7 @@ public class TaskItemBuilder : EntityBuilder<TaskItem, TaskItemBuilder>
     private string? _description;
     private TaskStatus _status = TaskStatus.Planned;
     private bool _isFavorite;
+    private bool _hideUnderSpoiler;
     private int? _priorityId;
     private PriorityLevel? _priority;
     private int? _interest = 5;
@@ -40,6 +41,12 @@ public class TaskItemBuilder : EntityBuilder<TaskItem, TaskItemBuilder>
     public TaskItemBuilder WithFavorite(bool isFavorite = true)
     {
         _isFavorite = isFavorite;
+        return this;
+    }
+
+    public TaskItemBuilder WithHideUnderSpoiler(bool hide = true)
+    {
+        _hideUnderSpoiler = hide;
         return this;
     }
 
@@ -188,13 +195,12 @@ public class TaskItemBuilder : EntityBuilder<TaskItem, TaskItemBuilder>
             Description = _description,
             Status = _status,
             IsFavorite = _isFavorite,
+            HideUnderSpoiler = _hideUnderSpoiler,
             PriorityId = _priorityId,
             Priority = _priority,
             Interest = _interest,
             Complexity = _complexity,
             EstimatedMinutes = _estimatedMinutes,
-            ScheduledDate = _scheduledDate,
-            DateSource = _dateSource,
             CompletedDate = _completedDate,
             CreatedDate = _createdDate,
             IsRecurring = _isRecurring,
@@ -211,9 +217,24 @@ public class TaskItemBuilder : EntityBuilder<TaskItem, TaskItemBuilder>
             LastChangesOn = DateTime.UtcNow
         };
 
+        if (_parentTask == null)
+        {
+            item.ScheduledDate = _scheduledDate;
+            item.DateSource = _dateSource;
+        }
+        else
+        {
+            if (_scheduledDate.HasValue)
+            {
+                item.ScheduledDate = _scheduledDate;
+                item.DateSource = _dateSource;
+            }
+        }
+
         foreach (var subtask in item.Subtasks)
         {
             subtask.ParentTaskId = item.Id;
+            subtask.ParentTask = item;
         }
 
         return item;

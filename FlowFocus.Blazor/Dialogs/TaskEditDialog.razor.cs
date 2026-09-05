@@ -89,6 +89,11 @@ public partial class TaskEditDialog
             StateHasChanged();
         }
 
+        if (_task.IsSubtask || ExistingTask?.IsSubtask == true)
+        {
+            IsSubtaskMode = true;
+        }
+
         // Синхронизируем локальное зеркало даты из модели
         _scheduledDate = _task.ScheduledDate;
 
@@ -307,18 +312,21 @@ public partial class TaskEditDialog
                 _ => _estimatedValue
             };
 
-            if (_task.IsRecurring && _task.ScheduledDate == null)
+            if (!IsSubtaskMode && !_task.IsSubtask)
             {
-                _task.ScheduledDate = TodoDay.Today.ToDateTime();
-                _task.DateSource = DateSource.Manual;
-                _scheduledDate = _task.ScheduledDate;
-            }
-            else if (_task.ScheduledDate == null)
-            {
-                _task.DateSource = DateSource.AutoFlexible;
+                if (_task.IsRecurring && _task.ScheduledDate == null)
+                {
+                    _task.ScheduledDate = TodoDay.Today.ToDateTime();
+                    _task.DateSource = DateSource.Manual;
+                    _scheduledDate = _task.ScheduledDate;
+                }
+                else if (_task.ScheduledDate == null)
+                {
+                    _task.DateSource = DateSource.AutoFlexible;
+                }
             }
 
-            if (_task.Status == TaskStatus.NotConfigured && !IsSubtaskMode)
+            if (_task.Status == TaskStatus.NotConfigured && !IsSubtaskMode && !_task.IsSubtask)
             {
                 _task.Status = TaskStatus.Planned;
             }

@@ -52,16 +52,37 @@ public class TaskItem : IAuditEntity
     public int? EstimatedMinutes { get; set; }
 
     // === Даты ===
+    private DateTime? _scheduledDate;
+
     /// <summary>
     /// Единственная дата планирования задачи.
-    /// Её источник и поведение определяются полем <see cref="DateSource"/>.
+    /// Для подзадачи ссылается (лайв-биндится) на дату родительской задачи.
     /// </summary>
-    public DateTime? ScheduledDate { get; set; }
+    /// <remarks>
+    /// Для подзадачи чтение всегда возвращает актуальную дату родителя (<see cref="ParentTask"/>).
+    /// Присвоение даты подзадаче ни при каких обстоятельствах не изменяет родительскую задачу.
+    /// </remarks>
+    public DateTime? ScheduledDate
+    {
+        get => ParentTask != null ? ParentTask.ScheduledDate : _scheduledDate;
+        set => _scheduledDate = value;
+    }
+
+    private DateSource _dateSource = DateSource.AutoFlexible;
 
     /// <summary>
     /// Определяет, кем и как была назначена дата <see cref="ScheduledDate"/>.
+    /// Для подзадачи ссылается (лайв-биндится) на источник даты родительской задачи.
     /// </summary>
-    public DateSource DateSource { get; set; } = DateSource.AutoFlexible;
+    /// <remarks>
+    /// Для подзадачи чтение всегда возвращает актуальный источник даты родителя (<see cref="ParentTask"/>).
+    /// Присвоение источника даты подзадаче ни при каких обстоятельствах не изменяет родительскую задачу.
+    /// </remarks>
+    public DateSource DateSource
+    {
+        get => ParentTask != null ? ParentTask.DateSource : _dateSource;
+        set => _dateSource = value;
+    }
 
     /// <summary>Дата завершения задачи</summary>
     public DateTime? CompletedDate { get; set; }
@@ -86,14 +107,44 @@ public class TaskItem : IAuditEntity
     public int? RecurrenceSourceId { get; init; }
 
     // === Связи ===
+    private TaskItem? _parentTask;
+
     /// <summary>ID родительской задачи (если это подзадача)</summary>
     public int? ParentTaskId { get; set; }
 
     [ForeignKey(nameof(ParentTaskId))]
-    public TaskItem? ParentTask { get; init; }
+    public TaskItem? ParentTask
+    {
+        get => _parentTask;
+        set
+        {
+            _parentTask = value;
+            if (value != null && value.Id != 0)
+            {
+                ParentTaskId = value.Id;
+            }
+        }
+    }
+
+    private List<TaskItem> _subtasks = [];
 
     /// <summary>Подзадачи</summary>
-    public List<TaskItem> Subtasks { get; set; } = [];
+    public List<TaskItem> Subtasks
+    {
+        get => _subtasks;
+        set
+        {
+            _subtasks = value ?? [];
+            foreach (var subtask in _subtasks)
+            {
+                subtask.ParentTask = this;
+                if (Id != 0 && subtask.ParentTaskId == null)
+                {
+                    subtask.ParentTaskId = Id;
+                }
+            }
+        }
+    }
 
     /// <summary>Теги задачи</summary>
     public List<TaskTag> Tags { get; set; } = [];
@@ -165,6 +216,8 @@ public class TaskItem : IAuditEntity
         Interest = source.Interest;
         Complexity = source.Complexity;
         EstimatedMinutes = source.EstimatedMinutes;
+        ParentTaskId = source.ParentTaskId;
+        ParentTask = source.ParentTask;
         ScheduledDate = source.ScheduledDate;
         DateSource = source.DateSource;
         CompletedDate = source.CompletedDate;
@@ -174,6 +227,5 @@ public class TaskItem : IAuditEntity
         RecurrenceInterval = source.RecurrenceInterval;
         RecurrenceWeekDays = source.RecurrenceWeekDays;
         RecurrenceSourceId = source.RecurrenceSourceId;
-        ParentTaskId = source.ParentTaskId;
     }
 }

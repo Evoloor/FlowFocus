@@ -69,32 +69,46 @@ public class TaskRecurrenceService : ITaskRecurrenceService
         bool isParent, 
         DateTime? scheduledDate = null, 
         DateSource? dateSource = null, 
-        int? recurrenceSourceId = null) => new()
+        int? recurrenceSourceId = null)
     {
-        Title = source.Title,
-        Description = source.Description,
-        Status = TaskStatus.Planned,
-        PriorityId = source.PriorityId,
-        Interest = source.Interest,
-        Complexity = source.Complexity,
-        EstimatedMinutes = source.EstimatedMinutes,
-        IsFavorite = source.IsFavorite,
-        HideUnderSpoiler = source.HideUnderSpoiler,
-        ScheduledDate = scheduledDate ?? source.ScheduledDate,
-        DateSource = isParent ? (dateSource ?? source.DateSource) : DateSource.AutoFlexible,
-        IsRecurring = isParent && source.IsRecurring,
-        RecurrenceType = isParent ? source.RecurrenceType : RecurrenceType.None,
-        RecurrenceInterval = isParent ? source.RecurrenceInterval : null,
-        RecurrenceWeekDays = isParent ? source.RecurrenceWeekDays : null,
-        RecurrenceSourceId = isParent ? (recurrenceSourceId ?? source.RecurrenceSourceId) : null,
-        ParentTaskId = null,
-        CreatedDate = DateTime.UtcNow,
-        Tags = source.Tags?.Select(t => new TaskTag { TagId = t.TagId }).ToList() ?? [],
-        PriorityEscalations = source.PriorityEscalations?
-            .Select(e => new PriorityEscalation { TargetPriorityId = e.TargetPriorityId, EscalationDate = e.EscalationDate, IsApplied = e.IsApplied })
-            .ToList() ?? [],
-        Subtasks = source.Subtasks?.Select(s => CloneTaskItem(s, isParent: false, scheduledDate: scheduledDate, dateSource: dateSource)).ToList() ?? []
-    };
+        var newTask = new TaskItem
+        {
+            Title = source.Title,
+            Description = source.Description,
+            Status = TaskStatus.Planned,
+            PriorityId = source.PriorityId,
+            Interest = source.Interest,
+            Complexity = source.Complexity,
+            EstimatedMinutes = source.EstimatedMinutes,
+            IsFavorite = source.IsFavorite,
+            HideUnderSpoiler = source.HideUnderSpoiler,
+            ScheduledDate = isParent ? (scheduledDate ?? source.ScheduledDate) : null,
+            DateSource = isParent ? (dateSource ?? source.DateSource) : DateSource.AutoFlexible,
+            IsRecurring = isParent && source.IsRecurring,
+            RecurrenceType = isParent ? source.RecurrenceType : RecurrenceType.None,
+            RecurrenceInterval = isParent ? source.RecurrenceInterval : null,
+            RecurrenceWeekDays = isParent ? source.RecurrenceWeekDays : null,
+            RecurrenceSourceId = isParent ? (recurrenceSourceId ?? source.RecurrenceSourceId) : null,
+            ParentTaskId = null,
+            CreatedDate = DateTime.UtcNow,
+            Tags = source.Tags?.Select(t => new TaskTag { TagId = t.TagId }).ToList() ?? [],
+            PriorityEscalations = source.PriorityEscalations?
+                .Select(e => new PriorityEscalation { TargetPriorityId = e.TargetPriorityId, EscalationDate = e.EscalationDate, IsApplied = e.IsApplied })
+                .ToList() ?? []
+        };
+
+        if (source.Subtasks != null && source.Subtasks.Count > 0)
+        {
+            newTask.Subtasks = source.Subtasks.Select(s =>
+            {
+                var clone = CloneTaskItem(s, isParent: false);
+                clone.ParentTask = newTask;
+                return clone;
+            }).ToList();
+        }
+
+        return newTask;
+    }
 
     private static DateTime CalculateNextMonthDate(DateTime baseDate, int monthsInterval)
     {

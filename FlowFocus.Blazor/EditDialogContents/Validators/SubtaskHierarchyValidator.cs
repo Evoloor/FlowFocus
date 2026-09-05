@@ -33,7 +33,6 @@ public static class SubtaskHierarchyValidator
                     Title = task.Title,
                     PriorityId = task.PriorityId,
                     Priority = taskPriority,
-                    ScheduledDate = task.ScheduledDate,
                     ParentTaskId = task.ParentTaskId
                 };
 
@@ -43,7 +42,6 @@ public static class SubtaskHierarchyValidator
                     Title = parentTask.Title,
                     PriorityId = parentTask.PriorityId,
                     Priority = parentPriority,
-                    ScheduledDate = parentTask.ScheduledDate,
                     ParentTask = parentTask.ParentTask
                 };
 
@@ -65,8 +63,7 @@ public static class SubtaskHierarchyValidator
                 Id = task.Id,
                 Title = task.Title,
                 PriorityId = task.PriorityId,
-                Priority = taskPriority,
-                ScheduledDate = task.ScheduledDate
+                Priority = taskPriority
             };
 
             foreach (var sub in existingTracked.Subtasks)
@@ -81,7 +78,6 @@ public static class SubtaskHierarchyValidator
                     Title = sub.Title,
                     PriorityId = sub.PriorityId,
                     Priority = subPriority,
-                    ScheduledDate = sub.ScheduledDate,
                     ParentTaskId = sub.ParentTaskId
                 };
 

@@ -18,6 +18,7 @@ public static class TaskDateNormalizer
 
         // 1. Нормализация неназначенных дат: если ScheduledDate == null и DateSource не AutoFlexible
         var tasksToNormalize = context.Tasks
+            .Where(t => t.ParentTaskId == null)
             .Where(t => t.ScheduledDate == null && (t.DateSource == DateSource.Manual || t.DateSource == DateSource.AutoFixed))
             .ToList();
 
