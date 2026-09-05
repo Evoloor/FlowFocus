@@ -82,6 +82,68 @@ public class RecurringTasksEngineTests : IntegrationTestBase
     }
 
     /// <summary>
+    /// Verifies that completing a task with a manual future date calculates next date relative to completion day (today), not future date.
+    /// </summary>
+    [Fact]
+    public void CompleteTask_WithManualFutureDate_CalculatesNextDateRelativeToToday()
+    {
+        // Arrange
+        var today = TodoDay.Today.ToDateTime();
+        var futureDate = today.AddDays(5);
+        var task = new TaskItemBuilder()
+            .WithId(201)
+            .WithTitle("Future Manual Recurring Task")
+            .WithScheduledDate(futureDate, DateSource.Manual)
+            .WithRecurrence(RecurrenceType.Daily)
+            .WithStatus(TaskStatus.Planned)
+            .Build();
+
+        TaskRepo.Add(task);
+
+        // Act
+        TaskRepo.CompleteTask(task.Id);
+
+        var allTasks = TaskRepo.GetAll();
+        var newCopy = allTasks.FirstOrDefault(t => t.RecurrenceSourceId == task.Id);
+
+        // Assert
+        newCopy.Should().NotBeNull();
+        newCopy!.ScheduledDate.Should().Be(today.AddDays(1));
+        newCopy.DateSource.Should().Be(DateSource.AutoFixed);
+    }
+
+    /// <summary>
+    /// Verifies that completing an EveryNDays task with a future scheduled date calculates next date relative to today.
+    /// </summary>
+    [Fact]
+    public void CompleteTask_WithEveryNDaysAndFutureDate_CalculatesNextDateRelativeToToday()
+    {
+        // Arrange
+        var today = TodoDay.Today.ToDateTime();
+        var futureDate = today.AddDays(10);
+        var task = new TaskItemBuilder()
+            .WithId(202)
+            .WithTitle("Every 3 Days Future Task")
+            .WithScheduledDate(futureDate, DateSource.AutoFixed)
+            .WithRecurrence(RecurrenceType.EveryNDays, interval: 3)
+            .WithStatus(TaskStatus.Planned)
+            .Build();
+
+        TaskRepo.Add(task);
+
+        // Act
+        TaskRepo.CompleteTask(task.Id);
+
+        var allTasks = TaskRepo.GetAll();
+        var newCopy = allTasks.FirstOrDefault(t => t.RecurrenceSourceId == task.Id);
+
+        // Assert
+        newCopy.Should().NotBeNull();
+        newCopy!.ScheduledDate.Should().Be(today.AddDays(3));
+        newCopy.DateSource.Should().Be(DateSource.AutoFixed);
+    }
+
+    /// <summary>
     /// Verifies that completing a monthly task calculates next date in following month.
     /// </summary>
     [Fact]

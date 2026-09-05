@@ -13,11 +13,10 @@ public class TaskRecurrenceService : ITaskRecurrenceService
 {
     public DateTime? CalculateNextRecurrenceDate(TaskItem task)
     {
+        // Расчёт следующей даты повторения всегда выполняется от фактической даты завершения (или от сегодня).
+        // Досрочное выполнение задач с будущей датой назначения также отсчитывает следующий повтор от сегодня.
         var completedDate = task.CompletedDate ?? TodoDay.Today.ToDateTime();
-        var assignedDate = task.ScheduledDate ?? completedDate;
-        var baseDate = completedDate.Date >= assignedDate.Date ? completedDate.Date : assignedDate.Date;
-
-        return CalculateNextRecurrenceDateFromBase(task, baseDate);
+        return CalculateNextRecurrenceDateFromBase(task, completedDate.Date);
     }
 
     public DateTime? CalculateNextRecurrenceDateFromBase(TaskItem task, DateTime baseDate)
