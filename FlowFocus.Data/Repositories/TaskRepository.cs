@@ -254,7 +254,9 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
         var task = GetById(taskId);
         if (task == null) return;
 
-        var completedDate = DetermineCompletionDate(task.ScheduledDate);
+        var completedDate = targetStatus == TaskStatus.Completed
+            ? DetermineCompletionDate(task.ScheduledDate)
+            : (DateTime?)null;
 
         UpdatePartial(taskId, t =>
         {
@@ -274,7 +276,7 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
             }
         }
 
-        if (task.IsRecurring && task.RecurrenceType != RecurrenceType.None)
+        if (targetStatus == TaskStatus.Completed && task.IsRecurring && task.RecurrenceType != RecurrenceType.None)
         {
             task.CompletedDate = completedDate;
             _recurrenceService.HandleTaskCompletionRecurrence(
@@ -287,7 +289,12 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
         }
     }
 
-    public void RestoreFromIrrelevant(int taskId) => UpdateTaskStatus(taskId, TaskStatus.Planned);
+    public void RestoreFromIrrelevant(int taskId) =>
+        UpdatePartial(taskId, t =>
+        {
+            t.Status = TaskStatus.Planned;
+            t.CompletedDate = null;
+        });
 
     public void ReopenTask(int taskId) =>
         UpdatePartial(taskId, t =>
@@ -374,7 +381,14 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
         }, saveChanges);
 
     public void UpdateTaskStatus(int taskId, TaskStatus status, bool saveChanges = true) =>
-        UpdatePartial(taskId, t => t.Status = status, saveChanges);
+        UpdatePartial(taskId, t =>
+        {
+            t.Status = status;
+            if (status != TaskStatus.Completed)
+            {
+                t.CompletedDate = null;
+            }
+        }, saveChanges);
 
     public void MutateRecurringTaskInPlace(int taskId, DateTime assignedDate) =>
         UpdatePartial(taskId, t =>

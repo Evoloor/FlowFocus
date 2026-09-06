@@ -31,6 +31,32 @@ public class StorageContext : DbContext
         }
     }
 
+    public override int SaveChanges()
+    {
+        EnforceCompletedDateInvariant();
+        return base.SaveChanges();
+    }
+
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        EnforceCompletedDateInvariant();
+        return base.SaveChangesAsync(cancellationToken);
+    }
+
+    private void EnforceCompletedDateInvariant()
+    {
+        foreach (var entry in ChangeTracker.Entries<TaskItem>())
+        {
+            if (entry.State is EntityState.Added or EntityState.Modified)
+            {
+                if (entry.Entity.Status != Core.Enums.TaskStatus.Completed)
+                {
+                    entry.Entity.CompletedDate = null;
+                }
+            }
+        }
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
