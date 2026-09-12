@@ -13,7 +13,7 @@ public static class TaskStatusCalculator
     /// </summary>
     public static bool IsTaskBlocked(TaskItem task)
     {
-        if (task.Status is TaskStatus.Completed or TaskStatus.Irrelevant)
+        if (task.IsInactive)
             return false;
 
         return task.IsBlocked;
@@ -21,12 +21,13 @@ public static class TaskStatusCalculator
 
     /// <summary>
     /// Определяет актуальный статус активной задачи.
-    /// Если задача заблокирована — возвращает TaskStatus.Blocked.
+    /// Если задача неактивна (Completed, Irrelevant, NotConfigured) — сохраняет её текущий статус без изменений.
+    /// Если активная задача заблокирована — возвращает TaskStatus.Blocked.
     /// Если разблокирована и предыдущий статус был Blocked — возвращает defaultUnblockedStatus (по умолчанию Planned).
     /// </summary>
     public static TaskStatus DetermineActiveStatus(TaskItem task, TaskStatus defaultUnblockedStatus = TaskStatus.Planned)
     {
-        if (task.Status is TaskStatus.Completed or TaskStatus.Irrelevant)
+        if (task.IsInactive)
             return task.Status;
 
         if (IsTaskBlocked(task))

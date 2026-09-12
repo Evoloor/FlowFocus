@@ -162,6 +162,18 @@ public class TaskItem : IAuditEntity
     public List<PriorityEscalation> PriorityEscalations { get; set; } = [];
 
     // === Вычисляемые свойства ===
+    /// <summary>Признак неактивной задачи (Completed, Irrelevant, NotConfigured). Условно readonly для автоматики.</summary>
+    [NotMapped]
+    public bool IsInactive => Status.IsInactive();
+
+    /// <summary>Признак активной задачи (Planned, Blocked).</summary>
+    [NotMapped]
+    public bool IsActive => Status.IsActive();
+
+    /// <summary>Условный readonly для всех автоматических фоновых алгоритмов.</summary>
+    [NotMapped]
+    public bool IsReadOnlyForAutomation => IsInactive;
+
     [NotMapped]
     public bool IsBlocked =>
         // Учёт через обратные связи (блокеры) или неактивные внешние условия

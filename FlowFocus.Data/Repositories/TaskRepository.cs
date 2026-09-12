@@ -91,12 +91,9 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
             TaskGraphSyncHelper.UpdateRelations(Context, trackedEntity, entity);
             TaskGraphSyncHelper.UpdateEscalations(Context, trackedEntity, entity);
 
-            if (trackedEntity.Status != TaskStatus.Completed && trackedEntity.Status != TaskStatus.Irrelevant)
+            if (trackedEntity.IsActive)
             {
-                if (FlowFocus.Core.Helpers.TaskStatusCalculator.IsTaskBlocked(trackedEntity))
-                {
-                    trackedEntity.Status = TaskStatus.Blocked;
-                }
+                trackedEntity.Status = FlowFocus.Core.Helpers.TaskStatusCalculator.DetermineActiveStatus(trackedEntity);
             }
 
             trackedEntity.LastChangesOn = DateTime.UtcNow;
@@ -324,7 +321,7 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
                 .Include(t => t.PriorityEscalations)
                 .FirstOrDefault(t => t.Id == taskId);
 
-            if (trackedTask == null) return;
+            if (trackedTask == null || trackedTask.IsInactive) return;
 
             trackedTask.PriorityId = targetPriorityId;
             trackedTask.LastChangesOn = DateTime.UtcNow;

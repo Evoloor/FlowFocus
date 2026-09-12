@@ -14,7 +14,7 @@ public class PriorityEscalationPlanner(ITaskRepository taskRepository)
 
         foreach (var task in tasks)
         {
-            if (task.Status is TaskStatus.Completed or TaskStatus.Irrelevant)
+            if (task.IsInactive)
                 continue;
 
             if (task.IsRecurring)
@@ -42,7 +42,7 @@ public class PriorityEscalationPlanner(ITaskRepository taskRepository)
     public void NormalizeBlockerPriorities()
     {
         var tasks = taskRepository.GetAll()
-            .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant)
+            .Where(t => t.IsActive)
             .ToList();
 
         var taskMap = tasks.ToDictionary(t => t.Id);
@@ -59,7 +59,7 @@ public class PriorityEscalationPlanner(ITaskRepository taskRepository)
                 foreach (var relation in task.InverseRelations.Where(r => r.Type == RelationType.Blocks))
                 {
                     if (!taskMap.TryGetValue(relation.SourceTaskId, out var blockerTask)) continue;
-                    if (blockerTask.Status is TaskStatus.Completed or TaskStatus.Irrelevant) continue;
+                    if (blockerTask.IsInactive) continue;
 
                     var blockerOrder = GetEffectivePriorityOrder(blockerTask);
                     if (targetOrder < blockerOrder)
@@ -75,7 +75,7 @@ public class PriorityEscalationPlanner(ITaskRepository taskRepository)
             {
                 taskRepository.SaveChanges();
                 tasks = taskRepository.GetAll()
-                    .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant)
+                    .Where(t => t.IsActive)
                     .ToList();
                 taskMap = tasks.ToDictionary(t => t.Id);
             }
@@ -88,7 +88,7 @@ public class PriorityEscalationPlanner(ITaskRepository taskRepository)
 
         foreach (var task in tasks)
         {
-            if (task.Status is TaskStatus.Completed or TaskStatus.Irrelevant)
+            if (task.IsInactive)
                 continue;
 
             var isBlocked = FlowFocus.Core.Helpers.TaskStatusCalculator.IsTaskBlocked(task);

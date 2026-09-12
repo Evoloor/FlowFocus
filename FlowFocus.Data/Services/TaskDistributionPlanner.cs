@@ -15,7 +15,7 @@ public class TaskDistributionPlanner(ITaskRepository taskRepository)
 
         var unassignedBlockers = taskRepository.GetAll()
             .Where(t => t.ParentTaskId == null)
-            .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
+            .Where(t => t.IsActive)
             .Where(t => t.DateSource == DateSource.AutoFlexible)
             .Where(t => !t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))
             .ToList();
@@ -25,7 +25,7 @@ public class TaskDistributionPlanner(ITaskRepository taskRepository)
             var blockedWithFixedDate = blocker.Relations
                 .Where(r => r.Type == RelationType.Blocks)
                 .Select(r => allTasksMap.TryGetValue(r.TargetTaskId, out var target) ? target : r.TargetTask)
-                .Where(t => t != null && t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
+                .Where(t => t != null && t.IsActive)
                 .Where(t => t!.DateSource is DateSource.Manual or DateSource.AutoFixed && t.ScheduledDate.HasValue)
                 .OrderBy(t => t!.ScheduledDate!.Value)
                 .FirstOrDefault();
@@ -39,7 +39,7 @@ public class TaskDistributionPlanner(ITaskRepository taskRepository)
 
         var tasks = taskRepository.GetAll()
             .Where(t => t.ParentTaskId == null)
-            .Where(t => t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant && t.Status != TaskStatus.NotConfigured)
+            .Where(t => t.IsActive)
             .Where(t => t.DateSource == DateSource.AutoFlexible)
             .Where(t => !t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))
             .Where(t => t is { IsRecurring: false, RecurrenceSourceId: null })
@@ -79,7 +79,7 @@ public class TaskDistributionPlanner(ITaskRepository taskRepository)
                         stats.TaskCount++;
                     }
                 }
-                else if (t.Status != TaskStatus.NotConfigured)
+                else if (t.IsActive)
                 {
                     var isFixed = t.DateSource is DateSource.Manual or DateSource.AutoFixed;
                     if (isFixed && t.ScheduledDate.HasValue && day.IsSameDay(t.ScheduledDate))

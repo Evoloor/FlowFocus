@@ -12,7 +12,19 @@ namespace FlowFocus.Data.Repositories.Helpers;
 public static class TaskQueryExtensions
 {
     public static IEnumerable<TaskItem> FilterActiveRootTasks(this IEnumerable<TaskItem> tasks) =>
-        tasks.Where(t => t.ParentTaskId == null && t.Status != TaskStatus.Completed && t.Status != TaskStatus.Irrelevant);
+        tasks.Where(t => t.ParentTaskId == null && t.IsActive);
+
+    public static IQueryable<TaskItem> WhereActive(this IQueryable<TaskItem> query) =>
+        query.Where(t => t.Status == TaskStatus.Planned || t.Status == TaskStatus.Blocked);
+
+    public static IQueryable<TaskItem> WhereInactive(this IQueryable<TaskItem> query) =>
+        query.Where(t => t.Status == TaskStatus.Completed || t.Status == TaskStatus.Irrelevant || t.Status == TaskStatus.NotConfigured);
+
+    public static IEnumerable<TaskItem> WhereActive(this IEnumerable<TaskItem> query) =>
+        query.Where(t => t.IsActive);
+
+    public static IEnumerable<TaskItem> WhereInactive(this IEnumerable<TaskItem> query) =>
+        query.Where(t => t.IsInactive);
 
     public static TaskItem? FindProcrastinationTask(this IEnumerable<TaskItem> tasks, List<int> excludeIds) =>
         tasks
