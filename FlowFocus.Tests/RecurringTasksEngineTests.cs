@@ -382,4 +382,37 @@ public class RecurringTasksEngineTests : IntegrationTestBase
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*не может быть автоматически гибкой*");
     }
+
+    /// <summary>
+    /// Verifies that completing a recurring task copies its external conditions to the newly created recurrence copy.
+    /// </summary>
+    [Fact]
+    public void CompleteRecurringTask_CopiesExternalConditionsToNewCopy()
+    {
+        // Arrange
+        var condition = ConditionRepo.GetOrCreate("Требуется интернет");
+        var today = TodoDay.Today.ToDateTime();
+        var task = new TaskItemBuilder()
+            .WithId(600)
+            .WithTitle("Daily Task With Condition")
+            .WithScheduledDate(today, DateSource.AutoFixed)
+            .WithRecurrence(RecurrenceType.EveryN, interval: 1, unit: RecurrenceUnit.Days)
+            .WithStatus(TaskStatus.Planned)
+            .Build();
+
+        task.Conditions.Add(new() { TaskId = task.Id, ConditionId = condition.Id });
+
+        TaskRepo.Add(task);
+        Context.ChangeTracker.Clear();
+
+        // Act
+        TaskRepo.CompleteTask(task.Id);
+
+        var allTasks = TaskRepo.GetAll();
+        var newCopy = allTasks.FirstOrDefault(t => t.RecurrenceSourceId == task.Id);
+
+        // Assert
+        newCopy.Should().NotBeNull();
+        newCopy!.Conditions.Should().ContainSingle(c => c.ConditionId == condition.Id);
+    }
 }

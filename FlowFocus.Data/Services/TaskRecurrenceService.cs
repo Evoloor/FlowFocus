@@ -96,6 +96,7 @@ public class TaskRecurrenceService : ITaskRecurrenceService
             ParentTaskId = null,
             CreatedDate = DateTime.UtcNow,
             Tags = source.Tags?.Select(t => new TaskTag { TagId = t.TagId }).ToList() ?? [],
+            Conditions = isParent ? (source.Conditions?.Select(c => new TaskCondition { ConditionId = c.ConditionId }).ToList() ?? []) : [],
             PriorityEscalations = source.PriorityEscalations?
                 .Select(e => new PriorityEscalation { TargetPriorityId = e.TargetPriorityId, EscalationDate = e.EscalationDate, IsApplied = e.IsApplied })
                 .ToList() ?? []
