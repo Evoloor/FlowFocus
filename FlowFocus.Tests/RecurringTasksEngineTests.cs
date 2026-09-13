@@ -30,7 +30,7 @@ public class RecurringTasksEngineTests : IntegrationTestBase
             .WithId(100)
             .WithTitle("Daily Task")
             .WithScheduledDate(today, DateSource.AutoFixed)
-            .WithRecurrence(RecurrenceType.Daily)
+            .WithRecurrence(RecurrenceType.EveryN, interval: 1, unit: RecurrenceUnit.Days)
             .WithStatus(TaskStatus.Planned)
             .Build();
 
@@ -64,7 +64,7 @@ public class RecurringTasksEngineTests : IntegrationTestBase
             .WithId(200)
             .WithTitle("Overdue Daily Task")
             .WithScheduledDate(overdueDate, DateSource.AutoFixed)
-            .WithRecurrence(RecurrenceType.Daily)
+            .WithRecurrence(RecurrenceType.EveryN, interval: 1, unit: RecurrenceUnit.Days)
             .WithStatus(TaskStatus.Planned)
             .Build();
 
@@ -94,7 +94,7 @@ public class RecurringTasksEngineTests : IntegrationTestBase
             .WithId(201)
             .WithTitle("Future Manual Recurring Task")
             .WithScheduledDate(futureDate, DateSource.Manual)
-            .WithRecurrence(RecurrenceType.Daily)
+            .WithRecurrence(RecurrenceType.EveryN, interval: 1, unit: RecurrenceUnit.Days)
             .WithStatus(TaskStatus.Planned)
             .Build();
 
@@ -125,7 +125,7 @@ public class RecurringTasksEngineTests : IntegrationTestBase
             .WithId(202)
             .WithTitle("Every 3 Days Future Task")
             .WithScheduledDate(futureDate, DateSource.AutoFixed)
-            .WithRecurrence(RecurrenceType.EveryNDays, interval: 3)
+            .WithRecurrence(RecurrenceType.EveryN, interval: 3, unit: RecurrenceUnit.Days)
             .WithStatus(TaskStatus.Planned)
             .Build();
 
@@ -155,7 +155,7 @@ public class RecurringTasksEngineTests : IntegrationTestBase
 
         var task = new TaskItemBuilder()
             .WithId(300)
-            .WithRecurrence(RecurrenceType.Monthly)
+            .WithRecurrence(RecurrenceType.EveryN, interval: 1, unit: RecurrenceUnit.Months)
             .WithCompletedDate(aug3)
             .Build();
 
@@ -178,7 +178,7 @@ public class RecurringTasksEngineTests : IntegrationTestBase
 
         var task = new TaskItemBuilder()
             .WithId(301)
-            .WithRecurrence(RecurrenceType.Monthly)
+            .WithRecurrence(RecurrenceType.EveryN, interval: 1, unit: RecurrenceUnit.Months)
             .WithScheduledDate(jan31)
             .WithCompletedDate(jan31)
             .Build();
@@ -202,7 +202,7 @@ public class RecurringTasksEngineTests : IntegrationTestBase
 
         var task = new TaskItemBuilder()
             .WithId(302)
-            .WithRecurrence(RecurrenceType.Yearly)
+            .WithRecurrence(RecurrenceType.EveryN, interval: 1, unit: RecurrenceUnit.Years)
             .WithScheduledDate(aug3)
             .WithCompletedDate(aug3)
             .Build();
@@ -223,7 +223,9 @@ public class RecurringTasksEngineTests : IntegrationTestBase
         // Arrange
         (var parent, _) = TaskItemBuilder.CreateParentWithSubtasks(2, 500);
         parent.IsRecurring = true;
-        parent.RecurrenceType = RecurrenceType.Daily;
+        parent.RecurrenceType = RecurrenceType.EveryN;
+        parent.RecurrenceUnit = RecurrenceUnit.Days;
+        parent.RecurrenceInterval = 1;
         parent.ScheduledDate = TodoDay.Today.ToDateTime();
         parent.DateSource = DateSource.AutoFixed;
         parent.Status = TaskStatus.Planned;
@@ -276,7 +278,7 @@ public class RecurringTasksEngineTests : IntegrationTestBase
             .WithId(700)
             .WithTitle("Recurring Parent")
             .WithScheduledDate(today, DateSource.AutoFixed)
-            .WithRecurrence(RecurrenceType.Daily)
+            .WithRecurrence(RecurrenceType.EveryN, interval: 1, unit: RecurrenceUnit.Days)
             .WithStatus(TaskStatus.Planned)
             .WithSubtask(subtask1)
             .WithSubtask(subtask2)
@@ -343,7 +345,7 @@ public class RecurringTasksEngineTests : IntegrationTestBase
         var task = new TaskItemBuilder()
             .WithId(500)
             .WithTitle("Rapid Click Task")
-            .WithRecurrence(RecurrenceType.Daily)
+            .WithRecurrence(RecurrenceType.EveryN, interval: 1, unit: RecurrenceUnit.Days)
             .WithScheduledDate(TodoDay.Today.ToDateTime())
             .WithStatus(TaskStatus.Planned)
             .Build();
@@ -365,7 +367,7 @@ public class RecurringTasksEngineTests : IntegrationTestBase
     {
         // Arrange
         var recurringTask = new TaskItemBuilder()
-            .WithRecurrence(RecurrenceType.Daily)
+            .WithRecurrence(RecurrenceType.EveryN, interval: 1, unit: RecurrenceUnit.Days)
             .WithScheduledDate(DateTime.UtcNow, DateSource.AutoFixed)
             .Build();
 

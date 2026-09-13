@@ -33,17 +33,17 @@ public class StorageContext : DbContext
 
     public override int SaveChanges()
     {
-        EnforceCompletedDateInvariant();
+        EnforceInvariants();
         return base.SaveChanges();
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        EnforceCompletedDateInvariant();
+        EnforceInvariants();
         return base.SaveChangesAsync(cancellationToken);
     }
 
-    private void EnforceCompletedDateInvariant()
+    private void EnforceInvariants()
     {
         foreach (var entry in ChangeTracker.Entries<TaskItem>())
         {
@@ -52,6 +52,11 @@ public class StorageContext : DbContext
                 if (entry.Entity.Status != Core.Enums.TaskStatus.Completed)
                 {
                     entry.Entity.CompletedDate = null;
+                }
+
+                if (entry.Entity.RecurrenceType == Core.Enums.RecurrenceType.EveryN && (entry.Entity.RecurrenceInterval == null || entry.Entity.RecurrenceInterval <= 0))
+                {
+                    entry.Entity.RecurrenceInterval = 1;
                 }
             }
         }
@@ -65,6 +70,9 @@ public class StorageContext : DbContext
         modelBuilder.Entity<TaskItem>(entity =>
         {
             entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.RecurrenceUnit)
+                .HasDefaultValue(Core.Enums.RecurrenceUnit.Days);
 
             entity.HasOne(e => e.ParentTask)
                 .WithMany(e => e.Subtasks)

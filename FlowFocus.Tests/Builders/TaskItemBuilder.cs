@@ -22,6 +22,7 @@ public class TaskItemBuilder : EntityBuilder<TaskItem, TaskItemBuilder>
     private readonly DateTime _createdDate = DateTime.UtcNow;
     private bool _isRecurring;
     private RecurrenceType _recurrenceType = RecurrenceType.None;
+    private RecurrenceUnit _recurrenceUnit = RecurrenceUnit.Days;
     private int? _recurrenceInterval;
     private int? _recurrenceWeekDays;
     private int? _recurrenceSourceId;
@@ -129,12 +130,13 @@ public class TaskItemBuilder : EntityBuilder<TaskItem, TaskItemBuilder>
         return this;
     }
 
-    public TaskItemBuilder WithRecurrence(RecurrenceType type, int? interval = null, int? weekDays = null)
+    public TaskItemBuilder WithRecurrence(RecurrenceType type, int? interval = null, int? weekDays = null, RecurrenceUnit unit = RecurrenceUnit.Days)
     {
         _isRecurring = type != RecurrenceType.None;
         _recurrenceType = type;
         _recurrenceInterval = interval;
         _recurrenceWeekDays = weekDays;
+        _recurrenceUnit = unit;
         return this;
     }
 
@@ -205,6 +207,7 @@ public class TaskItemBuilder : EntityBuilder<TaskItem, TaskItemBuilder>
             CreatedDate = _createdDate,
             IsRecurring = _isRecurring,
             RecurrenceType = _recurrenceType,
+            RecurrenceUnit = _recurrenceUnit,
             RecurrenceInterval = _recurrenceInterval,
             RecurrenceWeekDays = _recurrenceWeekDays,
             RecurrenceSourceId = _recurrenceSourceId,

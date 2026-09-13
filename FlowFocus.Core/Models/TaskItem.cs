@@ -94,11 +94,54 @@ public class TaskItem : IAuditEntity
     /// <summary>Включено ли повторение</summary>
     public bool IsRecurring { get; set; }
 
-    /// <summary>Тип повторения</summary>
-    public RecurrenceType RecurrenceType { get; set; } = RecurrenceType.None;
+    private RecurrenceType _recurrenceType = RecurrenceType.None;
 
-    /// <summary>Интервал повторения (для EveryNDays)</summary>
-    public int? RecurrenceInterval { get; set; }
+    /// <summary>Тип повторения</summary>
+    public RecurrenceType RecurrenceType
+    {
+        get => _recurrenceType;
+        set
+        {
+            switch ((int)value)
+            {
+                case 1: // Legacy Daily or EveryN
+                    _recurrenceType = RecurrenceType.EveryN;
+                    break;
+                case 2: // Legacy EveryNDays
+                    _recurrenceType = RecurrenceType.EveryN;
+                    RecurrenceUnit = RecurrenceUnit.Days;
+                    RecurrenceInterval ??= 1;
+                    break;
+                case 4: // Legacy Monthly
+                    _recurrenceType = RecurrenceType.EveryN;
+                    RecurrenceUnit = RecurrenceUnit.Months;
+                    RecurrenceInterval ??= 1;
+                    break;
+                case 5: // Legacy Yearly
+                    _recurrenceType = RecurrenceType.EveryN;
+                    RecurrenceUnit = RecurrenceUnit.Years;
+                    RecurrenceInterval ??= 1;
+                    break;
+                default:
+                    _recurrenceType = value;
+                    break;
+            }
+        }
+    }
+
+    /// <summary>Единица измерения интервала повторения</summary>
+    public RecurrenceUnit RecurrenceUnit { get; set; } = RecurrenceUnit.Days;
+
+    private int? _recurrenceInterval;
+
+    /// <summary>Интервал повторения (для EveryN)</summary>
+    public int? RecurrenceInterval
+    {
+        get => _recurrenceType == RecurrenceType.EveryN && (_recurrenceInterval == null || _recurrenceInterval <= 0)
+            ? 1
+            : _recurrenceInterval;
+        set => _recurrenceInterval = value;
+    }
 
     /// <summary>Дни недели для повторения (битовая маска: 1=Пн, 2=Вт, 4=Ср, 8=Чт, 16=Пт, 32=Сб, 64=Вс)</summary>
     public int? RecurrenceWeekDays { get; set; }
@@ -236,6 +279,7 @@ public class TaskItem : IAuditEntity
         CreatedDate = source.CreatedDate;
         IsRecurring = source.IsRecurring;
         RecurrenceType = source.RecurrenceType;
+        RecurrenceUnit = source.RecurrenceUnit;
         RecurrenceInterval = source.RecurrenceInterval;
         RecurrenceWeekDays = source.RecurrenceWeekDays;
         RecurrenceSourceId = source.RecurrenceSourceId;

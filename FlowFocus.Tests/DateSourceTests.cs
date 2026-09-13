@@ -169,7 +169,7 @@ public class DateSourceTests
         {
             // Arrange
             var task = new TaskItemBuilder()
-                .WithRecurrence(type: RecurrenceType.Daily)
+                .WithRecurrence(type: RecurrenceType.EveryN)
                 .WithScheduledDate(date: null)
                 .Build();
 

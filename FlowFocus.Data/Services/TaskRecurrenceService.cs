@@ -23,11 +23,14 @@ public class TaskRecurrenceService : ITaskRecurrenceService
     {
         return task.RecurrenceType switch
         {
-            RecurrenceType.Daily => baseDate.AddDays(1),
-            RecurrenceType.EveryNDays => baseDate.AddDays(task.RecurrenceInterval ?? 1),
+            RecurrenceType.EveryN => task.RecurrenceUnit switch
+            {
+                RecurrenceUnit.Days => baseDate.AddDays(task.RecurrenceInterval ?? 1),
+                RecurrenceUnit.Months => CalculateNextMonthDate(baseDate, task.RecurrenceInterval ?? 1),
+                RecurrenceUnit.Years => CalculateNextYearDate(baseDate, task.RecurrenceInterval ?? 1),
+                _ => baseDate.AddDays(task.RecurrenceInterval ?? 1)
+            },
             RecurrenceType.WeekDays => CalculateNextWeekDayDate(baseDate, task.RecurrenceWeekDays ?? 0),
-            RecurrenceType.Monthly => CalculateNextMonthDate(baseDate, task.RecurrenceInterval ?? 1),
-            RecurrenceType.Yearly => CalculateNextYearDate(baseDate, task.RecurrenceInterval ?? 1),
             _ => null
         };
     }
@@ -86,6 +89,7 @@ public class TaskRecurrenceService : ITaskRecurrenceService
             DateSource = isParent ? (dateSource ?? source.DateSource) : DateSource.AutoFlexible,
             IsRecurring = isParent && source.IsRecurring,
             RecurrenceType = isParent ? source.RecurrenceType : RecurrenceType.None,
+            RecurrenceUnit = isParent ? source.RecurrenceUnit : RecurrenceUnit.Days,
             RecurrenceInterval = isParent ? source.RecurrenceInterval : null,
             RecurrenceWeekDays = isParent ? source.RecurrenceWeekDays : null,
             RecurrenceSourceId = isParent ? (recurrenceSourceId ?? source.RecurrenceSourceId) : null,

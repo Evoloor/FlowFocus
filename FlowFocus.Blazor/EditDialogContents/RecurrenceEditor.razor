@@ -1,3 +1,6 @@
+@using FlowFocus.Core.Helpers
+@using FlowFocus.Core.Enums
+
 <div class="recurrence-block">
     <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Повторение</MudText>
     <MudCheckBox T="bool" Value="_isRecurringLocal" ValueChanged="OnIsRecurringChanged" Label="Повторяющаяся задача" />
@@ -7,7 +10,7 @@
         <div class="recurrence-options mt-2">
             <MudGrid>
                 <MudItem xs="12" sm="6">
-                    <MudSelect T="RecurrenceChoice" @Value="_choice" Label="Тип" Dense="true" ValueChanged="OnChoiceChanged">
+                    <MudSelect T="RecurrenceChoice" Value="_choice" Label="Тип" Dense="true" ValueChanged="OnChoiceChanged">
                         <MudSelectItem Value="RecurrenceChoice.EveryN">Каждые N</MudSelectItem>
                         <MudSelectItem Value="RecurrenceChoice.Weekly">По дням недели</MudSelectItem>
                     </MudSelect>
@@ -17,7 +20,7 @@
                     @if (_choice == RecurrenceChoice.EveryN)
                     {
                         <div class="d-flex align-center gap-2">
-                            <MudNumericField T="int?" @Value="_interval"
+                            <MudNumericField T="int?" Value="_interval"
                                              Min="1" Max="1000"
                                              Variant="Variant.Outlined"
                                              Margin="Margin.Dense"
@@ -25,7 +28,7 @@
                                              Style="width: 120px"
                                              ValueChanged="OnIntervalChanged" />
 
-                            <MudSelect T="RecurrenceUnit" @Value="_unit" Dense="true" ValueChanged="OnUnitChanged" Style="width: 140px">
+                            <MudSelect T="RecurrenceUnit" Value="_unit" Dense="true" ValueChanged="OnUnitChanged" Style="width: 140px">
                                 <MudSelectItem Value="RecurrenceUnit.Days">дней</MudSelectItem>
                                 <MudSelectItem Value="RecurrenceUnit.Months">месяцев</MudSelectItem>
                                 <MudSelectItem Value="RecurrenceUnit.Years">лет</MudSelectItem>
@@ -48,6 +51,10 @@
                     }
                 </div>
             }
+
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2 d-block">
+                Повтор: @GetSummaryText()
+            </MudText>
         </div>
     }
 </div>
@@ -59,14 +66,13 @@
     [Parameter]
     public EventCallback<bool> OnRecurringChanged { get; set; }
 
-    private enum RecurrenceChoice { Daily, Weekly, EveryN }
-    private enum RecurrenceUnit { Days, Months, Years }
+    public enum RecurrenceChoice { EveryN, Weekly }
 
     private RecurrenceChoice _choice = RecurrenceChoice.EveryN;
     private RecurrenceUnit _unit = RecurrenceUnit.Days;
-    private int? _interval;
+    private int? _interval = 1;
 
-    // Локальная переменная для привязки чекбокса. При изменении уведомляем родителя, чтобы он перерисовался.
+    // Локальная переменная для привязки чекбокса.
     private bool _isRecurringLocal;
 
     private static readonly (string Name, int Value)[] WeekDays =
@@ -76,51 +82,55 @@
 
     protected override void OnParametersSet()
     {
-        // Синхронизируем локальную переменную с моделью
+        SyncFromTask();
+    }
+
+    private void SyncFromTask()
+    {
         _isRecurringLocal = Task.IsRecurring;
 
-        // Инициализируем локальное отображение на основе существующих полей модели
-        switch (Task.RecurrenceType)
+        if (Task.IsRecurring)
         {
-            case RecurrenceType.Daily:
-                _choice = RecurrenceChoice.Daily;
-                _interval = null;
-                break;
-            case RecurrenceType.WeekDays:
+            if (Task.RecurrenceType == RecurrenceType.WeekDays)
+            {
                 _choice = RecurrenceChoice.Weekly;
                 _interval = null;
-                break;
-            case RecurrenceType.EveryNDays:
+            }
+            else
+            {
                 _choice = RecurrenceChoice.EveryN;
-                _unit = RecurrenceUnit.Days;
+                _unit = Task.RecurrenceUnit;
                 _interval = Task.RecurrenceInterval ?? 1;
-                break;
-            case RecurrenceType.Monthly:
-                _choice = RecurrenceChoice.EveryN;
-                _unit = RecurrenceUnit.Months;
-                _interval = Task.RecurrenceInterval ?? 1;
-                break;
-            case RecurrenceType.Yearly:
-                _choice = RecurrenceChoice.EveryN;
-                _unit = RecurrenceUnit.Years;
-                _interval = Task.RecurrenceInterval ?? 1;
-                break;
-            default:
-                _choice = RecurrenceChoice.Daily;
-                _interval = null;
-                break;
+            }
+        }
+        else
+        {
+            _choice = RecurrenceChoice.EveryN;
+            _unit = Task.RecurrenceUnit;
+            _interval = Task.RecurrenceInterval ?? 1;
         }
     }
 
     private async Task OnIsRecurringChanged(bool value)
     {
-        // Устанавливаем в модель и уведомляем родителя
         _isRecurringLocal = value;
         Task.IsRecurring = value;
-        if (value && Task.ScheduledDate == null)
+        if (value)
         {
-            Task.ScheduledDate = TodoDay.Today.ToDateTime();
-            Task.DateSource = DateSource.Manual;
+            if (Task.RecurrenceType == RecurrenceType.None)
+            {
+                Task.RecurrenceType = RecurrenceType.EveryN;
+                Task.RecurrenceUnit = RecurrenceUnit.Days;
+                Task.RecurrenceInterval = 1;
+                _choice = RecurrenceChoice.EveryN;
+                _unit = RecurrenceUnit.Days;
+                _interval = 1;
+            }
+            if (Task.ScheduledDate == null)
+            {
+                Task.ScheduledDate = TodoDay.Today.ToDateTime();
+                Task.DateSource = DateSource.Manual;
+            }
         }
         if (OnRecurringChanged.HasDelegate)
         {
@@ -132,28 +142,26 @@
     private void OnChoiceChanged(RecurrenceChoice newChoice)
     {
         _choice = newChoice;
-        // При изменении выбора обновляем поля модели
-        switch (_choice)
+        if (_choice == RecurrenceChoice.Weekly)
         {
-            case RecurrenceChoice.Daily:
-                Task.RecurrenceType = RecurrenceType.Daily;
-                Task.RecurrenceInterval = null;
-                break;
-            case RecurrenceChoice.Weekly:
-                Task.RecurrenceType = RecurrenceType.WeekDays;
-                Task.RecurrenceInterval = null;
-                break;
-            case RecurrenceChoice.EveryN:
-                ApplyEveryNToTask();
-                break;
+            Task.RecurrenceType = RecurrenceType.WeekDays;
+            Task.RecurrenceInterval = null;
+            if ((Task.RecurrenceWeekDays ?? 0) == 0)
+            {
+                var dow = (Task.ScheduledDate ?? DateTime.Today).DayOfWeek;
+                var mask = dow == DayOfWeek.Sunday ? 64 : 1 << ((int)dow - 1);
+                Task.RecurrenceWeekDays = mask;
+            }
+        }
+        else
+        {
+            ApplyEveryNToTask();
         }
     }
 
     private void OnIntervalChanged(int? value)
     {
-        _interval = value;
-        // Интервал изменился — применяем к модели, если в режиме EveryN
-        _interval = _interval <= 0 ? 1 : _interval;
+        _interval = (value == null || value <= 0) ? 1 : value;
         if (_choice == RecurrenceChoice.EveryN)
         {
             ApplyEveryNToTask();
@@ -171,20 +179,9 @@
 
     private void ApplyEveryNToTask()
     {
-        var n = _interval ?? 1;
-        Task.RecurrenceInterval = n;
-        switch (_unit)
-        {
-            case RecurrenceUnit.Days:
-                Task.RecurrenceType = RecurrenceType.EveryNDays;
-                break;
-            case RecurrenceUnit.Months:
-                Task.RecurrenceType = RecurrenceType.Monthly;
-                break;
-            case RecurrenceUnit.Years:
-                Task.RecurrenceType = RecurrenceType.Yearly;
-                break;
-        }
+        Task.RecurrenceType = RecurrenceType.EveryN;
+        Task.RecurrenceUnit = _unit;
+        Task.RecurrenceInterval = (_interval == null || _interval <= 0) ? 1 : _interval;
     }
 
     private bool IsWeekDaySelected(int dayValue)
@@ -200,10 +197,19 @@
         else
             Task.RecurrenceWeekDays &= ~dayValue;
 
-        // Убедимся, что RecurrenceType установлен в WeekDays
         if (selected || Task.RecurrenceWeekDays != 0)
         {
             Task.RecurrenceType = RecurrenceType.WeekDays;
         }
+    }
+
+    private string GetSummaryText()
+    {
+        if (_choice == RecurrenceChoice.Weekly)
+        {
+            return RecurrenceFormatHelper.FormatWeekDays(Task.RecurrenceWeekDays ?? 0);
+        }
+
+        return RecurrenceFormatHelper.FormatEveryN(_unit, _interval ?? 1);
     }
 }

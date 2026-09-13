@@ -69,8 +69,15 @@ public partial class TaskEditDialog
 
         if (ExistingTask != null)
         {
-            _task = new(ExistingTask);
-            _originalTask = new(ExistingTask); // Сохраняем оригинал для сравнения
+            var source = ExistingTask;
+            if (ExistingTask is { Id: > 0 })
+            {
+                var repoVersion = TaskRepo.GetById(ExistingTask.Id);
+                if (repoVersion != null) source = repoVersion;
+            }
+
+            _task = new(source);
+            _originalTask = new(source); // Сохраняем оригинал для сравнения
             LoadExistingTaskData();
 
             // If editing existing task, and it has no user priority set, apply default from settings
@@ -314,11 +321,21 @@ public partial class TaskEditDialog
 
             if (!IsSubtaskMode && !_task.IsSubtask)
             {
-                if (_task.IsRecurring && _task.ScheduledDate == null)
+                if (_task.IsRecurring)
                 {
-                    _task.ScheduledDate = TodoDay.Today.ToDateTime();
-                    _task.DateSource = DateSource.Manual;
-                    _scheduledDate = _task.ScheduledDate;
+                    if (_task.RecurrenceType == RecurrenceType.None)
+                    {
+                        _task.RecurrenceType = RecurrenceType.EveryN;
+                        _task.RecurrenceUnit = RecurrenceUnit.Days;
+                        _task.RecurrenceInterval = 1;
+                    }
+
+                    if (_task.ScheduledDate == null)
+                    {
+                        _task.ScheduledDate = TodoDay.Today.ToDateTime();
+                        _task.DateSource = DateSource.Manual;
+                        _scheduledDate = _task.ScheduledDate;
+                    }
                 }
                 else if (_task.ScheduledDate == null)
                 {

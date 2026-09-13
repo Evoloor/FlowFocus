@@ -203,7 +203,7 @@ public class ExternalConditionEngineTests : IntegrationTestBase
             .WithId(107)
             .WithTitle("Повторяющаяся дачная задача")
             .WithStatus(TaskStatus.Planned)
-            .WithRecurrence(RecurrenceType.Daily)
+            .WithRecurrence(RecurrenceType.EveryN)
             .WithScheduledDate(todayDate, DateSource.AutoFixed)
             .Build();
 

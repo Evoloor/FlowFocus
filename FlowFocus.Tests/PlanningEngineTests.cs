@@ -523,7 +523,7 @@ public class PlanningEngineTests : IntegrationTestBase
             .WithStatus(TaskStatus.Planned).Build();
 
         var recurringTask = new TaskItemBuilder()
-            .WithId(3003).WithRecurrence(RecurrenceType.Daily).WithScheduledDate(today, DateSource.AutoFixed)
+            .WithId(3003).WithRecurrence(RecurrenceType.EveryN).WithScheduledDate(today, DateSource.AutoFixed)
             .WithEstimatedMinutes(60).WithStatus(TaskStatus.Planned).Build();
 
         TaskRepo.Add(blockingTask);
@@ -670,7 +670,7 @@ public class PlanningEngineTests : IntegrationTestBase
         // Arrange
         var tenDaysAgo = TodoDay.Today.ToDateTime().AddDays(-10);
         var overdueTask = new TaskItemBuilder()
-            .WithId(301).WithRecurrence(RecurrenceType.Daily)
+            .WithId(301).WithRecurrence(RecurrenceType.EveryN)
             .WithScheduledDate(tenDaysAgo, DateSource.AutoFixed)
             .WithStatus(TaskStatus.Planned).Build();
 

@@ -68,7 +68,7 @@ public class ValidationTests : IntegrationTestBase
     {
         // Arrange
         var taskA = new TaskItemBuilder().WithId(1).WithTitle("Regular Task").Build();
-        var taskB = new TaskItemBuilder().WithId(2).WithTitle("Recurring Task").WithRecurrence(type: RecurrenceType.Daily).Build();
+        var taskB = new TaskItemBuilder().WithId(2).WithTitle("Recurring Task").WithRecurrence(type: RecurrenceType.EveryN).Build();
 
         // Act
         var act = () => TaskRelationValidator.ValidateNewRelation(sourceTask: taskA, targetTask: taskB, type: RelationType.Blocks);
@@ -150,7 +150,7 @@ public class ValidationTests : IntegrationTestBase
         // Act
         var updatedSubtask = TaskRepo.GetById(7001);
         updatedSubtask!.IsRecurring = true;
-        updatedSubtask.RecurrenceType = RecurrenceType.Daily;
+        updatedSubtask.RecurrenceType = RecurrenceType.EveryN;
         updatedSubtask.ScheduledDate = new DateTime(2027, 1, 1);
 
         var act = () => TaskRepo.Update(updatedSubtask);

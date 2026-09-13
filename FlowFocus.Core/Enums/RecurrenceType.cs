@@ -6,15 +6,9 @@ namespace FlowFocus.Core.Enums;
 public enum RecurrenceType
 {
     /// <summary>Без повторения</summary>
-    None,
-    /// <summary>Ежедневно</summary>
-    Daily,
-    /// <summary>Каждые N дней</summary>
-    EveryNDays,
+    None = 0,
+    /// <summary>Периодически каждые N (дней/месяцев/лет)</summary>
+    EveryN = 1,
     /// <summary>По дням недели</summary>
-    WeekDays,
-    /// <summary>Ежемесячно</summary>
-    Monthly,
-    /// <summary>Ежегодно</summary>
-    Yearly
-}
+    WeekDays = 3
+}
