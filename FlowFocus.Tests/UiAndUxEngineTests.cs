@@ -4,6 +4,7 @@ using FlowFocus.Blazor.Helpers;
 using FlowFocus.Core;
 using FlowFocus.Core.Helpers;
 using FlowFocus.Core.Models;
+using FlowFocus.Blazor.EditDialogContents;
 using FlowFocus.Core.Services;
 using FlowFocus.Data.Repositories;
 using FlowFocus.Tests.Builders;

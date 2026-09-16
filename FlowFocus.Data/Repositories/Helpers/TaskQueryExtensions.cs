@@ -11,8 +11,8 @@ namespace FlowFocus.Data.Repositories.Helpers;
 /// </summary>
 public static class TaskQueryExtensions
 {
-    public static IEnumerable<TaskItem> FilterActiveRootTasks(this IEnumerable<TaskItem> tasks) =>
-        tasks.Where(t => t.ParentTaskId == null && t.IsActive);
+    public static IEnumerable<TaskItem> FilterActiveTasks(this IEnumerable<TaskItem> tasks) =>
+        tasks.Where(t => t.IsActive);
 
     public static IQueryable<TaskItem> WhereActive(this IQueryable<TaskItem> query) =>
         query.Where(t => t.Status == TaskStatus.Planned || t.Status == TaskStatus.Blocked);
@@ -28,8 +28,7 @@ public static class TaskQueryExtensions
 
     public static TaskItem? FindProcrastinationTask(this IEnumerable<TaskItem> tasks, List<int> excludeIds) =>
         tasks
-            .Where(t => t.ParentTaskId == null &&
-                        t is { Interest: >= AppConfig.MinProcrastinationInterest, Status: TaskStatus.Planned } &&
+            .Where(t => t is { Interest: >= AppConfig.MinProcrastinationInterest, Status: TaskStatus.Planned } &&
                         !excludeIds.Contains(t.Id))
             .OrderByDescending(t => t.Interest - Math.Sqrt(t.Priority?.Order ?? 99))
             .FirstOrDefault();
@@ -38,7 +37,7 @@ public static class TaskQueryExtensions
     {
         var today = TodoDay.Today;
         return tasks
-            .FilterActiveRootTasks()
+            .FilterActiveTasks()
             .Where(t => t.ScheduledDate != null && today.IsSameDay(t.ScheduledDate) && t.Status == TaskStatus.Planned)
             .OrderByDescending(t => t.Priority?.Order ?? 99)
             .ThenBy(t => t.Interest ?? 0)
@@ -51,8 +50,7 @@ public static class TaskQueryExtensions
 
         return context.Tasks
             .AsNoTracking()
-            .Where(t => t.ParentTaskId == null &&
-                        t.Status != TaskStatus.Completed &&
+            .Where(t => t.Status != TaskStatus.Completed &&
                         t.Status != TaskStatus.Irrelevant &&
                         t.Status != TaskStatus.NotConfigured &&
                         t.IsRecurring)

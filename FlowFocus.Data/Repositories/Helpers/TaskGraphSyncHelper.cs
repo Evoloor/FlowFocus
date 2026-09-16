@@ -14,12 +14,12 @@ public static class TaskGraphSyncHelper
 
     public static void PrepareSubtasksForAdd(StorageContext context, TaskItem entity)
     {
-        var dbMax = context.Tasks.AsNoTracking().Select(t => (int?)t.Id).Max() ?? 0;
-        var maxId = Math.Max(dbMax, entity.Id);
-        foreach (var subtask in entity.Subtasks)
+        var maxId = context.Subtasks.AsNoTracking().Select(s => (int?)s.Id).Max() ?? 0;
+        for (var i = 0; i < entity.Subtasks.Count; i++)
         {
-            subtask.ParentTaskId ??= entity.Id;
-            subtask.ParentTask ??= entity;
+            var subtask = entity.Subtasks[i];
+            subtask.ParentTaskId = entity.Id;
+            subtask.ParentTask = entity;
             if (subtask.Id == 0)
             {
                 maxId++;
@@ -30,14 +30,15 @@ public static class TaskGraphSyncHelper
             {
                 subtask.CreatedDate = DateTime.UtcNow;
             }
-            subtask.Status = TaskStatus.Planned;
+            subtask.LastChangesOn = DateTime.UtcNow;
+            subtask.Status = subtask.Status == 0 ? TaskStatus.Planned : subtask.Status;
+            subtask.SortOrder = i;
         }
     }
 
     public static void PrepareRelationsForAdd(TaskItem entity)
     {
-        for (var i = 0; i < entity.Relations.Count; i++
-)
+        for (var i = 0; i < entity.Relations.Count; i++)
         {
             var relation = entity.Relations[i];
             
@@ -140,35 +141,46 @@ public static class TaskGraphSyncHelper
 
     public static void UpdateSubtasks(StorageContext context, TaskItem tracked, TaskItem source)
     {
-        var subtasksToRemove = tracked.Subtasks
+        var trackedSubtasks = context.Subtasks.Where(s => s.ParentTaskId == tracked.Id).ToList();
+
+        var subtasksToRemove = trackedSubtasks
             .Where(st => !source.Subtasks.Any(sst => sst.Id == st.Id && sst.Id > 0))
             .ToList();
 
         foreach (var subtask in subtasksToRemove)
         {
-            context.Tasks.Remove(subtask);
+            context.Subtasks.Remove(subtask);
         }
 
-        foreach (var sourceSubtask in source.Subtasks)
+        for (var i = 0; i < source.Subtasks.Count; i++)
         {
-            sourceSubtask.ParentTaskId ??= tracked.Id;
-            sourceSubtask.ParentTask ??= tracked;
+            var sourceSubtask = source.Subtasks[i];
+            sourceSubtask.ParentTaskId = tracked.Id;
+            sourceSubtask.ParentTask = tracked;
+            sourceSubtask.SortOrder = i;
+            sourceSubtask.LastChangesOn = DateTime.UtcNow;
             TaskHierarchyValidator.ValidateSubtaskParent(tracked, sourceSubtask);
 
             if (sourceSubtask.Id > 0)
             {
-                var existing = tracked.Subtasks.FirstOrDefault(s => s.Id == sourceSubtask.Id);
+                var existing = trackedSubtasks.FirstOrDefault(s => s.Id == sourceSubtask.Id);
                 if (existing != null)
                 {
-                    existing.ParentTask ??= tracked;
+                    existing.ParentTask = tracked;
                     context.Entry(existing).CurrentValues.SetValues(sourceSubtask);
+                    existing.LastChangesOn = DateTime.UtcNow;
                 }
             }
             else
             {
                 sourceSubtask.ParentTaskId = tracked.Id;
                 sourceSubtask.ParentTask = tracked;
-                context.Tasks.Add(sourceSubtask);
+                if (sourceSubtask.CreatedDate == default)
+                {
+                    sourceSubtask.CreatedDate = DateTime.UtcNow;
+                }
+                sourceSubtask.LastChangesOn = DateTime.UtcNow;
+                context.Subtasks.Add(sourceSubtask);
             }
         }
     }

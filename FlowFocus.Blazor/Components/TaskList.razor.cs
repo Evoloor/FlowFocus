@@ -104,9 +104,7 @@ public partial class TaskList : IDisposable
         }
         else
         {
-            _allTasks = TaskRepo.GetAll()
-                .Where(t => t.ParentTaskId == null)
-                .ToList();
+            _allTasks = TaskRepo.GetAll().ToList();
         }
 
         _availableTags = _allTasks

@@ -26,9 +26,7 @@ public class TaskItemBuilder : EntityBuilder<TaskItem, TaskItemBuilder>
     private int? _recurrenceInterval;
     private int? _recurrenceWeekDays;
     private int? _recurrenceSourceId;
-    private int? _parentTaskId;
-    private TaskItem? _parentTask;
-    private readonly List<TaskItem> _subtasks = [];
+    private readonly List<SubtaskItem> _subtasks = [];
     private readonly List<TaskRelation> _relations = [];
     private readonly List<TaskRelation> _inverseRelations = [];
     private readonly List<PriorityEscalation> _priorityEscalations = [];
@@ -54,13 +52,6 @@ public class TaskItemBuilder : EntityBuilder<TaskItem, TaskItemBuilder>
     public TaskItemBuilder WithRecurrenceSourceId(int? sourceId)
     {
         _recurrenceSourceId = sourceId;
-        return this;
-    }
-
-    public TaskItemBuilder WithParentTask(TaskItem? parentTask)
-    {
-        _parentTask = parentTask;
-        _parentTaskId = parentTask?.Id;
         return this;
     }
 
@@ -140,15 +131,9 @@ public class TaskItemBuilder : EntityBuilder<TaskItem, TaskItemBuilder>
         return this;
     }
 
-    public TaskItemBuilder WithSubtask(TaskItem subtask)
+    public TaskItemBuilder WithSubtask(SubtaskItem subtask)
     {
-        _subtasks.Add(item: subtask);
-        return this;
-    }
-
-    public TaskItemBuilder WithParentTaskId(int? parentId)
-    {
-        _parentTaskId = parentId;
+        _subtasks.Add(subtask);
         return this;
     }
 
@@ -203,6 +188,8 @@ public class TaskItemBuilder : EntityBuilder<TaskItem, TaskItemBuilder>
             Interest = _interest,
             Complexity = _complexity,
             EstimatedMinutes = _estimatedMinutes,
+            ScheduledDate = _scheduledDate,
+            DateSource = _dateSource,
             CompletedDate = _completedDate,
             CreatedDate = _createdDate,
             IsRecurring = _isRecurring,
@@ -211,28 +198,12 @@ public class TaskItemBuilder : EntityBuilder<TaskItem, TaskItemBuilder>
             RecurrenceInterval = _recurrenceInterval,
             RecurrenceWeekDays = _recurrenceWeekDays,
             RecurrenceSourceId = _recurrenceSourceId,
-            ParentTaskId = _parentTaskId,
-            ParentTask = _parentTask,
             Subtasks = [.. _subtasks],
             Relations = [.. _relations],
             InverseRelations = [.. _inverseRelations],
             PriorityEscalations = [.. _priorityEscalations],
             LastChangesOn = DateTime.UtcNow
         };
-
-        if (_parentTask == null)
-        {
-            item.ScheduledDate = _scheduledDate;
-            item.DateSource = _dateSource;
-        }
-        else
-        {
-            if (_scheduledDate.HasValue)
-            {
-                item.ScheduledDate = _scheduledDate;
-                item.DateSource = _dateSource;
-            }
-        }
 
         foreach (var subtask in item.Subtasks)
         {
@@ -258,13 +229,17 @@ public class TaskItemBuilder : EntityBuilder<TaskItem, TaskItemBuilder>
     /// <summary>
     /// Preset Object Mother factory: Creates a parent task with specified number of subtasks.
     /// </summary>
-    public static (TaskItem Parent, List<TaskItem> Subtasks) CreateParentWithSubtasks(int subtaskCount, int parentId = 1)
+    public static (TaskItem Parent, List<SubtaskItem> Subtasks) CreateParentWithSubtasks(int subtaskCount, int parentId = 1)
     {
         var parentBuilder = new TaskItemBuilder().WithId(parentId).WithTitle("Parent Task");
-        List<TaskItem> subtasks = [];
+        List<SubtaskItem> subtasks = [];
         for (var i = 1; i <= subtaskCount; i++)
         {
-            var subtask = new TaskItemBuilder().WithId(parentId * 100 + i).WithTitle($"Subtask {i}").WithParentTaskId(parentId).Build();
+            var subtask = new SubtaskItemBuilder()
+                .WithId(parentId * 100 + i)
+                .WithTitle($"Subtask {i}")
+                .WithSortOrder(i - 1)
+                .Build();
             subtasks.Add(subtask);
             parentBuilder.WithSubtask(subtask);
         }
@@ -272,4 +247,52 @@ public class TaskItemBuilder : EntityBuilder<TaskItem, TaskItemBuilder>
     }
 
     #endregion
+}
+
+/// <summary>
+/// Builder для SubtaskItem в тестах
+/// </summary>
+public class SubtaskItemBuilder : EntityBuilder<SubtaskItem, SubtaskItemBuilder>
+{
+    private string _title = "Test Subtask";
+    private string? _description;
+    private TaskStatus _status = TaskStatus.Planned;
+    private bool _isFavorite;
+    private bool _hideUnderSpoiler;
+    private int? _interest;
+    private int? _complexity;
+    private int? _estimatedMinutes;
+    private int _sortOrder;
+    private int _parentTaskId;
+
+    public SubtaskItemBuilder WithTitle(string title) { _title = title; return this; }
+    public SubtaskItemBuilder WithDescription(string? desc) { _description = desc; return this; }
+    public SubtaskItemBuilder WithStatus(TaskStatus status) { _status = status; return this; }
+    public SubtaskItemBuilder WithFavorite(bool fav = true) { _isFavorite = fav; return this; }
+    public SubtaskItemBuilder WithHideUnderSpoiler(bool hide = true) { _hideUnderSpoiler = hide; return this; }
+    public SubtaskItemBuilder WithInterest(int? interest) { _interest = interest; return this; }
+    public SubtaskItemBuilder WithComplexity(int? complexity) { _complexity = complexity; return this; }
+    public SubtaskItemBuilder WithEstimatedMinutes(int? minutes) { _estimatedMinutes = minutes; return this; }
+    public SubtaskItemBuilder WithSortOrder(int order) { _sortOrder = order; return this; }
+    public SubtaskItemBuilder WithParentTaskId(int parentId) { _parentTaskId = parentId; return this; }
+
+    public override SubtaskItem Build()
+    {
+        return new SubtaskItem
+        {
+            Id = Id,
+            Title = _title,
+            Description = _description,
+            Status = _status,
+            IsFavorite = _isFavorite,
+            HideUnderSpoiler = _hideUnderSpoiler,
+            Interest = _interest,
+            Complexity = _complexity,
+            EstimatedMinutes = _estimatedMinutes,
+            SortOrder = _sortOrder,
+            ParentTaskId = _parentTaskId,
+            CreatedDate = DateTime.UtcNow,
+            LastChangesOn = DateTime.UtcNow
+        };
+    }
 }

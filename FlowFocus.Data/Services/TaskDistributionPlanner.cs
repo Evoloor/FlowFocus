@@ -14,7 +14,6 @@ public class TaskDistributionPlanner(ITaskRepository taskRepository)
         var allTasksMap = taskRepository.GetAll().ToDictionary(t => t.Id);
 
         var unassignedBlockers = taskRepository.GetAll()
-            .Where(t => t.ParentTaskId == null)
             .Where(t => t.IsActive)
             .Where(t => t.DateSource == DateSource.AutoFlexible)
             .Where(t => !t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))
@@ -38,7 +37,6 @@ public class TaskDistributionPlanner(ITaskRepository taskRepository)
         }
 
         var tasks = taskRepository.GetAll()
-            .Where(t => t.ParentTaskId == null)
             .Where(t => t.IsActive)
             .Where(t => t.DateSource == DateSource.AutoFlexible)
             .Where(t => !t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))
@@ -54,9 +52,7 @@ public class TaskDistributionPlanner(ITaskRepository taskRepository)
         var today = TodoDay.Today;
         var tomorrow = today.AddDays(1);
 
-        var allRootTasks = taskRepository.GetAll()
-            .Where(t => t.ParentTaskId == null)
-            .ToList();
+        var allTasks = taskRepository.GetAll().ToList();
 
         Dictionary<TodoDay, DailyStats> dailyStatsMap = new();
 
@@ -66,7 +62,7 @@ public class TaskDistributionPlanner(ITaskRepository taskRepository)
                 return existing;
 
             DailyStats stats = new();
-            foreach (var t in allRootTasks)
+            foreach (var t in allTasks)
             {
                 var isInactive = t.Status is TaskStatus.Completed or TaskStatus.Irrelevant;
                 if (isInactive)

@@ -301,8 +301,6 @@ public class TaskEditDialogTests : IntegrationTestBase
         sub1.Complexity.Should().Be(4);
         sub1.Interest.Should().Be(7);
         sub1.IsFavorite.Should().BeTrue();
-        sub1.ScheduledDate.Should().Be(initialDate);
-        sub1.DateSource.Should().Be(DateSource.AutoFixed);
 
         var sub2 = savedParent.Subtasks.FirstOrDefault(s => s.Title == "Подзадача 2");
         sub2.Should().NotBeNull();
@@ -312,17 +310,6 @@ public class TaskEditDialogTests : IntegrationTestBase
         sub2.Complexity.Should().Be(8);
         sub2.Interest.Should().Be(3);
         sub2.HideUnderSpoiler.Should().BeTrue();
-        sub2.ScheduledDate.Should().Be(initialDate);
-        sub2.DateSource.Should().Be(DateSource.AutoFixed);
-
-        // Act: verify live-binding when changing parent date
-        DateTime newParentDate = new(2026, 9, 25);
-        TaskRepo.UpdateTaskSchedule(savedParent.Id, newParentDate, DateSource.Manual);
-
-        var refreshedSub1 = TaskRepo.GetById(sub1.Id);
-        refreshedSub1.Should().NotBeNull();
-        refreshedSub1!.ScheduledDate.Should().Be(newParentDate);
-        refreshedSub1.DateSource.Should().Be(DateSource.Manual);
     }
 
     /// <summary>
@@ -367,56 +354,6 @@ public class TaskEditDialogTests : IntegrationTestBase
         var addedSubtask = updatedParent.Subtasks.First();
         addedSubtask.Title.Should().Be("Новая добавленная подзадача");
         addedSubtask.ParentTaskId.Should().Be(100);
-        addedSubtask.ScheduledDate.Should().Be(initialDate);
-        addedSubtask.DateSource.Should().Be(DateSource.Manual);
-    }
-
-    [Fact]
-    public void TaskEditDialog_WhenEditingSubtask_EntersSubtaskModeAndHidesDatePicker()
-    {
-        // Arrange
-        var parent = new TaskItemBuilder()
-            .WithId(200)
-            .WithTitle("Родитель")
-            .WithScheduledDate(new DateTime(2026, 9, 15))
-            .Build();
-        var subtask = new TaskItemBuilder()
-            .WithId(201)
-            .WithTitle("Подзадача")
-            .WithParentTask(parent)
-            .Build();
-
-        // Act
-        var cut = RenderTaskEditDialog(existingTask: subtask);
-
-        // Assert
-        cut.Instance.IsSubtaskMode.Should().BeTrue();
-        cut.FindComponents<MudDatePicker>().Should().BeEmpty();
-    }
-
-    [Fact]
-    public void TaskDateRow_WhenTaskIsSubtask_RendersEmptyMarkup()
-    {
-        // Arrange
-        var parent = new TaskItemBuilder()
-            .WithId(300)
-            .WithTitle("Родитель")
-            .WithScheduledDate(new DateTime(2026, 9, 15))
-            .Build();
-        var subtask = new TaskItemBuilder()
-            .WithId(301)
-            .WithTitle("Подзадача")
-            .WithParentTask(parent)
-            .Build();
-
-        // Act
-        var cut = _ctx.Render<TaskDateRow>(parameters => parameters
-            .Add(p => p.Task, subtask)
-            .Add(p => p.Today, TodoDay.Today)
-        );
-
-        // Assert
-        cut.Markup.Trim().Should().BeEmpty();
     }
 
     [Fact]

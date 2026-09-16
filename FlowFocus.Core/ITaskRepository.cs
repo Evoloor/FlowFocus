@@ -43,6 +43,15 @@ public interface ITaskRepository : IRepository<TaskItem>
     /// <summary>Вернуть задачу из неактуальных в актуальные</summary>
     void RestoreFromIrrelevant(int taskId);
 
+    /// <summary>Переключить статус выполнения подзадачи (Planned <-> Completed)</summary>
+    void ToggleSubtaskStatus(int subtaskId);
+
+    /// <summary>Пометить подзадачу как выполненную</summary>
+    void CompleteSubtask(int subtaskId);
+
+    /// <summary>Отменить выполнение подзадачи</summary>
+    void ReopenSubtask(int subtaskId);
+
     /// <summary>Получить интересную задачу для прокрастинации</summary>
     TaskItem? GetProcrastinationTask(List<int> excludeIds);
 

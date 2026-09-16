@@ -29,8 +29,6 @@ public partial class TaskEditDialog
 
     [Parameter] public string? InitialTitle { get; set; }
 
-    [Parameter] public bool IsSubtaskMode { get; set; }
-
     private bool _isFormValid;
     private TaskItem _task = new();
     private TaskItem? _originalTask; // Для отслеживания изменений
@@ -96,11 +94,6 @@ public partial class TaskEditDialog
             StateHasChanged();
         }
 
-        if (_task.IsSubtask || ExistingTask?.IsSubtask == true)
-        {
-            IsSubtaskMode = true;
-        }
-
         // Синхронизируем локальное зеркало даты из модели
         _scheduledDate = _task.ScheduledDate;
 
@@ -160,15 +153,18 @@ public partial class TaskEditDialog
             _selectedConditionIds = [];
         }
 
-        _subtasks = (source?.Subtasks ?? []).Select(s => new SubtaskDto
+        _subtasks = (source?.Subtasks ?? []).Select((s, i) => new SubtaskDto
         {
             Id = s.Id,
             Title = s.Title,
+            Description = s.Description,
             HideUnderSpoiler = s.HideUnderSpoiler,
             IsFavorite = s.IsFavorite,
             Interest = s.Interest,
             Complexity = s.Complexity,
-            EstimatedMinutes = s.EstimatedMinutes
+            EstimatedMinutes = s.EstimatedMinutes,
+            Status = s.Status,
+            CompletedDate = s.CompletedDate
         }).ToList();
 
         var outgoing = (source?.Relations ?? []).Select(r => new RelationDto
@@ -319,31 +315,28 @@ public partial class TaskEditDialog
                 _ => _estimatedValue
             };
 
-            if (!IsSubtaskMode && !_task.IsSubtask)
+            if (_task.IsRecurring)
             {
-                if (_task.IsRecurring)
+                if (_task.RecurrenceType == RecurrenceType.None)
                 {
-                    if (_task.RecurrenceType == RecurrenceType.None)
-                    {
-                        _task.RecurrenceType = RecurrenceType.EveryN;
-                        _task.RecurrenceUnit = RecurrenceUnit.Days;
-                        _task.RecurrenceInterval = 1;
-                    }
-
-                    if (_task.ScheduledDate == null)
-                    {
-                        _task.ScheduledDate = TodoDay.Today.ToDateTime();
-                        _task.DateSource = DateSource.Manual;
-                        _scheduledDate = _task.ScheduledDate;
-                    }
+                    _task.RecurrenceType = RecurrenceType.EveryN;
+                    _task.RecurrenceUnit = RecurrenceUnit.Days;
+                    _task.RecurrenceInterval = 1;
                 }
-                else if (_task.ScheduledDate == null)
+
+                if (_task.ScheduledDate == null)
                 {
-                    _task.DateSource = DateSource.AutoFlexible;
+                    _task.ScheduledDate = TodoDay.Today.ToDateTime();
+                    _task.DateSource = DateSource.Manual;
+                    _scheduledDate = _task.ScheduledDate;
                 }
             }
+            else if (_task.ScheduledDate == null)
+            {
+                _task.DateSource = DateSource.AutoFlexible;
+            }
 
-            if (_task.Status == TaskStatus.NotConfigured && !IsSubtaskMode && !_task.IsSubtask)
+            if (_task.Status == TaskStatus.NotConfigured)
             {
                 _task.Status = TaskStatus.Planned;
             }
@@ -362,30 +355,37 @@ public partial class TaskEditDialog
 
             _task.Subtasks = _subtasks
                 .Where(s => !s.IsDeleted)
-                .Select(dto =>
+                .Select((dto, index) =>
                 {
-                    TaskItem ti = new();
+                    var si = new SubtaskItem
+                    {
+                        Title = dto.Title,
+                        Description = dto.Description,
+                        HideUnderSpoiler = dto.HideUnderSpoiler,
+                        IsFavorite = dto.IsFavorite,
+                        Interest = dto.Interest,
+                        Complexity = dto.Complexity,
+                        EstimatedMinutes = dto.EstimatedMinutes,
+                        SortOrder = index,
+                        Status = dto.Status != 0 ? dto.Status : TaskStatus.Planned,
+                        CompletedDate = dto.CompletedDate,
+                        LastChangesOn = DateTime.UtcNow
+                    };
+
                     if (dto.Id is > 0)
                     {
-                        ti.Id = dto.Id.Value;
+                        si.Id = dto.Id.Value;
                         var trackedSub = existingTracked?.Subtasks?.FirstOrDefault(st => st.Id == dto.Id.Value);
                         if (trackedSub != null)
                         {
-                            ti.CreatedDate = trackedSub.CreatedDate;
-                            ti.ParentTaskId = trackedSub.ParentTaskId;
-                            ti.Status = trackedSub.Status;
+                            si.CreatedDate = trackedSub.CreatedDate;
+                            si.ParentTaskId = trackedSub.ParentTaskId;
+                            si.Status = trackedSub.Status;
+                            si.CompletedDate = trackedSub.CompletedDate;
                         }
                     }
 
-                    ti.Title = dto.Title;
-                    ti.HideUnderSpoiler = dto.HideUnderSpoiler;
-                    ti.IsFavorite = dto.IsFavorite;
-                    ti.Interest = dto.Interest;
-                    ti.Complexity = dto.Complexity;
-                    ti.EstimatedMinutes = dto.EstimatedMinutes;
-                    ti.Status = ti.Status == 0 ? TaskStatus.Planned : ti.Status;
-
-                    return ti;
+                    return si;
                 }).ToList();
 
             if (_task.IsRecurring)

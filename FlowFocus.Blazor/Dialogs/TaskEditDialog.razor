@@ -23,17 +23,14 @@
                 </MudItem>
 
                 @* === ДАТА НАЗНАЧЕНИЯ === *@
-                @if (!IsSubtaskMode)
-                {
-                    <MudItem xs="12" sm="6">
-                        <MudDatePicker T="DateTime?" Date="_scheduledDate"
-                                       DateChanged="OnScheduledDateChanged"
-                                       Label="Дата назначения"
-                                       Placeholder="Автоматически"
-                                       Variant="Variant.Outlined"
-                                       Clearable="true"/>
-                    </MudItem>
-                }
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker T="DateTime?" Date="_scheduledDate"
+                                   DateChanged="OnScheduledDateChanged"
+                                   Label="Дата назначения"
+                                   Placeholder="Автоматически"
+                                   Variant="Variant.Outlined"
+                                   Clearable="true"/>
+                </MudItem>
 
                 @* === ИЗБРАННОЕ === *@
                 <MudItem xs="12" sm="6">
@@ -45,26 +42,23 @@
                 </MudItem>
 
                 @* === ПРИОРИТЕТ === *@
-                @if (!IsSubtaskMode)
-                {
-                    <MudItem xs="12" sm="6">
-                        <MudSelect T="int?" @bind-Value="_task.PriorityId"
-                                   Label="Приоритет"
-                                   Variant="Variant.Outlined"
-                                   Clearable="true"
-                                   AnchorOrigin="Origin.BottomCenter">
-                            @foreach (var priority in _priorities)
-                            {
-                                <MudSelectItem T="int?" Value="priority.Id">
-                                    <div class="priority-option">
-                                        <div class="priority-color" style="background-color: @priority.Color"></div>
-                                        <span>@priority.Name</span>
-                                    </div>
-                                </MudSelectItem>
-                            }
-                        </MudSelect>
-                    </MudItem>
-                }
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int?" @bind-Value="_task.PriorityId"
+                               Label="Приоритет"
+                               Variant="Variant.Outlined"
+                               Clearable="true"
+                               AnchorOrigin="Origin.BottomCenter">
+                        @foreach (var priority in _priorities)
+                        {
+                            <MudSelectItem T="int?" Value="priority.Id">
+                                <div class="priority-option">
+                                    <div class="priority-color" style="background-color: @priority.Color"></div>
+                                    <span>@priority.Name</span>
+                                </div>
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
 
                 @* === ИНТЕРЕСНОСТЬ === *@
                 <MudItem xs="12" sm="4">
@@ -101,71 +95,65 @@
                 </MudItem>
 
                 @* === ТЕГИ === *@
-                @if (!IsSubtaskMode)
-                {
-                    <MudItem xs="12">
-                        <TagInput SuggestedLabels="_suggestedTags"
-                                  SelectedLabels="_selectedTags"
-                                  SelectedLabelIds="_selectedTagIds"
-                                  OnLabelAdded="@(async (Tag t) => await AddTag(t))"
-                                  OnLabelRemoved="@(async (Tag t) =>
-                                                {
-                                                    RemoveTag(t);
-                                                    await RefreshSuggestedTags();
-                                                    await InvokeAsync(StateHasChanged);
-                                                })"/>
-                    </MudItem>
-                }
+                <MudItem xs="12">
+                    <TagInput SuggestedLabels="_suggestedTags"
+                              SelectedLabels="_selectedTags"
+                              SelectedLabelIds="_selectedTagIds"
+                              OnLabelAdded="@(async (Tag t) => await AddTag(t))"
+                              OnLabelRemoved="@(async (Tag t) =>
+                                            {
+                                                RemoveTag(t);
+                                                await RefreshSuggestedTags();
+                                                await InvokeAsync(StateHasChanged);
+                                            })"/>
+                </MudItem>
 
                 @* === РАСШИРЕННЫЕ НАСТРОЙКИ === *@
-                @if (!IsSubtaskMode)
-                {
-                    <MudItem xs="12">
-                        <MudExpansionPanels>
-                            <MudExpansionPanel Text="Расширенные настройки">
-                                @* Описание *@
-                                <MudTextField T="string?" @bind-Value="_task.Description"
-                                              Label="Описание"
-                                              Lines="3"
-                                              Variant="Variant.Outlined"
-                                              Class="mb-4"/>
+                <MudItem xs="12">
+                    <MudExpansionPanels>
+                        <MudExpansionPanel Text="Расширенные настройки">
+                            @* Описание *@
+                            <MudTextField T="string?" @bind-Value="_task.Description"
+                                          Label="Описание"
+                                          Lines="3"
+                                          Variant="Variant.Outlined"
+                                          Class="mb-4"/>
 
-                                @* Внешние условия *@
-                                <div class="mb-4">
-                                    <ConditionInput SuggestedLabels="_suggestedConditions"
-                                                    SelectedLabels="_selectedConditions"
-                                                    SelectedLabelIds="_selectedConditionIds"
-                                                    OnLabelAdded="@(async (ExternalCondition c) => { await RefreshSuggestedConditions(); await InvokeAsync(StateHasChanged); })"
-                                                    OnLabelRemoved="@(async (ExternalCondition c) => { await RefreshSuggestedConditions(); await InvokeAsync(StateHasChanged); })" />
-                                </div>
+                            @* Внешние условия *@
+                            <div class="mb-4">
+                                <ConditionInput SuggestedLabels="_suggestedConditions"
+                                                SelectedLabels="_selectedConditions"
+                                                SelectedLabelIds="_selectedConditionIds"
+                                                OnLabelAdded="@(async (ExternalCondition c) => { await RefreshSuggestedConditions(); await InvokeAsync(StateHasChanged); })"
+                                                OnLabelRemoved="@(async (ExternalCondition c) => { await RefreshSuggestedConditions(); await InvokeAsync(StateHasChanged); })" />
+                            </div>
 
-                                @* Подзадачи *@
-                                <SubtasksEditor Subtasks="_subtasks" SubtasksChanged="@OnSubtasksChanged"/>
+                            @* Подзадачи *@
+                            <SubtasksEditor Subtasks="_subtasks" SubtasksChanged="@OnSubtasksChanged"/>
 
-                                @* Повышение приоритета *@
-                                <EscalationsEditor Escalations="_escalations" Task="_task" Priorities="_priorities"
-                                                   ShouldShow="ShouldShowEscalationTable" IsTaskRecurring="_task.IsRecurring"/>
+                            @* Повышение приоритета *@
+                            <EscalationsEditor Escalations="_escalations" Task="_task" Priorities="_priorities"
+                                               ShouldShow="ShouldShowEscalationTable" IsTaskRecurring="_task.IsRecurring"/>
 
-                                @* Связи *@
-                                <MudItem xs="12">
-                                    <fieldset disabled="@_task.IsRecurring" style="border:none;padding:0">
-                                        <RelationsEditor Relations="_relations" AvailableTasks="_availableTasks" EditingTask="_task"
-                                                         OnRemoveRequested="@OnRelationRemoveRequested"/>
-                                        @if (_task.IsRecurring)
-                                        {
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                Связи недоступны для повторяющихся задач — они будут удалены при сохранении.
-                                            </MudText>
-                                        }
-                                    </fieldset>
-                                </MudItem>
+                            @* Связи *@
+                            <MudItem xs="12">
+                                <fieldset disabled="@_task.IsRecurring" style="border:none;padding:0">
+                                    <RelationsEditor Relations="_relations" AvailableTasks="_availableTasks" EditingTask="_task"
+                                                     OnRemoveRequested="@OnRelationRemoveRequested"/>
+                                    @if (_task.IsRecurring)
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            Связи недоступны для повторяющихся задач — они будут удалены при сохранении.
+                                        </MudText>
+                                    }
+                                </fieldset>
+                            </MudItem>
 
-                                @* Повторение *@
-                                <RecurrenceEditor Task="_task" OnRecurringChanged="@(async (bool v) => { _task.IsRecurring = v; if (v && _scheduledDate == null) { _scheduledDate = _task.ScheduledDate ?? TodoDay.Today.ToDateTime(); } await InvokeAsync(StateHasChanged); })"/>
-                            </MudExpansionPanel>
-                        </MudExpansionPanels>
-                    </MudItem>
-                }
+                            @* Повторение *@
+                            <RecurrenceEditor Task="_task" OnRecurringChanged="@(async (bool v) => { _task.IsRecurring = v; if (v && _scheduledDate == null) { _scheduledDate = _task.ScheduledDate ?? TodoDay.Today.ToDateTime(); } await InvokeAsync(StateHasChanged); })"/>
+                        </MudExpansionPanel>
+                    </MudExpansionPanels>
+                </MudItem>
             </MudGrid>
         </MudForm>
     </DialogContent>

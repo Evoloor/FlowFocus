@@ -10,7 +10,7 @@ using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 namespace FlowFocus.Tests;
 
 /// <summary>
-/// Unit tests for subtask aggregation, list isolation, edit field truncation, and hierarchy validation.
+/// Unit tests for subtask aggregation, list isolation, model validation, and hierarchy.
 /// </summary>
 [UsedImplicitly]
 [Trait("Category", "Domain")]
@@ -18,14 +18,14 @@ namespace FlowFocus.Tests;
 public class SubtasksEngineTests : IntegrationTestBase
 {
     /// <summary>
-    /// Verifies that total estimated minutes and complexity aggregate parent and subtasks recursively.
+    /// Verifies that total estimated minutes and complexity aggregate parent and subtasks.
     /// </summary>
     [Fact]
-    public void CalculateTotalMinutesAndComplexity_AggregatesParentAndSubtasksFromRepository()
+    public void CalculateTotalMinutesAndComplexity_AggregatesParentAndSubtasks()
     {
         // Arrange
-        var subtask1 = new TaskItemBuilder().WithId(101).WithEstimatedMinutes(15).WithComplexity(5).Build();
-        var subtask2 = new TaskItemBuilder().WithId(102).WithEstimatedMinutes(45).WithComplexity(15).Build();
+        var subtask1 = new SubtaskItemBuilder().WithId(101).WithEstimatedMinutes(15).WithComplexity(5).Build();
+        var subtask2 = new SubtaskItemBuilder().WithId(102).WithEstimatedMinutes(45).WithComplexity(15).Build();
 
         var parent = new TaskItemBuilder()
             .WithId(100)
@@ -46,32 +46,32 @@ public class SubtasksEngineTests : IntegrationTestBase
     }
 
     /// <summary>
-    /// Verifies that repository root queries exclude subtasks with non-null ParentTaskId.
+    /// Verifies that GetAll returns only top-level tasks (no subtasks mixed in).
     /// </summary>
     [Fact]
-    public void RepositoryRootQuery_ExcludesSubtasksWithNonNullParentId()
+    public void GetAll_ReturnsOnlyTopLevelTasks()
     {
         // Arrange
-        (var mainTask, _) = TaskItemBuilder.CreateParentWithSubtasks(1, 200);
-
+        (var mainTask, _) = TaskItemBuilder.CreateParentWithSubtasks(2, 200);
         TaskRepo.Add(mainTask);
 
         // Act
-        var rootTasks = TaskRepo.GetAll().Where(t => t.ParentTaskId == null).ToList();
+        var allTasks = TaskRepo.GetAll();
 
-        // Assert
-        rootTasks.Should().ContainSingle();
-        rootTasks.First().Id.Should().Be(200);
+        // Assert — only the parent task should be returned, subtasks are nested
+        allTasks.Should().ContainSingle();
+        allTasks.First().Id.Should().Be(200);
+        allTasks.First().Subtasks.Should().HaveCount(2);
     }
 
     /// <summary>
-    /// Verifies that subtask models expose only valid allowed subtask properties.
+    /// Verifies that SubtaskItem model only has allowed fields (no ScheduledDate, DateSource, IsRecurring etc.)
     /// </summary>
     [Fact]
-    public void SubtaskModel_ExposesOnlyAllowedSubtaskFields()
+    public void SubtaskModel_HasOnlyAllowedFields()
     {
         // Arrange & Act
-        var subtask = new TaskItemBuilder()
+        var subtask = new SubtaskItemBuilder()
             .WithTitle("Subtask Title")
             .WithInterest(8)
             .WithComplexity(20)
@@ -79,214 +79,118 @@ public class SubtasksEngineTests : IntegrationTestBase
             .WithParentTaskId(400)
             .Build();
 
-        // Assert
-        subtask.IsSubtask.Should().BeTrue();
+        // Assert — SubtaskItem has all expected fields
         subtask.Title.Should().Be("Subtask Title");
         subtask.Interest.Should().Be(8);
         subtask.Complexity.Should().Be(20);
         subtask.EstimatedMinutes.Should().Be(25);
         subtask.ParentTaskId.Should().Be(400);
-        subtask.IsRecurring.Should().BeFalse();
-        subtask.ScheduledDate.Should().BeNull();
+
+        // SubtaskItem should NOT have ScheduledDate, DateSource, IsRecurring, PriorityId etc.
+        // (These are compile-time guarantees via the type system now)
+        subtask.Should().BeOfType<SubtaskItem>();
+        subtask.Should().NotBeAssignableTo<TaskItem>();
     }
 
     /// <summary>
-    /// Verifies that assigning a higher priority to a subtask than its parent throws a validation exception.
+    /// Verifies that ValidateSubtaskParent rejects a subtask referencing a different parent.
     /// </summary>
     [Fact]
-    public void SubtaskPriority_ExceedingParentPriority_ThrowsValidationError()
+    public void SubtaskValidation_MismatchedParent_ThrowsValidationError()
     {
         // Arrange
-        var parentPriority = PriorityLevelBuilder.Medium;
-        var subtaskPriority = PriorityLevelBuilder.High;
-        var parentTask = new TaskItemBuilder()
-            .WithId(10)
-            .WithPriority(parentPriority)
-            .Build();
-        var subtask = new TaskItemBuilder()
-            .WithId(11)
-            .WithPriority(subtaskPriority)
-            .WithParentTask(parentTask)
-            .Build();
+        var parentTask = new TaskItemBuilder().WithId(10).Build();
+        var subtask = new SubtaskItemBuilder().WithId(10).WithParentTaskId(99).Build();
 
         // Act
-        var act = () => TaskHierarchyValidator.ValidateSubtaskParent(parentTask: parentTask, childTask: subtask);
+        var act = () => TaskHierarchyValidator.ValidateSubtaskParent(parentTask, subtask);
 
         // Assert
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage(expectedWildcardPattern: "*приоритет не может быть выше приоритета родительской*");
+            .WithMessage(expectedWildcardPattern: "*привязана к другой родительской задаче*");
     }
 
     /// <summary>
-    /// Verifies that subtask's scheduled date is live-bound to its parent task's scheduled date.
+    /// Verifies that toggling a subtask status cycles between Planned and Completed with correct CompletedDate.
     /// </summary>
     [Fact]
-    public void SubtaskDate_LiveBindsToParentTaskDate()
+    public void ToggleSubtaskStatus_CyclesStatusAndCompletedDate()
     {
         // Arrange
-        DateTime initialDate = new(2026, 8, 10);
-        var parentTask = new TaskItemBuilder()
-            .WithId(20)
-            .WithScheduledDate(initialDate, DateSource.Manual)
-            .Build();
-
-        var subtask = new TaskItemBuilder()
-            .WithId(21)
-            .WithParentTask(parentTask)
-            .Build();
-
-        // Assert initial live binding
-        subtask.ScheduledDate.Should().Be(initialDate);
-        subtask.DateSource.Should().Be(DateSource.Manual);
-
-        // Act - change parent date
-        DateTime updatedDate = new(2026, 8, 15);
-        parentTask.ScheduledDate = updatedDate;
-        parentTask.DateSource = DateSource.AutoFixed;
-
-        // Assert live update reflection
-        subtask.ScheduledDate.Should().Be(updatedDate);
-        subtask.DateSource.Should().Be(DateSource.AutoFixed);
-
-        // Act - attempt to change date via subtask
-        DateTime newDateViaSubtask = new(2026, 8, 20);
-        subtask.ScheduledDate = newDateViaSubtask;
-        subtask.DateSource = DateSource.Manual;
-
-        // Assert - Parent task must NOT be updated through subtask under any circumstances!
-        parentTask.ScheduledDate.Should().Be(updatedDate);
-        parentTask.DateSource.Should().Be(DateSource.AutoFixed);
-
-        // Subtask date must continue to live-bind to parent task date
-        subtask.ScheduledDate.Should().Be(updatedDate);
-        subtask.DateSource.Should().Be(DateSource.AutoFixed);
-    }
-
-    /// <summary>
-    /// Verifies that assigning date or date source to a subtask NEVER modifies the parent task or sibling subtasks.
-    /// </summary>
-    [Fact]
-    public void Subtask_DateOrSourceChange_NeverModifiesParentTaskOrSiblingSubtasks()
-    {
-        // Arrange
-        DateTime initialDate = new(2026, 8, 10);
-        var sub1 = new TaskItemBuilder().WithId(101).WithTitle("Subtask 1").Build();
-        var sub2 = new TaskItemBuilder().WithId(102).WithTitle("Subtask 2").Build();
-        var sub3 = new TaskItemBuilder().WithId(103).WithTitle("Subtask 3").Build();
-
-        var parentTask = new TaskItemBuilder()
-            .WithId(100)
-            .WithScheduledDate(initialDate, DateSource.AutoFixed)
-            .WithSubtask(sub1)
-            .WithSubtask(sub2)
-            .WithSubtask(sub3)
-            .Build();
-
-        // Initial state: all subtasks live-bind to parent
-        sub1.ScheduledDate.Should().Be(initialDate);
-        sub2.ScheduledDate.Should().Be(initialDate);
-        sub3.ScheduledDate.Should().Be(initialDate);
-
-        // Act - aggressively try to change date and date source via subtask 1
-        DateTime attemptDate = new(2026, 12, 31);
-        sub1.ScheduledDate = attemptDate;
-        sub1.DateSource = DateSource.Manual;
-
-        // Assert - parent task is COMPLETELY UNTOUCHED
-        parentTask.ScheduledDate.Should().Be(initialDate);
-        parentTask.DateSource.Should().Be(DateSource.AutoFixed);
-
-        // Assert - sibling subtasks are COMPLETELY UNTOUCHED
-        sub2.ScheduledDate.Should().Be(initialDate);
-        sub2.DateSource.Should().Be(DateSource.AutoFixed);
-        sub3.ScheduledDate.Should().Be(initialDate);
-        sub3.DateSource.Should().Be(DateSource.AutoFixed);
-
-        // Assert - subtask 1 continues to live-bind to parent date
-        sub1.ScheduledDate.Should().Be(initialDate);
-        sub1.DateSource.Should().Be(DateSource.AutoFixed);
-
-        // Act 2 - updating parent task date propagates down to all subtasks
-        DateTime newParentDate = new(2026, 8, 25);
-        parentTask.ScheduledDate = newParentDate;
-        parentTask.DateSource = DateSource.Manual;
-
-        sub1.ScheduledDate.Should().Be(newParentDate);
-        sub1.DateSource.Should().Be(DateSource.Manual);
-        sub2.ScheduledDate.Should().Be(newParentDate);
-        sub2.DateSource.Should().Be(DateSource.Manual);
-        sub3.ScheduledDate.Should().Be(newParentDate);
-        sub3.DateSource.Should().Be(DateSource.Manual);
-    }
-
-    /// <summary>
-    /// Verifies that updating a subtask directly in repository never mutates the parent task's schedule.
-    /// </summary>
-    [Fact]
-    public void Subtask_UpdateInRepository_NeverModifiesParentTask()
-    {
-        // Arrange
-        DateTime initialDate = new(2026, 9, 1);
-        var subtask = new TaskItemBuilder().WithId(501).Build();
-        var parent = new TaskItemBuilder()
-            .WithId(500)
-            .WithScheduledDate(initialDate, DateSource.Manual)
-            .WithSubtask(subtask)
-            .Build();
-
+        var subtask = new SubtaskItemBuilder().WithId(101).WithTitle("Subtask to Toggle").Build();
+        var parent = new TaskItemBuilder().WithId(100).WithSubtask(subtask).Build();
         TaskRepo.Add(parent);
 
-        // Act - attempt to change date on retrieved subtask and update via repo
-        var retrievedSubtask = TaskRepo.GetById(subtask.Id)!;
-        retrievedSubtask.ScheduledDate = new DateTime(2026, 9, 30);
-        retrievedSubtask.DateSource = DateSource.AutoFixed;
-        TaskRepo.Update(retrievedSubtask);
+        // Act 1 - toggle from Planned to Completed
+        TaskRepo.ToggleSubtaskStatus(subtask.Id);
 
-        // Assert - parent task in repository must NOT be modified
-        var refreshedParent = TaskRepo.GetById(parent.Id)!;
-        refreshedParent.ScheduledDate.Should().Be(initialDate);
-        refreshedParent.DateSource.Should().Be(DateSource.Manual);
+        // Assert 1
+        var retrievedParent1 = TaskRepo.GetById(parent.Id)!;
+        var retrievedSub1 = retrievedParent1.Subtasks.First(s => s.Id == subtask.Id);
+        retrievedSub1.Status.Should().Be(TaskStatus.Completed);
+        retrievedSub1.CompletedDate.Should().NotBeNull();
+        retrievedParent1.Status.Should().Be(TaskStatus.Planned, "completing a subtask does not complete the parent");
 
-        // Subtask still live-binds to parent's date
-        var refreshedSubtask = TaskRepo.GetById(subtask.Id)!;
-        refreshedSubtask.ScheduledDate.Should().Be(initialDate);
-        refreshedSubtask.DateSource.Should().Be(DateSource.Manual);
+        // Act 2 - toggle back from Completed to Planned
+        TaskRepo.ToggleSubtaskStatus(subtask.Id);
+
+        // Assert 2
+        var retrievedParent2 = TaskRepo.GetById(parent.Id)!;
+        var retrievedSub2 = retrievedParent2.Subtasks.First(s => s.Id == subtask.Id);
+        retrievedSub2.Status.Should().Be(TaskStatus.Planned);
+        retrievedSub2.CompletedDate.Should().BeNull();
     }
 
     /// <summary>
-    /// Verifies that subtask live date binding persists and functions correctly through repository operations.
+    /// Verifies CompleteSubtask and ReopenSubtask methods.
     /// </summary>
     [Fact]
-    public void SubtaskDate_LiveBindsInRepository()
+    public void CompleteSubtask_And_ReopenSubtask_WorkCorrectly()
     {
         // Arrange
-        DateTime initialDate = new(2026, 9, 1);
-        var subtask = new TaskItemBuilder()
-            .WithId(501)
-            .Build();
+        var subtask = new SubtaskItemBuilder().WithId(201).WithTitle("Subtask").Build();
+        var parent = new TaskItemBuilder().WithId(200).WithSubtask(subtask).Build();
+        TaskRepo.Add(parent);
 
+        // Act - complete
+        TaskRepo.CompleteSubtask(subtask.Id);
+        var subAfterComplete = TaskRepo.GetById(parent.Id)!.Subtasks.First(s => s.Id == subtask.Id);
+        subAfterComplete.Status.Should().Be(TaskStatus.Completed);
+        subAfterComplete.CompletedDate.Should().NotBeNull();
+
+        // Act - reopen
+        TaskRepo.ReopenSubtask(subtask.Id);
+        var subAfterReopen = TaskRepo.GetById(parent.Id)!.Subtasks.First(s => s.Id == subtask.Id);
+        subAfterReopen.Status.Should().Be(TaskStatus.Planned);
+        subAfterReopen.CompletedDate.Should().BeNull();
+    }
+
+    /// <summary>
+    /// Verifies that subtasks are stored in the Subtasks table, not the Tasks table.
+    /// </summary>
+    [Fact]
+    public void Subtasks_StoredInSeparateCollection()
+    {
+        // Arrange
+        var subtask = new SubtaskItemBuilder().WithId(501).WithTitle("My Subtask").Build();
         var parent = new TaskItemBuilder()
             .WithId(500)
-            .WithScheduledDate(initialDate, DateSource.Manual)
+            .WithScheduledDate(new DateTime(2026, 9, 1), DateSource.Manual)
             .WithSubtask(subtask)
             .Build();
 
         TaskRepo.Add(parent);
 
         // Act
-        DateTime updatedDate = new(2026, 9, 10);
-        TaskRepo.UpdateTaskSchedule(parent.Id, updatedDate, DateSource.AutoFixed);
-
         var retrievedParent = TaskRepo.GetById(parent.Id);
-        var retrievedSubtask = TaskRepo.GetById(subtask.Id);
 
         // Assert
         retrievedParent.Should().NotBeNull();
-        retrievedParent!.ScheduledDate.Should().Be(updatedDate);
+        retrievedParent!.Subtasks.Should().HaveCount(1);
+        retrievedParent.Subtasks.First().Title.Should().Be("My Subtask");
 
-        retrievedSubtask.Should().NotBeNull();
-        retrievedSubtask!.ScheduledDate.Should().Be(updatedDate);
-        retrievedSubtask.DateSource.Should().Be(DateSource.AutoFixed);
+        // Subtask should NOT appear in GetAll (it's not a TaskItem)
+        TaskRepo.GetAll().Should().ContainSingle();
     }
 
     /// <summary>
@@ -297,19 +201,15 @@ public class SubtasksEngineTests : IntegrationTestBase
     {
         // Arrange
         DateTime today = TodoDay.Today.ToDateTime();
-        var subtaskPlanned = new TaskItemBuilder()
+        var subtaskPlanned = new SubtaskItemBuilder()
             .WithId(601)
             .WithTitle("Planned Subtask")
             .Build();
 
-        var subtaskIrrelevant = new TaskItemBuilder()
-            .WithId(602)
-            .WithTitle("Irrelevant Subtask")
-            .Build();
-
-        var subtaskCompleted = new TaskItemBuilder()
+        var subtaskCompleted = new SubtaskItemBuilder()
             .WithId(603)
             .WithTitle("Completed Subtask")
+            .WithStatus(TaskStatus.Completed)
             .Build();
 
         var parent = new TaskItemBuilder()
@@ -318,15 +218,10 @@ public class SubtasksEngineTests : IntegrationTestBase
             .WithScheduledDate(today, DateSource.AutoFixed)
             .WithStatus(TaskStatus.Planned)
             .WithSubtask(subtaskPlanned)
-            .WithSubtask(subtaskIrrelevant)
             .WithSubtask(subtaskCompleted)
             .Build();
 
         TaskRepo.Add(parent);
-
-        // Explicitly set different statuses to subtasks
-        TaskRepo.MarkIrrelevant(subtaskIrrelevant.Id);
-        TaskRepo.CompleteTask(subtaskCompleted.Id);
 
         // Act - complete the parent task
         TaskRepo.CompleteTask(parent.Id);
@@ -336,18 +231,37 @@ public class SubtasksEngineTests : IntegrationTestBase
         retrievedParent.Should().NotBeNull();
         retrievedParent!.Status.Should().Be(TaskStatus.Completed);
 
-        // Assert - subtasks retain their exact original statuses
-        var retrievedPlanned = TaskRepo.GetById(subtaskPlanned.Id);
-        var retrievedIrrelevant = TaskRepo.GetById(subtaskIrrelevant.Id);
-        var retrievedCompleted = TaskRepo.GetById(subtaskCompleted.Id);
+        // Assert - subtasks retain their original statuses
+        retrievedParent.Subtasks.Should().HaveCount(2);
+        retrievedParent.Subtasks.First(s => s.Id == 601).Status.Should().Be(TaskStatus.Planned);
+    }
 
-        retrievedPlanned.Should().NotBeNull();
-        retrievedPlanned!.Status.Should().Be(TaskStatus.Planned);
+    /// <summary>
+    /// Verifies subtask SortOrder is preserved through repository operations.
+    /// </summary>
+    [Fact]
+    public void SubtaskSortOrder_PreservedThroughRepository()
+    {
+        // Arrange
+        var sub1 = new SubtaskItemBuilder().WithId(701).WithTitle("First").WithSortOrder(0).Build();
+        var sub2 = new SubtaskItemBuilder().WithId(702).WithTitle("Second").WithSortOrder(1).Build();
+        var sub3 = new SubtaskItemBuilder().WithId(703).WithTitle("Third").WithSortOrder(2).Build();
 
-        retrievedIrrelevant.Should().NotBeNull();
-        retrievedIrrelevant!.Status.Should().Be(TaskStatus.Irrelevant);
+        var parent = new TaskItemBuilder()
+            .WithId(700)
+            .WithSubtask(sub1)
+            .WithSubtask(sub2)
+            .WithSubtask(sub3)
+            .Build();
 
-        retrievedCompleted.Should().NotBeNull();
-        retrievedCompleted!.Status.Should().Be(TaskStatus.Completed);
+        TaskRepo.Add(parent);
+
+        // Act
+        var retrieved = TaskRepo.GetById(parent.Id);
+
+        // Assert
+        retrieved.Should().NotBeNull();
+        retrieved!.Subtasks.OrderBy(s => s.SortOrder).Select(s => s.Title)
+            .Should().BeEquivalentTo(["First", "Second", "Third"], o => o.WithStrictOrdering());
     }
 }

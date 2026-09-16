@@ -254,7 +254,7 @@ public class RecurringTasksEngineTests : IntegrationTestBase
     {
         // Arrange
         var today = TodoDay.Today.ToDateTime();
-        var subtask1 = new TaskItemBuilder()
+        var subtask1 = new SubtaskItemBuilder()
             .WithId(701)
             .WithTitle("Subtask 1")
             .WithDescription("Subtask 1 description")
@@ -264,7 +264,7 @@ public class RecurringTasksEngineTests : IntegrationTestBase
             .WithFavorite(true)
             .Build();
 
-        var subtask2 = new TaskItemBuilder()
+        var subtask2 = new SubtaskItemBuilder()
             .WithId(702)
             .WithTitle("Subtask 2")
             .WithDescription("Subtask 2 description")
@@ -285,22 +285,15 @@ public class RecurringTasksEngineTests : IntegrationTestBase
             .Build();
 
         TaskRepo.Add(recurringParent);
-        TaskRepo.CompleteTask(subtask1.Id);
-        TaskRepo.MarkIrrelevant(subtask2.Id);
         Context.ChangeTracker.Clear();
 
         // Act - Complete the recurring parent task
         TaskRepo.CompleteTask(recurringParent.Id);
 
-        // Assert - Original task is completed and original subtasks retain their status
+        // Assert - Original task is completed
         var completedOriginal = TaskRepo.GetById(recurringParent.Id);
         completedOriginal.Should().NotBeNull();
         completedOriginal!.Status.Should().Be(TaskStatus.Completed);
-
-        var originalSub1 = TaskRepo.GetById(subtask1.Id);
-        var originalSub2 = TaskRepo.GetById(subtask2.Id);
-        originalSub1!.Status.Should().Be(TaskStatus.Completed);
-        originalSub2!.Status.Should().Be(TaskStatus.Irrelevant);
 
         // Assert - New copy created for tomorrow
         var allTasks = TaskRepo.GetAll();
@@ -314,25 +307,23 @@ public class RecurringTasksEngineTests : IntegrationTestBase
 
         var newSub1 = newCopy.Subtasks.FirstOrDefault(s => s.Title == "Subtask 1");
         newSub1.Should().NotBeNull();
-        newSub1!.Status.Should().Be(TaskStatus.Planned, "Recurring subtask in new copy must reset to Planned even if completed previously");
+        newSub1!.Status.Should().Be(TaskStatus.Planned, "Recurring subtask in new copy must reset to Planned");
         newSub1.Description.Should().Be("Subtask 1 description");
         newSub1.EstimatedMinutes.Should().Be(45);
         newSub1.Complexity.Should().Be(15);
         newSub1.Interest.Should().Be(8);
         newSub1.IsFavorite.Should().BeTrue();
         newSub1.ParentTaskId.Should().Be(newCopy.Id);
-        newSub1.ScheduledDate.Should().Be(newCopy.ScheduledDate, "Subtask date must live-bind to new recurrence copy's date");
 
         var newSub2 = newCopy.Subtasks.FirstOrDefault(s => s.Title == "Subtask 2");
         newSub2.Should().NotBeNull();
-        newSub2!.Status.Should().Be(TaskStatus.Planned, "Recurring subtask in new copy must reset to Planned even if marked irrelevant previously");
+        newSub2!.Status.Should().Be(TaskStatus.Planned, "Recurring subtask in new copy must reset to Planned");
         newSub2.Description.Should().Be("Subtask 2 description");
         newSub2.EstimatedMinutes.Should().Be(20);
         newSub2.Complexity.Should().Be(5);
         newSub2.Interest.Should().Be(6);
         newSub2.HideUnderSpoiler.Should().BeTrue();
         newSub2.ParentTaskId.Should().Be(newCopy.Id);
-        newSub2.ScheduledDate.Should().Be(newCopy.ScheduledDate, "Subtask date must live-bind to new recurrence copy's date");
     }
     
     /// <summary>

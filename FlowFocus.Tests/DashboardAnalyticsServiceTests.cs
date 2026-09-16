@@ -348,13 +348,7 @@ public class DashboardAnalyticsServiceTests
                 Subtasks =
                 [
                     new() { Id = 2, Title = "Subtask 1", ParentTaskId = 1 },
-                    new()
-                    {
-                        Id = 3,
-                        Title = "Subtask 2",
-                        ParentTaskId = 1,
-                        Subtasks = [new() { Id = 4, Title = "Nested Subtask 2.1", ParentTaskId = 3 }]
-                    }
+                    new() { Id = 3, Title = "Subtask 2", ParentTaskId = 1 }
                 ]
             }
         ];
@@ -362,7 +356,7 @@ public class DashboardAnalyticsServiceTests
         var metrics = _service.CalculateMetrics(tasks, new());
 
         metrics.TotalTasksCount.Should().Be(1);
-        metrics.TotalSubtasksCount.Should().Be(3);
+        metrics.TotalSubtasksCount.Should().Be(2);
     }
 
     #endregion

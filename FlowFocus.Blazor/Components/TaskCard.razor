@@ -15,10 +15,9 @@
                             OnTaskCompleted="OnTaskCompleted"
                             OnToggleFavorite="ToggleFavorite" />
 
-            @if (!Task.IsSubtask)
-            {
-                <TaskDateRow Task="Task" Today="@TodoDay.Today" />
-            }
+
+            <TaskDateRow Task="Task" Today="@TodoDay.Today" />
+
 
             <TaskDescription Task="Task"
                              DisplayMode="DisplayMode"

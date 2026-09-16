@@ -20,7 +20,6 @@ public static class TaskDateNormalizer
         // 1. Нормализация неназначенных дат: если ScheduledDate == null и DateSource не AutoFlexible (только для активных задач)
         var tasksToNormalize = context.Tasks
             .WhereActive()
-            .Where(t => t.ParentTaskId == null)
             .Where(t => t.ScheduledDate == null && (t.DateSource == DateSource.Manual || t.DateSource == DateSource.AutoFixed))
             .ToList();
 
@@ -40,7 +39,6 @@ public static class TaskDateNormalizer
         // Просроченная задача с DateSource.Manual переводится в AutoFlexible для перераспределения.
         var overdueManualTasks = context.Tasks
             .WhereActive()
-            .Where(t => t.ParentTaskId == null)
             .Where(t => t.DateSource == DateSource.Manual)
             .ToList()
             .Where(t => today.IsOverdue(t.ScheduledDate))
@@ -60,7 +58,6 @@ public static class TaskDateNormalizer
         var blockedRecurringTasks = context.Tasks
             .WhereActive()
             .Include(t => t.Conditions).ThenInclude(tc => tc.Condition)
-            .Where(t => t.ParentTaskId == null)
             .Where(t => t.IsRecurring || t.RecurrenceSourceId != null)
             .Where(t => t.DateSource != DateSource.Manual)
             .Where(t => t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))
@@ -90,7 +87,6 @@ public static class TaskDateNormalizer
         var activeRecurringTasks = context.Tasks
             .WhereActive()
             .Include(t => t.Conditions).ThenInclude(tc => tc.Condition)
-            .Where(t => t.ParentTaskId == null)
             .Where(t => t.IsRecurring || t.RecurrenceSourceId != null)
             .Where(t => t.DateSource != DateSource.Manual)
             .Where(t => !t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))

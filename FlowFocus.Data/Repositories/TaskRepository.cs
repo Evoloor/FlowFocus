@@ -67,21 +67,11 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
                                     .Include(t => t.Tags)
                                     .Include(t => t.Conditions).ThenInclude(tc => tc.Condition)
                                     .Include(t => t.Subtasks)
-                                    .Include(t => t.ParentTask)
                                     .Include(t => t.Relations)
                                     .Include(t => t.InverseRelations)
                                     .Include(t => t.PriorityEscalations)
                                     .FirstOrDefault(e => e.Id == entity.Id)
                                 ?? throw new InvalidOperationException($"Entity with ID {entity.Id} not found");
-
-            if (trackedEntity.ParentTaskId != null)
-            {
-                var parent = GetById(trackedEntity.ParentTaskId.Value);
-                if (parent != null)
-                {
-                    TaskHierarchyValidator.ValidateSubtaskParent(parent, entity);
-                }
-            }
 
             Context.Entry(trackedEntity).CurrentValues.SetValues(entity);
 
@@ -157,46 +147,19 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
             .Include(t => t.Relations).ThenInclude(r => r.TargetTask)
             .Include(t => t.InverseRelations).ThenInclude(r => r.SourceTask)
             .Include(t => t.Subtasks)
-            .Include(t => t.ParentTask)
             .Include(t => t.PriorityEscalations).ThenInclude(pe => pe.TargetPriority);
 
-    public override List<TaskItem> GetAll()
-    {
-        var list = base.GetAll();
-        var dict = list.ToDictionary(t => t.Id);
-        foreach (var item in list)
-        {
-            if (item.ParentTaskId.HasValue && item.ParentTask == null && dict.TryGetValue(item.ParentTaskId.Value, out var parent))
-            {
-                item.ParentTask = parent;
-                if (!parent.Subtasks.Any(s => s.Id == item.Id))
-                {
-                    parent.Subtasks.Add(item);
-                }
-            }
-            if (item.Subtasks != null)
-            {
-                foreach (var sub in item.Subtasks)
-                {
-                    sub.ParentTask = item;
-                    sub.ParentTaskId = item.Id;
-                }
-            }
-        }
-        return list;
-    }
-
-    private IEnumerable<TaskItem> GetActiveRootTasks() => GetAll().FilterActiveRootTasks();
+    private IEnumerable<TaskItem> GetActiveTasks() => GetAll().FilterActiveTasks();
 
     public List<TaskItem> GetTasksForDate(DateTime date) =>
-        GetActiveRootTasks()
+        GetActiveTasks()
             .Where(t => t.ScheduledDate != null && t.ScheduledDate.Value.Date == date.Date)
             .ToList();
 
     public List<TaskItem> GetTodayTasks()
     {
         var today = TodoDay.Today;
-        return GetActiveRootTasks()
+        return GetActiveTasks()
             .Where(t => t.ScheduledDate != null && today.IsSameDay(t.ScheduledDate))
             .ToList();
     }
@@ -204,15 +167,15 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
     public List<TaskItem> GetTomorrowTasks() => GetTasksForDate(TodoDay.Today.Tomorrow.ToDateTime());
 
     public List<TaskItem> GetNotConfiguredTasks() =>
-        GetAll().Where(t => t.ParentTaskId == null && t.Status == TaskStatus.NotConfigured).ToList();
+        GetAll().Where(t => t.Status == TaskStatus.NotConfigured).ToList();
 
     public int GetNotConfiguredCount() =>
-        GetAll().Count(t => t.ParentTaskId == null && t.Status == TaskStatus.NotConfigured);
+        GetAll().Count(t => t.Status == TaskStatus.NotConfigured);
 
     public List<TaskItem> GetOverdueTasks()
     {
         var today = TodoDay.Today;
-        return GetActiveRootTasks()
+        return GetActiveTasks()
             .Where(t => t.ScheduledDate != null && today.IsOverdue(t.ScheduledDate))
             .Where(t => !t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))
             .ToList();
@@ -228,7 +191,7 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
             .ToList();
 
     public List<TaskItem> GetTasksForAutocomplete() =>
-        GetActiveRootTasks()
+        GetActiveTasks()
             .OrderBy(t => t.Title)
             .ToList();
 
@@ -299,6 +262,60 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
             t.Status = TaskStatus.Planned;
             t.CompletedDate = null;
         });
+
+    public void ToggleSubtaskStatus(int subtaskId)
+    {
+        lock (CacheLock)
+        {
+            var subtask = Context.Subtasks.Find(subtaskId);
+            if (subtask == null) return;
+
+            if (subtask.Status == TaskStatus.Completed)
+            {
+                subtask.Status = TaskStatus.Planned;
+                subtask.CompletedDate = null;
+            }
+            else
+            {
+                subtask.Status = TaskStatus.Completed;
+                subtask.CompletedDate = DateTime.UtcNow;
+            }
+
+            subtask.LastChangesOn = DateTime.UtcNow;
+            Context.SaveChanges();
+            MarkDirty();
+        }
+    }
+
+    public void CompleteSubtask(int subtaskId)
+    {
+        lock (CacheLock)
+        {
+            var subtask = Context.Subtasks.Find(subtaskId);
+            if (subtask == null) return;
+
+            subtask.Status = TaskStatus.Completed;
+            subtask.CompletedDate = DateTime.UtcNow;
+            subtask.LastChangesOn = DateTime.UtcNow;
+            Context.SaveChanges();
+            MarkDirty();
+        }
+    }
+
+    public void ReopenSubtask(int subtaskId)
+    {
+        lock (CacheLock)
+        {
+            var subtask = Context.Subtasks.Find(subtaskId);
+            if (subtask == null) return;
+
+            subtask.Status = TaskStatus.Planned;
+            subtask.CompletedDate = null;
+            subtask.LastChangesOn = DateTime.UtcNow;
+            Context.SaveChanges();
+            MarkDirty();
+        }
+    }
 
     public void DeleteRelation(int relationId)
     {

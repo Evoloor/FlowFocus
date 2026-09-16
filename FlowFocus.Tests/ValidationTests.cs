@@ -136,27 +136,19 @@ public class ValidationTests : IntegrationTestBase
         result.Should().Be(expected);
     }
 
+    /// <summary>
+    /// SubtaskItem enforces field restrictions at compile time — it doesn't have
+    /// IsRecurring, ScheduledDate, DateSource, PriorityId etc.
+    /// This test verifies SubtaskItem is a distinct type from TaskItem.
+    /// </summary>
     [Fact]
-    public void UpdateSubtask_WithForbiddenFields_IgnoresChangesOrThrows()
+    public void SubtaskItem_IsNotAssignableToTaskItem()
     {
         // Arrange
-        var parentTask = new TaskItemBuilder().WithId(7000).WithScheduledDate(new DateTime(2026, 1, 1)).Build();
-        var subtask = new TaskItemBuilder().WithId(7001).WithParentTask(parentTask).Build();
+        var subtask = new SubtaskItemBuilder().WithId(7001).WithTitle("Test Subtask").Build();
 
-        TaskRepo.Add(parentTask);
-        TaskRepo.Add(subtask);
-        Context.ChangeTracker.Clear();
-
-        // Act
-        var updatedSubtask = TaskRepo.GetById(7001);
-        updatedSubtask!.IsRecurring = true;
-        updatedSubtask.RecurrenceType = RecurrenceType.EveryN;
-        updatedSubtask.ScheduledDate = new DateTime(2027, 1, 1);
-
-        var act = () => TaskRepo.Update(updatedSubtask);
-
-        // Assert
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*подзадачи не поддерживают независимые даты или повторения*");
+        // Assert — type safety: SubtaskItem is not a TaskItem
+        subtask.Should().BeOfType<SubtaskItem>();
+        subtask.Should().NotBeAssignableTo<TaskItem>();
     }
 }

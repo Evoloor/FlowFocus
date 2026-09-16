@@ -18,6 +18,14 @@
                                   Immediate="true" />
                 </MudItem>
 
+                @* Описание *@
+                <MudItem xs="12">
+                    <MudTextField T="string?" @bind-Value="_subtask.Description"
+                                  Label="Описание"
+                                  Lines="2"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+
                 @* Скрывать под спойлер *@
                 <MudItem xs="12" sm="6">
                     <MudCheckBox T="bool" @bind-Value="_subtask.HideUnderSpoiler"
@@ -105,11 +113,14 @@
             {
                 Id = ExistingSubtask.Id,
                 Title = ExistingSubtask.Title,
+                Description = ExistingSubtask.Description,
                 HideUnderSpoiler = ExistingSubtask.HideUnderSpoiler,
                 IsFavorite = ExistingSubtask.IsFavorite,
                 Interest = ExistingSubtask.Interest,
                 Complexity = ExistingSubtask.Complexity,
-                EstimatedMinutes = ExistingSubtask.EstimatedMinutes
+                EstimatedMinutes = ExistingSubtask.EstimatedMinutes,
+                Status = ExistingSubtask.Status,
+                CompletedDate = ExistingSubtask.CompletedDate
             };
         }
         else

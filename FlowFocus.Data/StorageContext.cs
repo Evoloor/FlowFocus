@@ -6,6 +6,7 @@ namespace FlowFocus.Data;
 public class StorageContext : DbContext
 {
     public DbSet<TaskItem> Tasks { get; set; } = null!;
+    public DbSet<SubtaskItem> Subtasks { get; set; } = null!;
     public DbSet<PriorityLevel> Priorities { get; set; } = null!;
     public DbSet<Tag> Tags { get; set; } = null!;
     public DbSet<TaskTag> TaskTags { get; set; } = null!;
@@ -60,6 +61,17 @@ public class StorageContext : DbContext
                 }
             }
         }
+
+        foreach (var entry in ChangeTracker.Entries<SubtaskItem>())
+        {
+            if (entry.State is EntityState.Added or EntityState.Modified)
+            {
+                if (entry.Entity.Status != Core.Enums.TaskStatus.Completed)
+                {
+                    entry.Entity.CompletedDate = null;
+                }
+            }
+        }
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -74,15 +86,15 @@ public class StorageContext : DbContext
             entity.Property(e => e.RecurrenceUnit)
                 .HasDefaultValue(Core.Enums.RecurrenceUnit.Days);
 
-            entity.HasOne(e => e.ParentTask)
-                .WithMany(e => e.Subtasks)
-                .HasForeignKey(e => e.ParentTaskId)
-                .OnDelete(DeleteBehavior.Cascade);
-
             entity.HasOne(e => e.Priority)
                 .WithMany()
                 .HasForeignKey(e => e.PriorityId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasMany(e => e.Subtasks)
+                .WithOne(e => e.ParentTask)
+                .HasForeignKey(e => e.ParentTaskId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasMany(e => e.Tags)
                 .WithOne(e => e.Task)
@@ -108,6 +120,12 @@ public class StorageContext : DbContext
                 .WithOne(e => e.Task)
                 .HasForeignKey(e => e.TaskId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // SubtaskItem
+        modelBuilder.Entity<SubtaskItem>(entity =>
+        {
+            entity.HasKey(e => e.Id);
         });
 
         // TaskRelation

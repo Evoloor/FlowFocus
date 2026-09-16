@@ -42,20 +42,37 @@ public class GraphAndCycleTests
     }
 
     /// <summary>
-    /// Verifies that making a parent task a subtask of its own subtask throws a validation exception.
+    /// Verifies that validating a subtask with mismatched ParentTaskId throws a validation exception.
     /// </summary>
     [Fact]
-    public void MakeParentTaskSubtaskOfItsOwnSubtask_ThrowsValidationError()
+    public void Subtask_MismatchedParentTaskId_ThrowsValidationError()
     {
         // Arrange
-        var taskB = new TaskItemBuilder().WithId(20).WithTitle("Child B").Build();
-        var taskA = new TaskItemBuilder().WithId(10).WithTitle("Parent A").WithSubtask(taskB).Build();
+        var taskA = new TaskItemBuilder().WithId(10).WithTitle("Task A").Build();
+        var subtask = new SubtaskItemBuilder().WithId(5).WithTitle("Other Parent Subtask").WithParentTaskId(20).Build();
 
         // Act
-        var act = () => TaskHierarchyValidator.ValidateSubtaskParent(parentTask: taskB, childTask: taskA);
+        var act = () => TaskHierarchyValidator.ValidateSubtaskParent(taskA, subtask);
 
         // Assert
         act.Should().Throw<InvalidOperationException>()
-           .WithMessage(expectedWildcardPattern: "*Запрещена циклическая вложенность*");
+           .WithMessage(expectedWildcardPattern: "*привязана к другой родительской задаче*");
+    }
+
+    /// <summary>
+    /// Verifies that a task and subtask can share the same numeric ID without conflict.
+    /// </summary>
+    [Fact]
+    public void Subtask_WithSameNumericIdAsParent_DoesNotThrow()
+    {
+        // Arrange
+        var taskA = new TaskItemBuilder().WithId(10).WithTitle("Task A").Build();
+        var subtask = new SubtaskItemBuilder().WithId(10).WithTitle("Same ID Subtask").WithParentTaskId(10).Build();
+
+        // Act
+        var act = () => TaskHierarchyValidator.ValidateSubtaskParent(taskA, subtask);
+
+        // Assert
+        act.Should().NotThrow();
     }
 }

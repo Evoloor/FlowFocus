@@ -182,7 +182,6 @@ public class PlanningEngineTests : IntegrationTestBase
         foreach (var sub in subtasks)
         {
             sub.EstimatedMinutes = 60;
-            sub.DateSource = DateSource.AutoFlexible;
             sub.Status = TaskStatus.Planned;
         }
 

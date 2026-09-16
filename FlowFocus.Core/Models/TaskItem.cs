@@ -6,30 +6,11 @@ using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 namespace FlowFocus.Core.Models;
 
 /// <summary>
-/// Основная модель задачи
+/// Основная модель задачи (верхнеуровневый рабочий элемент).
+/// Не может быть подзадачей — для этого используется <see cref="SubtaskItem"/>.
 /// </summary>
-public class TaskItem : IAuditEntity
+public class TaskItem : WorkItemBase
 {
-    public int Id { get; set; }
-    public DateTime LastChangesOn { get; set; }
-
-    // === Основные поля ===
-    [Required(ErrorMessage = "Название обязательно")]
-    [StringLength(500, ErrorMessage = "Название не должно превышать 500 символов")]
-    public string Title { get; set; } = string.Empty;
-
-    [StringLength(5000)]
-    public string? Description { get; set; }
-
-    /// <summary>Скрывать название/описание под спойлер</summary>
-    public bool HideUnderSpoiler { get; set; }
-
-    /// <summary>Статус задачи</summary>
-    public TaskStatus Status { get; set; } = TaskStatus.NotConfigured;
-
-    /// <summary>Избранная задача</summary>
-    public bool IsFavorite { get; set; }
-
     // === Приоритет ===
     /// <summary>ID приоритета, установленного пользователем (null = не установлен)</summary>
     public int? PriorityId { get; set; }
@@ -38,57 +19,12 @@ public class TaskItem : IAuditEntity
     [ForeignKey(nameof(PriorityId))]
     public PriorityLevel? Priority { get; init; }
 
-    // === Оценки ===
-    /// <summary>Интересность задачи (1-10)</summary>
-    [Range(1, 10)]
-    public int? Interest { get; set; }
-
-    /// <summary>Сложность задачи (1-100)</summary>
-    [Range(1, 100)]
-    public int? Complexity { get; set; }
-
-    /// <summary>Время выполнения в минутах</summary>
-    [Range(1, 10000)]
-    public int? EstimatedMinutes { get; set; }
-
     // === Даты ===
-    private DateTime? _scheduledDate;
+    /// <summary>Дата планирования задачи</summary>
+    public DateTime? ScheduledDate { get; set; }
 
-    /// <summary>
-    /// Единственная дата планирования задачи.
-    /// Для подзадачи ссылается (лайв-биндится) на дату родительской задачи.
-    /// </summary>
-    /// <remarks>
-    /// Для подзадачи чтение всегда возвращает актуальную дату родителя (<see cref="ParentTask"/>).
-    /// Присвоение даты подзадаче ни при каких обстоятельствах не изменяет родительскую задачу.
-    /// </remarks>
-    public DateTime? ScheduledDate
-    {
-        get => ParentTask != null ? ParentTask.ScheduledDate : _scheduledDate;
-        set => _scheduledDate = value;
-    }
-
-    private DateSource _dateSource = DateSource.AutoFlexible;
-
-    /// <summary>
-    /// Определяет, кем и как была назначена дата <see cref="ScheduledDate"/>.
-    /// Для подзадачи ссылается (лайв-биндится) на источник даты родительской задачи.
-    /// </summary>
-    /// <remarks>
-    /// Для подзадачи чтение всегда возвращает актуальный источник даты родителя (<see cref="ParentTask"/>).
-    /// Присвоение источника даты подзадаче ни при каких обстоятельствах не изменяет родительскую задачу.
-    /// </remarks>
-    public DateSource DateSource
-    {
-        get => ParentTask != null ? ParentTask.DateSource : _dateSource;
-        set => _dateSource = value;
-    }
-
-    /// <summary>Дата завершения задачи</summary>
-    public DateTime? CompletedDate { get; set; }
-
-    /// <summary>Дата создания задачи</summary>
-    public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
+    /// <summary>Определяет, кем и как была назначена дата <see cref="ScheduledDate"/>.</summary>
+    public DateSource DateSource { get; set; } = DateSource.AutoFlexible;
 
     // === Повторение ===
     /// <summary>Включено ли повторение</summary>
@@ -150,44 +86,8 @@ public class TaskItem : IAuditEntity
     public int? RecurrenceSourceId { get; init; }
 
     // === Связи ===
-    private TaskItem? _parentTask;
-
-    /// <summary>ID родительской задачи (если это подзадача)</summary>
-    public int? ParentTaskId { get; set; }
-
-    [ForeignKey(nameof(ParentTaskId))]
-    public TaskItem? ParentTask
-    {
-        get => _parentTask;
-        set
-        {
-            _parentTask = value;
-            if (value != null && value.Id != 0)
-            {
-                ParentTaskId = value.Id;
-            }
-        }
-    }
-
-    private List<TaskItem> _subtasks = [];
-
     /// <summary>Подзадачи</summary>
-    public List<TaskItem> Subtasks
-    {
-        get => _subtasks;
-        set
-        {
-            _subtasks = value ?? [];
-            foreach (var subtask in _subtasks)
-            {
-                subtask.ParentTask = this;
-                if (Id != 0 && subtask.ParentTaskId == null)
-                {
-                    subtask.ParentTaskId = Id;
-                }
-            }
-        }
-    }
+    public List<SubtaskItem> Subtasks { get; set; } = [];
 
     /// <summary>Теги задачи</summary>
     public List<TaskTag> Tags { get; set; } = [];
@@ -205,18 +105,6 @@ public class TaskItem : IAuditEntity
     public List<PriorityEscalation> PriorityEscalations { get; set; } = [];
 
     // === Вычисляемые свойства ===
-    /// <summary>Признак неактивной задачи (Completed, Irrelevant, NotConfigured). Условно readonly для автоматики.</summary>
-    [NotMapped]
-    public bool IsInactive => Status.IsInactive();
-
-    /// <summary>Признак активной задачи (Planned, Blocked).</summary>
-    [NotMapped]
-    public bool IsActive => Status.IsActive();
-
-    /// <summary>Условный readonly для всех автоматических фоновых алгоритмов.</summary>
-    [NotMapped]
-    public bool IsReadOnlyForAutomation => IsInactive;
-
     [NotMapped]
     public bool IsBlocked =>
         // Учёт через обратные связи (блокеры) или неактивные внешние условия
@@ -224,22 +112,6 @@ public class TaskItem : IAuditEntity
                                    r.SourceTask?.Status != TaskStatus.Completed &&
                                    r.SourceTask?.Status != TaskStatus.Irrelevant)
         || Conditions.Any(c => c.Condition != null && !c.Condition.IsActive);
-
-    [NotMapped]
-    public bool IsSubtask => ParentTaskId != null;
-
-    [NotMapped]
-    public string FormattedDuration
-    {
-        get
-        {
-            if (EstimatedMinutes == null) return string.Empty;
-            if (EstimatedMinutes < 60) return $"{EstimatedMinutes} мин";
-            var hours = EstimatedMinutes.Value / 60;
-            var minutes = EstimatedMinutes.Value % 60;
-            return minutes > 0 ? $"{hours} ч {minutes} мин" : $"{hours} ч";
-        }
-    }
 
     /// <summary>
     /// Суммарное время (включая подзадачи)
@@ -254,10 +126,13 @@ public class TaskItem : IAuditEntity
     public int TotalComplexity => (Complexity ?? 0) + Subtasks.Sum(s => s.Complexity ?? 0);
 
     /// <summary>
-    /// Конструктор копирования
+    /// Конструктор по умолчанию
     /// </summary>
     public TaskItem() { }
 
+    /// <summary>
+    /// Конструктор копирования
+    /// </summary>
     public TaskItem(TaskItem source)
     {
         Id = source.Id;
@@ -271,8 +146,6 @@ public class TaskItem : IAuditEntity
         Interest = source.Interest;
         Complexity = source.Complexity;
         EstimatedMinutes = source.EstimatedMinutes;
-        ParentTaskId = source.ParentTaskId;
-        ParentTask = source.ParentTask;
         ScheduledDate = source.ScheduledDate;
         DateSource = source.DateSource;
         CompletedDate = source.CompletedDate;

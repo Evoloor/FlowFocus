@@ -1,4 +1,3 @@
-using FlowFocus.Core.Enums;
 using FlowFocus.Core.Models;
 
 namespace FlowFocus.Core.Validation;
@@ -9,59 +8,16 @@ namespace FlowFocus.Core.Validation;
 public static class TaskHierarchyValidator
 {
     /// <summary>
-    /// Проверка допустимости присвоения parentTaskId для задачи childTask
+    /// Проверка допустимости подзадачи для родительской задачи
     /// </summary>
-    public static void ValidateSubtaskParent(TaskItem parentTask, TaskItem childTask)
+    public static void ValidateSubtaskParent(TaskItem parentTask, SubtaskItem subtask)
     {
         ArgumentNullException.ThrowIfNull(parentTask);
-        ArgumentNullException.ThrowIfNull(childTask);
+        ArgumentNullException.ThrowIfNull(subtask);
 
-        if (parentTask.Id != 0 && parentTask.Id == childTask.Id)
+        if (subtask.ParentTaskId != 0 && parentTask.Id != 0 && subtask.ParentTaskId != parentTask.Id)
         {
-            throw new InvalidOperationException("Задача не может являться подзадачей самой себя.");
+            throw new InvalidOperationException("Подзадача привязана к другой родительской задаче.");
         }
-
-        // Проверка: если parentTask уже является подзадачей (прямой или косвенной) для childTask
-        if (IsDescendant(childTask, parentTask))
-        {
-            throw new InvalidOperationException("Запрещена циклическая вложенность подзадач друг в друга.");
-        }
-
-        // Проверка: цепочка навигации вверх через ParentTask
-        var currentParent = parentTask;
-        while (currentParent != null)
-        {
-            if (childTask.Id != 0 && currentParent.Id == childTask.Id)
-            {
-                throw new InvalidOperationException("Запрещена циклическая вложенность подзадач друг в друга.");
-            }
-
-            currentParent = currentParent.ParentTask;
-        }
-
-        // Проверка: приоритет подзадачи не может быть выше приоритета родительской задачи
-        if (parentTask.Priority != null && childTask.Priority != null)
-        {
-            if (childTask.Priority.Order < parentTask.Priority.Order)
-            {
-                throw new InvalidOperationException("Подзадача: приоритет не может быть выше приоритета родительской задачи.");
-            }
-        }
-
-        if (childTask.IsRecurring || childTask.RecurrenceType != RecurrenceType.None)
-        {
-            throw new InvalidOperationException("подзадачи не поддерживают независимые даты или повторения");
-        }
-    }
-
-    private static bool IsDescendant(TaskItem root, TaskItem target)
-    {
-        if (root.Subtasks.Count == 0) return false;
-        foreach (var sub in root.Subtasks)
-        {
-            if (sub.Id != 0 && target.Id != 0 && sub.Id == target.Id) return true;
-            if (IsDescendant(sub, target)) return true;
-        }
-        return false;
     }
 }

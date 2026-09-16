@@ -57,7 +57,7 @@ public class TaskRecurrenceService : ITaskRecurrenceService
             var exists = existsPredicate(sourceId, start, end);
             if (exists) return;
 
-            var newTask = CloneTaskItem(sourceTask, isParent: true, scheduledDate: nextDate, dateSource: DateSource.AutoFixed, recurrenceSourceId: sourceId);
+            var newTask = CloneTaskItem(sourceTask, scheduledDate: nextDate, dateSource: DateSource.AutoFixed, recurrenceSourceId: sourceId);
             onNewTaskCreated(newTask);
         }
         catch (Exception ex)
@@ -67,9 +67,8 @@ public class TaskRecurrenceService : ITaskRecurrenceService
         }
     }
 
-    private TaskItem CloneTaskItem(
-        TaskItem source, 
-        bool isParent, 
+    private static TaskItem CloneTaskItem(
+        TaskItem source,
         DateTime? scheduledDate = null, 
         DateSource? dateSource = null, 
         int? recurrenceSourceId = null)
@@ -85,30 +84,37 @@ public class TaskRecurrenceService : ITaskRecurrenceService
             EstimatedMinutes = source.EstimatedMinutes,
             IsFavorite = source.IsFavorite,
             HideUnderSpoiler = source.HideUnderSpoiler,
-            ScheduledDate = isParent ? (scheduledDate ?? source.ScheduledDate) : null,
-            DateSource = isParent ? (dateSource ?? source.DateSource) : DateSource.AutoFlexible,
-            IsRecurring = isParent && source.IsRecurring,
-            RecurrenceType = isParent ? source.RecurrenceType : RecurrenceType.None,
-            RecurrenceUnit = isParent ? source.RecurrenceUnit : RecurrenceUnit.Days,
-            RecurrenceInterval = isParent ? source.RecurrenceInterval : null,
-            RecurrenceWeekDays = isParent ? source.RecurrenceWeekDays : null,
-            RecurrenceSourceId = isParent ? (recurrenceSourceId ?? source.RecurrenceSourceId) : null,
-            ParentTaskId = null,
+            ScheduledDate = scheduledDate ?? source.ScheduledDate,
+            DateSource = dateSource ?? source.DateSource,
+            IsRecurring = source.IsRecurring,
+            RecurrenceType = source.RecurrenceType,
+            RecurrenceUnit = source.RecurrenceUnit,
+            RecurrenceInterval = source.RecurrenceInterval,
+            RecurrenceWeekDays = source.RecurrenceWeekDays,
+            RecurrenceSourceId = recurrenceSourceId ?? source.RecurrenceSourceId,
             CreatedDate = DateTime.UtcNow,
             Tags = source.Tags?.Select(t => new TaskTag { TagId = t.TagId }).ToList() ?? [],
-            Conditions = isParent ? (source.Conditions?.Select(c => new TaskCondition { ConditionId = c.ConditionId }).ToList() ?? []) : [],
+            Conditions = source.Conditions?.Select(c => new TaskCondition { ConditionId = c.ConditionId }).ToList() ?? [],
             PriorityEscalations = source.PriorityEscalations?
                 .Select(e => new PriorityEscalation { TargetPriorityId = e.TargetPriorityId, EscalationDate = e.EscalationDate, IsApplied = e.IsApplied })
                 .ToList() ?? []
         };
 
-        if (source.Subtasks != null && source.Subtasks.Count > 0)
+        if (source.Subtasks is { Count: > 0 })
         {
-            newTask.Subtasks = source.Subtasks.Select(s =>
+            newTask.Subtasks = source.Subtasks.Select((s, i) => new SubtaskItem
             {
-                var clone = CloneTaskItem(s, isParent: false);
-                clone.ParentTask = newTask;
-                return clone;
+                Title = s.Title,
+                Description = s.Description,
+                HideUnderSpoiler = s.HideUnderSpoiler,
+                IsFavorite = s.IsFavorite,
+                Interest = s.Interest,
+                Complexity = s.Complexity,
+                EstimatedMinutes = s.EstimatedMinutes,
+                Status = TaskStatus.Planned,
+                CreatedDate = DateTime.UtcNow,
+                ParentTask = newTask,
+                SortOrder = i
             }).ToList();
         }
 

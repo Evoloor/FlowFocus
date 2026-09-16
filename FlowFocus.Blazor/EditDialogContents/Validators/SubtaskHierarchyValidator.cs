@@ -14,76 +14,19 @@ public static class SubtaskHierarchyValidator
     {
         List<string> errors = [];
 
-        var parentTask = task.ParentTask;
-        if (parentTask == null && task.ParentTaskId is > 0)
-        {
-            parentTask = taskRepo.GetById(task.ParentTaskId.Value);
-        }
-
-        if (parentTask != null)
-        {
-            try
-            {
-                var taskPriority = task.Priority ?? (task.PriorityId.HasValue ? priorities.FirstOrDefault(p => p.Id == task.PriorityId) : null);
-                var parentPriority = parentTask.Priority ?? (parentTask.PriorityId.HasValue ? priorities.FirstOrDefault(p => p.Id == parentTask.PriorityId) : null);
-
-                TaskItem taskWrapper = new()
-                {
-                    Id = task.Id,
-                    Title = task.Title,
-                    PriorityId = task.PriorityId,
-                    Priority = taskPriority,
-                    ParentTaskId = task.ParentTaskId
-                };
-
-                TaskItem parentWrapper = new()
-                {
-                    Id = parentTask.Id,
-                    Title = parentTask.Title,
-                    PriorityId = parentTask.PriorityId,
-                    Priority = parentPriority,
-                    ParentTask = parentTask.ParentTask
-                };
-
-                Core.Validation.TaskHierarchyValidator.ValidateSubtaskParent(parentWrapper, taskWrapper);
-            }
-            catch (InvalidOperationException ex)
-            {
-                errors.Add(ex.Message);
-            }
-        }
-
         if (task.Id <= 0) return new(errors.Count == 0, errors);
+
         var existingTracked = taskRepo.GetById(task.Id);
         if (existingTracked?.Subtasks != null)
         {
-            var taskPriority = task.Priority ?? (task.PriorityId.HasValue ? priorities.FirstOrDefault(p => p.Id == task.PriorityId) : null);
-            TaskItem parentWrapper = new()
-            {
-                Id = task.Id,
-                Title = task.Title,
-                PriorityId = task.PriorityId,
-                Priority = taskPriority
-            };
-
             foreach (var sub in existingTracked.Subtasks)
             {
                 if (subtasks is not null && subtasks.Any(s => s.Id == sub.Id && s.IsDeleted))
                     continue;
 
-                var subPriority = sub.Priority ?? (sub.PriorityId.HasValue ? priorities.FirstOrDefault(p => p.Id == sub.PriorityId) : null);
-                TaskItem subWrapper = new()
-                {
-                    Id = sub.Id,
-                    Title = sub.Title,
-                    PriorityId = sub.PriorityId,
-                    Priority = subPriority,
-                    ParentTaskId = sub.ParentTaskId
-                };
-
                 try
                 {
-                    Core.Validation.TaskHierarchyValidator.ValidateSubtaskParent(parentWrapper, subWrapper);
+                    Core.Validation.TaskHierarchyValidator.ValidateSubtaskParent(task, sub);
                 }
                 catch (InvalidOperationException ex)
                 {

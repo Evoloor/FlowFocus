@@ -331,11 +331,8 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         // === Summary Grid Metrics ===
         dto.ActivityPercentage = CalculateActivityMetric(slices.FullyFiltered, filter.DateRange, now);
 
-        var topLevelTasks = slices.FullyFiltered.Where(t => !t.IsSubtask).ToList();
-        dto.TotalTasksCount = topLevelTasks.Count > 0 ? topLevelTasks.Count : slices.FullyFiltered.Count;
-        dto.TotalSubtasksCount = topLevelTasks.Count > 0
-            ? topLevelTasks.Sum(t => t.Subtasks != null ? GetSubtasksCountRecursive(t) : 0)
-            : slices.FullyFiltered.Sum(t => t.Subtasks != null ? GetSubtasksCountRecursive(t) : 0);
+        dto.TotalTasksCount = slices.FullyFiltered.Count;
+        dto.TotalSubtasksCount = slices.FullyFiltered.Sum(t => t.Subtasks?.Count ?? 0);
 
         var completedTasksCount = slices.FullyFiltered.Count(t => t.Status == TaskStatus.Completed);
         var totalForCompletion = slices.FullyFiltered.Count;
@@ -586,15 +583,9 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         return mins > 0 ? $"{hours} ч {mins} мин" : $"{hours} ч";
     }
 
-    private static int GetSubtasksCountRecursive(TaskItem task)
+    private static int GetSubtasksCount(TaskItem task)
     {
-        if (task.Subtasks == null || task.Subtasks.Count == 0) return 0;
-        var count = task.Subtasks.Count;
-        foreach (var sub in task.Subtasks)
-        {
-            count += GetSubtasksCountRecursive(sub);
-        }
-        return count;
+        return task.Subtasks?.Count ?? 0;
     }
 
     private static Dictionary<string, int> CalculateInterestHistogram(List<TaskItem> tasks)

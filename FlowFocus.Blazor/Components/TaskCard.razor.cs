@@ -142,8 +142,7 @@ public partial class TaskCard : IDisposable
     {
         DialogParameters<TaskEditDialog> parameters = new()
         {
-            { x => x.ExistingTask, Task },
-            { x => x.IsSubtaskMode, Task.IsSubtask }
+            { x => x.ExistingTask, Task }
         };
 
         DialogOptions options = new()
