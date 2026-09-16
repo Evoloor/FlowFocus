@@ -9,17 +9,17 @@ using TaskStatus = FlowFocus.Core.Enums.TaskStatus;
 
 namespace FlowFocus.Blazor.Components;
 
-public partial class TaskCard : IDisposable
+public partial class TaskCard : WorkItemCardBase<TaskItem>
 {
     [Inject] public ITaskRepository TaskRepo { get; set; } = null!;
-    [Inject] public ISettingsRepository SettingsRepo { get; set; } = null!;
-    [Inject] public INotificationService NotificationService { get; set; } = null!;
     [Inject] public IDialogService DialogService { get; set; } = null!;
     [Inject] public ISnackbar Snackbar { get; set; } = null!;
     [Inject] public IPlannerService PlannerService { get; set; } = null!;
 
     [Parameter, EditorRequired]
     public TaskItem Task { get; set; } = null!;
+
+    protected override TaskItem WorkItem => Task;
 
     [Parameter]
     public DisplayMode DisplayMode { get; set; } = DisplayMode.List;
@@ -30,52 +30,7 @@ public partial class TaskCard : IDisposable
     [Parameter]
     public EventCallback OnTaskChanged { get; set; }
 
-    private UserSettings? _settings;
-    private bool _spoilerRevealed;
-
-    protected override void OnInitialized()
-    {
-        _settings = SettingsRepo.GetUserSettings();
-        NotificationService.OnSettingsChanged += OnSettingsChanged;
-    }
-
-    private void OnSettingsChanged()
-    {
-        _settings = SettingsRepo.GetUserSettings();
-        InvokeAsync(StateHasChanged);
-    }
-
-    private bool ShouldHideUnderSpoiler =>
-        (_settings?.HideTaskTitlesDefault ?? false) && Task.HideUnderSpoiler;
-
-    private void ToggleSpoiler()
-    {
-        _spoilerRevealed = !_spoilerRevealed;
-    }
-
-    private string GetCardClass()
-    {
-        List<string> classes = ["task-card"];
-
-        if (Task.Status == TaskStatus.Completed)
-            classes.Add("task-card-completed");
-        else if (Task.Status == TaskStatus.Irrelevant)
-            classes.Add("task-card-irrelevant");
-        else if (Task.Status == TaskStatus.NotConfigured)
-            classes.Add("task-card-not-configured");
-        else if (Task.Status == TaskStatus.Blocked || Task.IsBlocked)
-            classes.Add("task-card-blocked");
-
-        if (IsNested)
-            classes.Add("task-card-nested");
-
-        if (DisplayMode == DisplayMode.Compact)
-            classes.Add("task-card-compact");
-        else if (DisplayMode == DisplayMode.Grid)
-            classes.Add("task-card-grid");
-
-        return string.Join(" ", classes);
-    }
+    private string GetCardClass() => GetCardClass(IsNested, DisplayMode);
 
     private string GetCardStyle()
     {
@@ -200,10 +155,5 @@ public partial class TaskCard : IDisposable
             NotificationService.NotifyTasksChanged();
             await OnTaskChanged.InvokeAsync();
         }
-    }
-
-    public void Dispose()
-    {
-        NotificationService.OnSettingsChanged -= OnSettingsChanged;
     }
 }

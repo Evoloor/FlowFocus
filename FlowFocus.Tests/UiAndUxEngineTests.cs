@@ -341,4 +341,51 @@ public class UiAndUxEngineTests : IntegrationTestBase
         reloadedSettings.Should().NotBeNull();
         reloadedSettings.HideTaskTitlesDefault.Should().BeTrue();
     }
+
+    /// <summary>
+    /// Verifies that WorkItemStyleHelper calculates unified CSS classes for both TaskItem and SubtaskItem.
+    /// </summary>
+    [Fact]
+    public void WorkItemStyleHelper_GetCardClass_AppliesCorrectClassesForTaskAndSubtask()
+    {
+        // 1. Regular planned task
+        var plannedTask = new TaskItemBuilder().WithStatus(TaskStatus.Planned).Build();
+        var plannedClasses = WorkItemStyleHelper.GetCardClass(plannedTask);
+        plannedClasses.Should().Be("task-card");
+
+        // 2. Completed nested subtask
+        var completedSubtask = new SubtaskItemBuilder().WithStatus(TaskStatus.Completed).Build();
+        var subtaskClasses = WorkItemStyleHelper.GetCardClass(completedSubtask, isNested: true, displayMode: FlowFocus.Core.Enums.DisplayMode.Compact);
+        subtaskClasses.Should().Contain("task-card");
+        subtaskClasses.Should().Contain("task-card-completed");
+        subtaskClasses.Should().Contain("task-card-nested");
+        subtaskClasses.Should().Contain("task-card-compact");
+
+        // 3. Blocked task
+        var blockedTask = new TaskItemBuilder().WithStatus(TaskStatus.Blocked).Build();
+        WorkItemStyleHelper.GetCardClass(blockedTask).Should().Contain("task-card-blocked");
+
+        // 4. Irrelevant subtask
+        var irrelevantSubtask = new SubtaskItemBuilder().WithStatus(TaskStatus.Irrelevant).Build();
+        WorkItemStyleHelper.GetCardClass(irrelevantSubtask).Should().Contain("task-card-irrelevant");
+    }
+
+    /// <summary>
+    /// Verifies that WorkItemStyleHelper calculates unified title classes for work items.
+    /// </summary>
+    [Fact]
+    public void WorkItemStyleHelper_GetTitleClass_AppliesCorrectTitleClasses()
+    {
+        var completedSub = new SubtaskItemBuilder().WithStatus(TaskStatus.Completed).Build();
+        WorkItemStyleHelper.GetTitleClass(completedSub).Should().Be("title-completed");
+
+        var plannedTask = new TaskItemBuilder().WithStatus(TaskStatus.Planned).Build();
+        WorkItemStyleHelper.GetTitleClass(plannedTask).Should().BeEmpty();
+
+        var irrelevantTask = new TaskItemBuilder().WithStatus(TaskStatus.Irrelevant).Build();
+        WorkItemStyleHelper.GetTitleClass(irrelevantTask).Should().Be("title-irrelevant");
+
+        var notConfiguredTask = new TaskItemBuilder().WithStatus(TaskStatus.NotConfigured).Build();
+        WorkItemStyleHelper.GetTitleClass(notConfiguredTask).Should().Be("title-not-configured");
+    }
 }

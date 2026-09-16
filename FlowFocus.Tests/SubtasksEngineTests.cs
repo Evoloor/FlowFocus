@@ -264,4 +264,30 @@ public class SubtasksEngineTests : IntegrationTestBase
         retrieved!.Subtasks.OrderBy(s => s.SortOrder).Select(s => s.Title)
             .Should().BeEquivalentTo(["First", "Second", "Third"], o => o.WithStrictOrdering());
     }
+
+    /// <summary>
+    /// Verifies toggling a subtask favorite status.
+    /// </summary>
+    [Fact]
+    public void ToggleSubtaskFavorite_TogglesIsFavoriteCorrectly()
+    {
+        // Arrange
+        var sub = new SubtaskItemBuilder().WithId(801).WithTitle("Fav Subtask").WithFavorite(false).Build();
+        var parent = new TaskItemBuilder().WithId(800).WithSubtask(sub).Build();
+        TaskRepo.Add(parent);
+
+        // Act 1: toggle to true
+        TaskRepo.ToggleSubtaskFavorite(sub.Id);
+
+        // Assert 1
+        var retrieved1 = TaskRepo.GetById(parent.Id)!.Subtasks.First(s => s.Id == sub.Id);
+        retrieved1.IsFavorite.Should().BeTrue();
+
+        // Act 2: toggle back to false
+        TaskRepo.ToggleSubtaskFavorite(sub.Id);
+
+        // Assert 2
+        var retrieved2 = TaskRepo.GetById(parent.Id)!.Subtasks.First(s => s.Id == sub.Id);
+        retrieved2.IsFavorite.Should().BeFalse();
+    }
 }

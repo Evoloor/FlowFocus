@@ -1,5 +1,4 @@
 @namespace FlowFocus.Blazor.Components
-@inject ITaskRepository TaskRepo
 
 @if (!IsNested && (Task.Subtasks.Any() || Task.Relations.Any() || Task.InverseRelations.Any()))
 {
@@ -10,25 +9,7 @@
                 <MudExpansionPanel Text="@($"({Task.Subtasks.Count}) подзадач")" Expanded="true">
                     @foreach (var subtask in Task.Subtasks.OrderBy(s => s.SortOrder))
                     {
-                        <MudPaper @key="subtask.Id" Class="task-card-nested pa-2 mb-1" Elevation="0" Outlined="true">
-                            <div class="d-flex align-center gap-2">
-                                <MudCheckBox T="bool"
-                                             Value="@(subtask.Status == TaskStatus.Completed)"
-                                             ValueChanged="@(async _ => await ToggleSubtask(subtask.Id))"
-                                             Dense="true"
-                                             Size="Size.Small"
-                                             Color="Color.Success" />
-                                <MudText Typo="Typo.body2"
-                                         Style="@(subtask.Status == TaskStatus.Completed ? "text-decoration: line-through; opacity: 0.7" : "")"
-                                         Class="flex-grow-1">
-                                    @subtask.Title
-                                </MudText>
-                                @if (subtask.EstimatedMinutes.HasValue)
-                                {
-                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@subtask.FormattedDuration</MudChip>
-                                }
-                            </div>
-                        </MudPaper>
+                        <SubtaskCard @key="subtask.Id" Subtask="subtask" OnSubtaskChanged="OnTaskChanged" />
                     }
                 </MudExpansionPanel>
             </MudExpansionPanels>
@@ -87,12 +68,6 @@ else if (IsNested && TotalRelationsCount > 0)
 
     [Parameter]
     public EventCallback OnTaskChanged { get; set; }
-
-    private async Task ToggleSubtask(int subtaskId)
-    {
-        TaskRepo.ToggleSubtaskStatus(subtaskId);
-        await OnTaskChanged.InvokeAsync();
-    }
 
     private int TotalRelationsCount =>
         Task.Subtasks.Count + Task.Relations.Count + Task.InverseRelations.Count;

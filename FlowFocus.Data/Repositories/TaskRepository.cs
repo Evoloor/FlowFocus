@@ -317,6 +317,20 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
         }
     }
 
+    public void ToggleSubtaskFavorite(int subtaskId)
+    {
+        lock (CacheLock)
+        {
+            var subtask = Context.Subtasks.Find(subtaskId);
+            if (subtask == null) return;
+
+            subtask.IsFavorite = !subtask.IsFavorite;
+            subtask.LastChangesOn = DateTime.UtcNow;
+            Context.SaveChanges();
+            MarkDirty();
+        }
+    }
+
     public void DeleteRelation(int relationId)
     {
         lock (CacheLock)

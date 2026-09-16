@@ -1,17 +1,18 @@
 @namespace FlowFocus.Blazor.Components
+@using FlowFocus.Blazor.Helpers
 @using FlowFocus.Core.Helpers
 
 <div class="task-card-header">
     <div class="task-status-control">
-        @switch (Task.Status)
+        @switch (CurrentItem.Status)
         {
             case TaskStatus.Planned:
             case TaskStatus.Completed:
-                <MudCheckBox T="bool" Value="@(Task.Status == TaskStatus.Completed)"
-                             ValueChanged="@OnTaskCompleted"
+                <MudCheckBox T="bool" Value="@(CurrentItem.Status == TaskStatus.Completed)"
+                             ValueChanged="@HandleStatusChanged"
                              Size="Size.Small"
                              Color="Color.Primary"
-                             Disabled="@(Task.Status == TaskStatus.NotConfigured)"/>
+                             Disabled="@(CurrentItem.Status == TaskStatus.NotConfigured)"/>
                 break;
             case TaskStatus.Irrelevant:
                 <MudText Typo="Typo.caption" Class="vertical-text text-muted">Неактуально</MudText>
@@ -23,7 +24,7 @@
     </div>
 
     <div class="task-title-container flex-grow-1">
-        @if (Task.Status == TaskStatus.NotConfigured)
+        @if (CurrentItem.Status == TaskStatus.NotConfigured)
         {
             <MudIcon Icon="@Icons.Material.Filled.Settings" Size="Size.Small" Class="me-1" Color="Color.Info" />
         }
@@ -33,7 +34,7 @@
             @if (!SpoilerRevealed)
             {
                 <div class="d-flex align-center gap-2 flex-grow-1">
-                    <MudText Typo="Typo.body1" Class="@GetTitleClass()">@PrivacyHelper.MaskText(Task.Title)</MudText>
+                    <MudText Typo="@TitleTypo" Class="@GetTitleClass()">@PrivacyHelper.MaskText(CurrentItem.Title)</MudText>
                     <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small"
                                    OnClick="@OnToggleSpoiler" Title="Показать" />
                 </div>
@@ -41,7 +42,7 @@
             else
             {
                 <div class="d-flex align-center gap-2 flex-grow-1">
-                    <MudText Typo="Typo.body1" Class="@GetTitleClass()">@Task.Title</MudText>
+                    <MudText Typo="@TitleTypo" Class="@GetTitleClass()">@CurrentItem.Title</MudText>
                     <MudIconButton Icon="@Icons.Material.Filled.VisibilityOff" Size="Size.Small"
                                    OnClick="@OnToggleSpoiler" Title="Скрыть" />
                 </div>
@@ -49,19 +50,27 @@
         }
         else
         {
-            <MudText Typo="Typo.body1" Class="@GetTitleClass()">@Task.Title</MudText>
+            <MudText Typo="@TitleTypo" Class="@GetTitleClass()">@CurrentItem.Title</MudText>
         }
     </div>
 
-    <MudIconButton Icon="@(Task.IsFavorite ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarBorder)"
+    @if (ShowDuration && CurrentItem.EstimatedMinutes.HasValue)
+    {
+        <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@CurrentItem.FormattedDuration</MudChip>
+    }
+
+    <MudIconButton Icon="@(CurrentItem.IsFavorite ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarBorder)"
                    Size="Size.Small"
-                   Color="@(Task.IsFavorite ? Color.Warning : Color.Default)"
+                   Color="@(CurrentItem.IsFavorite ? Color.Warning : Color.Default)"
                    OnClick="@OnToggleFavorite" />
 </div>
 
 @code {
-    [Parameter, EditorRequired]
-    public TaskItem Task { get; set; } = null!;
+    [Parameter]
+    public WorkItemBase? Item { get; set; }
+
+    [Parameter]
+    public TaskItem? Task { get; set; }
 
     [Parameter]
     public bool ShouldHideUnderSpoiler { get; set; }
@@ -73,22 +82,29 @@
     public EventCallback OnToggleSpoiler { get; set; }
 
     [Parameter]
+    public EventCallback<bool> OnStatusChanged { get; set; }
+
+    [Parameter]
     public EventCallback<bool> OnTaskCompleted { get; set; }
 
     [Parameter]
     public EventCallback OnToggleFavorite { get; set; }
 
-    private string GetTitleClass()
+    [Parameter]
+    public bool ShowDuration { get; set; } = false;
+
+    [Parameter]
+    public Typo TitleTypo { get; set; } = Typo.body1;
+
+    private WorkItemBase CurrentItem => Item ?? Task!;
+
+    private async Task HandleStatusChanged(bool value)
     {
-        List<string> classes = [];
-
-        if (Task.Status == TaskStatus.Completed)
-            classes.Add("title-completed");
-        else if (Task.Status == TaskStatus.Irrelevant)
-            classes.Add("title-irrelevant");
-        else if (Task.Status == TaskStatus.NotConfigured)
-            classes.Add("title-not-configured");
-
-        return string.Join(" ", classes);
+        if (OnStatusChanged.HasDelegate)
+            await OnStatusChanged.InvokeAsync(value);
+        else if (OnTaskCompleted.HasDelegate)
+            await OnTaskCompleted.InvokeAsync(value);
     }
+
+    private string GetTitleClass() => WorkItemStyleHelper.GetTitleClass(CurrentItem);
 }

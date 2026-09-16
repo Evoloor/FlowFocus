@@ -52,6 +52,9 @@ public interface ITaskRepository : IRepository<TaskItem>
     /// <summary>Отменить выполнение подзадачи</summary>
     void ReopenSubtask(int subtaskId);
 
+    /// <summary>Переключить статус избранного подзадачи</summary>
+    void ToggleSubtaskFavorite(int subtaskId);
+
     /// <summary>Получить интересную задачу для прокрастинации</summary>
     TaskItem? GetProcrastinationTask(List<int> excludeIds);
 

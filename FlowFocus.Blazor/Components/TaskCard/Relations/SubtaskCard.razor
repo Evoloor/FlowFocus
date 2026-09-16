@@ -1,0 +1,45 @@
+@namespace FlowFocus.Blazor.Components
+@inherits WorkItemCardBase<SubtaskItem>
+@inject ITaskRepository TaskRepo
+
+<MudPaper Class="@GetCardClass(isNested: true, displayMode: DisplayMode.Compact)" Elevation="0">
+    <div class="task-card-content">
+        <div class="task-card-main">
+            <TaskCardHeader Item="Subtask"
+                            ShouldHideUnderSpoiler="ShouldHideUnderSpoiler"
+                            SpoilerRevealed="_spoilerRevealed"
+                            OnToggleSpoiler="ToggleSpoiler"
+                            OnStatusChanged="ToggleCompleted"
+                            OnToggleFavorite="ToggleFavorite"
+                            ShowDuration="true"
+                            TitleTypo="Typo.body2" />
+        </div>
+    </div>
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired]
+    public SubtaskItem Subtask { get; set; } = null!;
+
+    [Parameter]
+    public EventCallback OnSubtaskChanged { get; set; }
+
+    protected override SubtaskItem WorkItem => Subtask;
+
+    private async Task ToggleCompleted(bool completed)
+    {
+        TaskRepo.ToggleSubtaskStatus(Subtask.Id);
+        Subtask.Status = completed ? TaskStatus.Completed : TaskStatus.Planned;
+        Subtask.CompletedDate = completed ? DateTime.UtcNow : null;
+        NotificationService.NotifyTasksChanged();
+        await OnSubtaskChanged.InvokeAsync();
+    }
+
+    private async Task ToggleFavorite()
+    {
+        TaskRepo.ToggleSubtaskFavorite(Subtask.Id);
+        Subtask.IsFavorite = !Subtask.IsFavorite;
+        NotificationService.NotifyTasksChanged();
+        await OnSubtaskChanged.InvokeAsync();
+    }
+}
