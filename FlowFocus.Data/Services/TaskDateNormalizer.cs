@@ -17,10 +17,11 @@ public static class TaskDateNormalizer
     {
         var hasChanges = false;
 
-        // 1. Нормализация неназначенных дат: если ScheduledDate == null и DateSource не AutoFlexible (только для активных задач)
+        // 1. Нормализация неназначенных дат для обычных (не повторяющихся) задач:
+        // Если ScheduledDate == null и задача не повторяющаяся, её статус должен быть AutoFlexible
         var tasksToNormalize = context.Tasks
             .WhereActive()
-            .Where(t => t.ScheduledDate == null && (t.DateSource == DateSource.Manual || t.DateSource == DateSource.AutoFixed))
+            .Where(t => t.ScheduledDate == null && !t.IsRecurring && t.RecurrenceSourceId == null && (t.DateSource == DateSource.Manual || t.DateSource == DateSource.AutoFixed))
             .ToList();
 
         if (tasksToNormalize.Count > 0)
@@ -33,10 +34,27 @@ public static class TaskDateNormalizer
             hasChanges = true;
         }
 
+        // 1.1. Нормализация повторяющихся задач со статусом AutoFlexible:
+        // Повторяющиеся задачи не могут иметь статус AutoFlexible — они переводятся в AutoFixed.
+        var recurringAutoFlexibleTasks = context.Tasks
+            .WhereActive()
+            .Where(t => (t.IsRecurring || t.RecurrenceSourceId != null) && t.DateSource == DateSource.AutoFlexible)
+            .ToList();
+
+        if (recurringAutoFlexibleTasks.Count > 0)
+        {
+            foreach (var task in recurringAutoFlexibleTasks)
+            {
+                task.DateSource = DateSource.AutoFixed;
+                task.LastChangesOn = DateTime.UtcNow;
+            }
+            hasChanges = true;
+        }
+
         var today = TodoDay.Today;
 
         // 1.2. Нормализация просроченных задач с ручной датой:
-        // Просроченная задача с DateSource.Manual переводится в AutoFlexible для перераспределения.
+        // Просроченная задача с DateSource.Manual переводится в AutoFlexible для обычных задач и AutoFixed для повтор-задач.
         var overdueManualTasks = context.Tasks
             .WhereActive()
             .Where(t => t.DateSource == DateSource.Manual)
@@ -48,7 +66,7 @@ public static class TaskDateNormalizer
         {
             foreach (var task in overdueManualTasks)
             {
-                task.DateSource = DateSource.AutoFlexible;
+                task.DateSource = (task.IsRecurring || task.RecurrenceSourceId != null) ? DateSource.AutoFixed : DateSource.AutoFlexible;
                 task.LastChangesOn = DateTime.UtcNow;
             }
             hasChanges = true;
@@ -57,7 +75,6 @@ public static class TaskDateNormalizer
         // 1.3. Сброс дат для заблокированных неактивным условием повторяющихся задач ("улетают" из расписания)
         var blockedRecurringTasks = context.Tasks
             .WhereActive()
-            .Include(t => t.Conditions).ThenInclude(tc => tc.Condition)
             .Where(t => t.IsRecurring || t.RecurrenceSourceId != null)
             .Where(t => t.DateSource != DateSource.Manual)
             .Where(t => t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))
@@ -86,7 +103,6 @@ public static class TaskDateNormalizer
 
         var activeRecurringTasks = context.Tasks
             .WhereActive()
-            .Include(t => t.Conditions).ThenInclude(tc => tc.Condition)
             .Where(t => t.IsRecurring || t.RecurrenceSourceId != null)
             .Where(t => t.DateSource != DateSource.Manual)
             .Where(t => !t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))
@@ -114,6 +130,24 @@ public static class TaskDateNormalizer
                 task.LastChangesOn = DateTime.UtcNow;
                 hasChanges = true;
             }
+        }
+
+        // 2.1. Гарантия инварианта: если активная задача не заблокирована неактивным условием и имеет статус AutoFixed,
+        // то её ScheduledDate после нормализации должен быть непустым.
+        var unassignedAutoFixed = context.Tasks
+            .WhereActive()
+            .Where(t => t.DateSource == DateSource.AutoFixed && t.ScheduledDate == null)
+            .Where(t => !t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))
+            .ToList();
+
+        if (unassignedAutoFixed.Count > 0)
+        {
+            foreach (var task in unassignedAutoFixed)
+            {
+                task.ScheduledDate = todayDt;
+                task.LastChangesOn = DateTime.UtcNow;
+            }
+            hasChanges = true;
         }
 
         return hasChanges;

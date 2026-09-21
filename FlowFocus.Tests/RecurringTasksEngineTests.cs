@@ -406,4 +406,84 @@ public class RecurringTasksEngineTests : IntegrationTestBase
         newCopy.Should().NotBeNull();
         newCopy!.Conditions.Should().ContainSingle(c => c.ConditionId == condition.Id);
     }
+
+    [Fact]
+    public void NormalizeDateSources_WhenRecurringTaskHasAutoFlexible_NormalizesToAutoFixed()
+    {
+        // Arrange
+        var today = TodoDay.Today.ToDateTime();
+        var task = new TaskItemBuilder()
+            .WithId(700)
+            .WithTitle("Recurring with flexible")
+            .WithRecurrence(RecurrenceType.EveryN, interval: 1, unit: RecurrenceUnit.Days)
+            .WithScheduledDate(today, DateSource.AutoFlexible)
+            .WithStatus(TaskStatus.Planned)
+            .Build();
+
+        Context.Tasks.Add(task);
+        Context.SaveChanges();
+        Context.ChangeTracker.Clear();
+
+        // Act
+        TaskRepo.NormalizeTaskDateSources();
+
+        // Assert
+        var normalized = TaskRepo.GetById(700);
+        normalized.Should().NotBeNull();
+        normalized!.DateSource.Should().Be(DateSource.AutoFixed);
+        normalized.ScheduledDate.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void NormalizeDateSources_WhenRecurringTaskHasNullDate_AssignsTodayAndAutoFixed()
+    {
+        // Arrange
+        var task = new TaskItemBuilder()
+            .WithId(701)
+            .WithTitle("Recurring without date")
+            .WithRecurrence(RecurrenceType.EveryN, interval: 1, unit: RecurrenceUnit.Days)
+            .WithScheduledDate(null, DateSource.AutoFixed)
+            .WithStatus(TaskStatus.Planned)
+            .Build();
+
+        Context.Tasks.Add(task);
+        Context.SaveChanges();
+        Context.ChangeTracker.Clear();
+
+        // Act
+        TaskRepo.NormalizeTaskDateSources();
+
+        // Assert
+        var normalized = TaskRepo.GetById(701);
+        normalized.Should().NotBeNull();
+        normalized!.DateSource.Should().Be(DateSource.AutoFixed);
+        normalized.ScheduledDate.Should().Be(TodoDay.Today.ToDateTime());
+    }
+
+    [Fact]
+    public void NormalizeDateSources_WhenTaskIsAutoFixed_ScheduledDateIsNeverNullAfterNormalization()
+    {
+        // Arrange
+        var task = new TaskItemBuilder()
+            .WithId(702)
+            .WithTitle("AutoFixed task without date")
+            .WithRecurrence(RecurrenceType.EveryN, interval: 2, unit: RecurrenceUnit.Days)
+            .WithScheduledDate(null, DateSource.AutoFixed)
+            .WithStatus(TaskStatus.Planned)
+            .Build();
+
+        Context.Tasks.Add(task);
+        Context.SaveChanges();
+        Context.ChangeTracker.Clear();
+
+        // Act
+        TaskDateNormalizer.NormalizeDateSources(Context, new TaskRecurrenceService());
+        Context.SaveChanges();
+
+        // Assert
+        var normalized = Context.Tasks.Find(702);
+        normalized.Should().NotBeNull();
+        normalized!.DateSource.Should().Be(DateSource.AutoFixed);
+        normalized.ScheduledDate.Should().NotBeNull();
+    }
 }

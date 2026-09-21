@@ -94,8 +94,9 @@ public partial class TaskEditDialog
             StateHasChanged();
         }
 
-        // Синхронизируем локальное зеркало даты из модели
-        _scheduledDate = _task.ScheduledDate;
+        // Синхронизируем локальное зеркало даты: в поле ввода отображается только Manual дата.
+        // Задачи с AutoFixed и AutoFlexible отображаются с плейсхолдером "Автоматически" (_scheduledDate = null).
+        _scheduledDate = _task.DateSource == DateSource.Manual ? _task.ScheduledDate : null;
 
         // Конвертируем время
         if (_task.EstimatedMinutes != null)
@@ -324,11 +325,9 @@ public partial class TaskEditDialog
                     _task.RecurrenceInterval = 1;
                 }
 
-                if (_task.ScheduledDate == null)
+                if (_task.DateSource != DateSource.Manual)
                 {
-                    _task.ScheduledDate = TodoDay.Today.ToDateTime();
-                    _task.DateSource = DateSource.Manual;
-                    _scheduledDate = _task.ScheduledDate;
+                    _task.DateSource = DateSource.AutoFixed;
                 }
             }
             else if (_task.ScheduledDate == null)
@@ -446,6 +445,14 @@ public partial class TaskEditDialog
                 Snackbar.Add("Задача создана", Severity.Success);
             }
 
+            TaskRepo.NormalizeTaskDateSources();
+
+            if (_task.Id > 0)
+            {
+                var reloaded = TaskRepo.GetById(_task.Id);
+                if (reloaded != null) _task = reloaded;
+            }
+
             if (_settings?.AutoDistributeEnabled == true && ShouldRecalculate())
             {
                 await InvokeAsync(() =>
@@ -485,7 +492,33 @@ public partial class TaskEditDialog
     {
         _scheduledDate = value;
         _task.ScheduledDate = value;
-        _task.DateSource = value.HasValue ? DateSource.Manual : DateSource.AutoFlexible;
+        _task.DateSource = value.HasValue 
+            ? DateSource.Manual 
+            : (_task.IsRecurring ? DateSource.AutoFixed : DateSource.AutoFlexible);
+    }
+
+    private async Task OnRecurringChanged(bool isRecurring)
+    {
+        _task.IsRecurring = isRecurring;
+        if (isRecurring)
+        {
+            if (_task.DateSource != DateSource.Manual)
+            {
+                _task.DateSource = DateSource.AutoFixed;
+                _scheduledDate = null;
+                _task.ScheduledDate = null;
+            }
+        }
+        else
+        {
+            if (_task.DateSource == DateSource.AutoFixed)
+            {
+                _task.DateSource = DateSource.AutoFlexible;
+                _scheduledDate = null;
+                _task.ScheduledDate = null;
+            }
+        }
+        await InvokeAsync(StateHasChanged);
     }
 
     private List<string> ValidateTask()
@@ -493,11 +526,9 @@ public partial class TaskEditDialog
         List<string> errors = [];
         if (string.IsNullOrWhiteSpace(_task.Title)) errors.Add("Название обязательно");
 
-        if (_task.IsRecurring && _task.ScheduledDate == null)
+        if (_task.IsRecurring && _task.DateSource != DateSource.Manual)
         {
-            _task.ScheduledDate = TodoDay.Today.ToDateTime();
-            _task.DateSource = DateSource.Manual;
-            _scheduledDate = _task.ScheduledDate;
+            _task.DateSource = DateSource.AutoFixed;
         }
 
         var escalationValidation = TaskEditValidator.ValidateEscalations(_escalations, _task, _priorities);

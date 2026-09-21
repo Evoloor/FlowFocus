@@ -150,7 +150,7 @@
                             </MudItem>
 
                             @* Повторение *@
-                            <RecurrenceEditor Task="_task" OnRecurringChanged="@(async (bool v) => { _task.IsRecurring = v; if (v && _scheduledDate == null) { _scheduledDate = _task.ScheduledDate ?? TodoDay.Today.ToDateTime(); } await InvokeAsync(StateHasChanged); })"/>
+                            <RecurrenceEditor Task="_task" OnRecurringChanged="OnRecurringChanged"/>
                         </MudExpansionPanel>
                     </MudExpansionPanels>
                 </MudItem>

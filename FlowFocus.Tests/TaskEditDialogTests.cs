@@ -376,6 +376,141 @@ public class TaskEditDialogTests : IntegrationTestBase
         cut.Markup.Should().Contain("15.09.2026");
     }
 
+    [Fact]
+    public void TaskEditDialog_WhenExistingTaskIsAutoFixed_ScheduledDateMirrorIsNull()
+    {
+        // Arrange
+        var task = new TaskItemBuilder()
+            .WithId(501)
+            .WithTitle("Повторяющаяся авто-задача")
+            .WithRecurrence(RecurrenceType.EveryN, interval: 1, unit: RecurrenceUnit.Days)
+            .WithScheduledDate(new DateTime(2026, 9, 20), DateSource.AutoFixed)
+            .WithStatus(TaskStatus.Planned)
+            .Build();
+        TaskRepo.Add(task);
+
+        // Act
+        var cut = RenderTaskEditDialog(existingTask: task);
+        var dialog = cut.Instance;
+
+        var scheduledDateField = typeof(TaskEditDialog).GetField("_scheduledDate", BindingFlags.Instance | BindingFlags.NonPublic);
+        var scheduledDate = (DateTime?)scheduledDateField!.GetValue(dialog);
+
+        // Assert: Поле ввода даты должно быть пустым (отображая плейсхолдер "Автоматически")
+        scheduledDate.Should().BeNull();
+    }
+
+    [Fact]
+    public void TaskEditDialog_OnScheduledDateChanged_WhenClearedOnNormalTask_SetsAutoFlexibleAndNull()
+    {
+        // Arrange
+        var task = new TaskItemBuilder()
+            .WithId(502)
+            .WithTitle("Обычная задача с датой")
+            .WithScheduledDate(new DateTime(2026, 9, 25), DateSource.Manual)
+            .WithStatus(TaskStatus.Planned)
+            .Build();
+        TaskRepo.Add(task);
+
+        var cut = RenderTaskEditDialog(existingTask: task);
+        var dialog = cut.Instance;
+
+        // Act: Пользователь нажимает на крестик сброса даты
+        var onDateChangedMethod = typeof(TaskEditDialog).GetMethod("OnScheduledDateChanged", BindingFlags.Instance | BindingFlags.NonPublic);
+        onDateChangedMethod!.Invoke(dialog, [null]);
+
+        var scheduledDateField = typeof(TaskEditDialog).GetField("_scheduledDate", BindingFlags.Instance | BindingFlags.NonPublic);
+        var scheduledDate = (DateTime?)scheduledDateField!.GetValue(dialog);
+
+        var taskField = typeof(TaskEditDialog).GetField("_task", BindingFlags.Instance | BindingFlags.NonPublic);
+        var taskInDialog = (TaskItem)taskField!.GetValue(dialog)!;
+
+        // Assert
+        scheduledDate.Should().BeNull();
+        taskInDialog.ScheduledDate.Should().BeNull();
+        taskInDialog.DateSource.Should().Be(DateSource.AutoFlexible);
+    }
+
+    [Fact]
+    public void TaskEditDialog_OnScheduledDateChanged_WhenClearedOnRecurringTask_SetsAutoFixedAndNull()
+    {
+        // Arrange
+        var task = new TaskItemBuilder()
+            .WithId(503)
+            .WithTitle("Повторяющаяся с ручной датой")
+            .WithRecurrence(RecurrenceType.EveryN, interval: 1, unit: RecurrenceUnit.Days)
+            .WithScheduledDate(new DateTime(2026, 9, 25), DateSource.Manual)
+            .WithStatus(TaskStatus.Planned)
+            .Build();
+        TaskRepo.Add(task);
+
+        var cut = RenderTaskEditDialog(existingTask: task);
+        var dialog = cut.Instance;
+
+        // Act: Пользователь сбрасывает дату на крестик
+        var onDateChangedMethod = typeof(TaskEditDialog).GetMethod("OnScheduledDateChanged", BindingFlags.Instance | BindingFlags.NonPublic);
+        onDateChangedMethod!.Invoke(dialog, [null]);
+
+        var scheduledDateField = typeof(TaskEditDialog).GetField("_scheduledDate", BindingFlags.Instance | BindingFlags.NonPublic);
+        var scheduledDate = (DateTime?)scheduledDateField!.GetValue(dialog);
+
+        var taskField = typeof(TaskEditDialog).GetField("_task", BindingFlags.Instance | BindingFlags.NonPublic);
+        var taskInDialog = (TaskItem)taskField!.GetValue(dialog)!;
+
+        // Assert: статус должен сброситься в AutoFixed, дата null, не откатываясь к Today/Manual
+        scheduledDate.Should().BeNull();
+        taskInDialog.ScheduledDate.Should().BeNull();
+        taskInDialog.DateSource.Should().Be(DateSource.AutoFixed);
+    }
+
+    [Fact]
+    public async Task TaskEditDialog_OnRecurringChanged_WhenTurnedOnWithAutomaticDate_SetsAutoFixedAndNull()
+    {
+        // Arrange: новая задача
+        var cut = RenderTaskEditDialog(initialTitle: "Новая задача");
+        var dialog = cut.Instance;
+
+        // Act: включаем повторение
+        var onRecurringMethod = typeof(TaskEditDialog).GetMethod("OnRecurringChanged", BindingFlags.Instance | BindingFlags.NonPublic);
+        var task = (Task)onRecurringMethod!.Invoke(dialog, [true])!;
+        await task;
+
+        var scheduledDateField = typeof(TaskEditDialog).GetField("_scheduledDate", BindingFlags.Instance | BindingFlags.NonPublic);
+        var scheduledDate = (DateTime?)scheduledDateField!.GetValue(dialog);
+
+        var taskField = typeof(TaskEditDialog).GetField("_task", BindingFlags.Instance | BindingFlags.NonPublic);
+        var taskInDialog = (TaskItem)taskField!.GetValue(dialog)!;
+
+        // Assert
+        scheduledDate.Should().BeNull();
+        taskInDialog.ScheduledDate.Should().BeNull();
+        taskInDialog.DateSource.Should().Be(DateSource.AutoFixed);
+    }
+
+    [Fact]
+    public async Task SaveTask_NewRecurringTaskWithAutoDate_NormalizesToTodayAndAutoFixed()
+    {
+        // Arrange
+        var cut = RenderTaskEditDialog(initialTitle: "Новая повторяющаяся задача");
+        var dialog = cut.Instance;
+
+        // Включаем повторение
+        var onRecurringMethod = typeof(TaskEditDialog).GetMethod("OnRecurringChanged", BindingFlags.Instance | BindingFlags.NonPublic);
+        var recTask = (Task)onRecurringMethod!.Invoke(dialog, [true])!;
+        await recTask;
+
+        // Act: сохраняем задачу
+        await cut.InvokeAsync(() => InvokeSaveTaskAsync(dialog));
+
+        // Assert
+        AssertNoSnackbarErrors();
+        var saved = TaskRepo.GetAll().FirstOrDefault(t => t.Title == "Новая повторяющаяся задача");
+        saved.Should().NotBeNull();
+        saved!.IsRecurring.Should().BeTrue();
+        saved.DateSource.Should().Be(DateSource.AutoFixed);
+        saved.ScheduledDate.Should().Be(TodoDay.Today.ToDateTime());
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)

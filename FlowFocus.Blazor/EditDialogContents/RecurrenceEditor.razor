@@ -115,22 +115,14 @@
     {
         _isRecurringLocal = value;
         Task.IsRecurring = value;
-        if (value)
+        if (value && Task.RecurrenceType == RecurrenceType.None)
         {
-            if (Task.RecurrenceType == RecurrenceType.None)
-            {
-                Task.RecurrenceType = RecurrenceType.EveryN;
-                Task.RecurrenceUnit = RecurrenceUnit.Days;
-                Task.RecurrenceInterval = 1;
-                _choice = RecurrenceChoice.EveryN;
-                _unit = RecurrenceUnit.Days;
-                _interval = 1;
-            }
-            if (Task.ScheduledDate == null)
-            {
-                Task.ScheduledDate = TodoDay.Today.ToDateTime();
-                Task.DateSource = DateSource.Manual;
-            }
+            Task.RecurrenceType = RecurrenceType.EveryN;
+            Task.RecurrenceUnit = RecurrenceUnit.Days;
+            Task.RecurrenceInterval = 1;
+            _choice = RecurrenceChoice.EveryN;
+            _unit = RecurrenceUnit.Days;
+            _interval = 1;
         }
         if (OnRecurringChanged.HasDelegate)
         {
