@@ -232,4 +232,128 @@ public class DateSourceTests
             candidates.Select(selector: t => t.Id).Should().NotContain(unexpected: 101);
         }
     }
+
+    /// <summary>
+    /// Tests verification of normalizing tasks where recurrence was removed.
+    /// </summary>
+    [UsedImplicitly]
+    [Trait(name: "Category", value: "Domain")]
+    public class NonRecurringNormalization
+    {
+        [Fact]
+        public void ResetRecurrence_ClearsAllRecurrenceFields_AndConvertsAutoFixedToAutoFlexible()
+        {
+            // Arrange
+            var task = new TaskItem
+            {
+                IsRecurring = true,
+                RecurrenceSourceId = 555,
+                RecurrenceType = RecurrenceType.EveryN,
+                RecurrenceInterval = 3,
+                RecurrenceWeekDays = 5,
+                DateSource = DateSource.AutoFixed,
+                ScheduledDate = DateTime.Today
+            };
+
+            // Act
+            task.ResetRecurrence();
+
+            // Assert
+            task.IsRecurring.Should().BeFalse();
+            task.RecurrenceSourceId.Should().BeNull();
+            task.RecurrenceType.Should().Be(RecurrenceType.None);
+            task.RecurrenceInterval.Should().BeNull();
+            task.RecurrenceWeekDays.Should().BeNull();
+            task.DateSource.Should().Be(DateSource.AutoFlexible);
+        }
+
+        [Fact]
+        public void NormalizeDateSources_WhenRecurrenceRemovedFromInstance_NormalizesToAutoFlexibleAndClearsRecurrenceSourceId()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.CreateInMemoryContext();
+            var task = new TaskItemBuilder()
+                .WithId(id: 201)
+                .WithTitle(title: "Task with recurrence turned off")
+                .WithStatus(status: TaskStatus.Planned)
+                .WithScheduledDate(date: TodoDay.Today.ToDateTime(), dateSource: DateSource.AutoFixed)
+                .WithRecurrenceSourceId(sourceId: 999)
+                .Build();
+
+            task.IsRecurring = false;
+            task.RecurrenceType = RecurrenceType.EveryN;
+
+            context.Tasks.Add(task);
+            context.SaveChanges();
+            context.ChangeTracker.Clear();
+
+            // Act
+            var hasChanges = FlowFocus.Data.Services.TaskDateNormalizer.NormalizeDateSources(context, new FlowFocus.Data.Services.TaskRecurrenceService());
+            context.SaveChanges();
+
+            // Assert
+            hasChanges.Should().BeTrue();
+            var normalized = context.Tasks.Find(201);
+            normalized.Should().NotBeNull();
+            normalized!.IsRecurring.Should().BeFalse();
+            normalized.RecurrenceSourceId.Should().BeNull();
+            normalized.RecurrenceType.Should().Be(RecurrenceType.None);
+            normalized.DateSource.Should().Be(DateSource.AutoFlexible);
+        }
+
+        [Fact]
+        public void RecalculateAll_WhenRecurrenceRemovedFromTask_NormalizesAndAllowsHigherPriorityTasksToFillDay()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.CreateInMemoryContext();
+            TaskRepository taskRepo = new(context: context, notificationService: Substitute.For<INotificationService>());
+            PlannerService plannerService = new(taskRepo);
+
+            var today = TodoDay.Today;
+            var settings = new UserSettingsBuilder()
+                .WithDailyTaskLimit(1) // Лимит: 1 задача в день
+                .WithDailyTimeLimit(100)
+                .WithDailyComplexityLimit(100)
+                .Build();
+
+            // Задача с низким приоритетом, у которой сняли повторение, но остался AutoFixed на сегодня
+            var formerlyRecurringTask = new TaskItemBuilder()
+                .WithId(id: 301)
+                .WithTitle(title: "Formerly Recurring Low Priority")
+                .WithPriorityId(4) // Low Priority
+                .WithStatus(status: TaskStatus.Planned)
+                .WithScheduledDate(date: today.ToDateTime(), dateSource: DateSource.AutoFixed)
+                .WithRecurrenceSourceId(sourceId: 888)
+                .Build();
+            formerlyRecurringTask.IsRecurring = false;
+            formerlyRecurringTask.RecurrenceType = RecurrenceType.EveryN;
+
+            // Срочная/высокоприоритетная задача без даты (AutoFlexible)
+            var urgentTask = new TaskItemBuilder()
+                .WithId(id: 302)
+                .WithTitle(title: "Urgent Task")
+                .WithPriorityId(2) // High Priority
+                .WithStatus(status: TaskStatus.Planned)
+                .WithDateSource(DateSource.AutoFlexible)
+                .Build();
+
+            taskRepo.Add(formerlyRecurringTask);
+            taskRepo.Add(urgentTask);
+
+            // Act: Запуск полного пересчёта (который включает нормализацию)
+            plannerService.RecalculateAll(settings);
+
+            // Assert:
+            // 1. Бывшая повтор-задача должна быть нормализована в AutoFlexible, и так как лимит 1 задача,
+            //    а у неё приоритет ниже (Low vs High), она должна быть вытеснена на завтра!
+            var updatedFormer = taskRepo.GetById(301);
+            updatedFormer!.RecurrenceSourceId.Should().BeNull();
+            updatedFormer.DateSource.Should().Be(DateSource.AutoFlexible);
+            updatedFormer.ScheduledDate.Should().Be(today.Tomorrow.ToDateTime());
+
+            // 2. Срочная задача должна занять слот на сегодня!
+            var updatedUrgent = taskRepo.GetById(302);
+            updatedUrgent!.ScheduledDate.Should().Be(today.ToDateTime());
+        }
+    }
 }

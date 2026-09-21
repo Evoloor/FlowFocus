@@ -17,6 +17,25 @@ public static class TaskDateNormalizer
     {
         var hasChanges = false;
 
+        // 0. Нормализация задач, у которых было отключено повторение:
+        // Если у активной задачи отключено повторение (!IsRecurring), но сохранились признаки серии повторений (RecurrenceSourceId != null или RecurrenceType != None):
+        // - Отвязываем её от серии повторений (RecurrenceSourceId = null) и сбрасываем параметры повтора.
+        // - Если статус даты был AutoFixed (унаследованный от повторений), переводим в AutoFlexible, чтобы задача не висела вечным якорем.
+        var recurrenceDetachedTasks = context.Tasks
+            .WhereActive()
+            .Where(t => !t.IsRecurring && (t.RecurrenceSourceId != null || t.RecurrenceType != RecurrenceType.None))
+            .ToList();
+
+        if (recurrenceDetachedTasks.Count > 0)
+        {
+            foreach (var task in recurrenceDetachedTasks)
+            {
+                task.ResetRecurrence();
+                task.LastChangesOn = DateTime.UtcNow;
+            }
+            hasChanges = true;
+        }
+
         // 1. Нормализация неназначенных дат для обычных (не повторяющихся) задач:
         // Если ScheduledDate == null и задача не повторяющаяся, её статус должен быть AutoFlexible
         var tasksToNormalize = context.Tasks
@@ -38,7 +57,7 @@ public static class TaskDateNormalizer
         // Повторяющиеся задачи не могут иметь статус AutoFlexible — они переводятся в AutoFixed.
         var recurringAutoFlexibleTasks = context.Tasks
             .WhereActive()
-            .Where(t => (t.IsRecurring || t.RecurrenceSourceId != null) && t.DateSource == DateSource.AutoFlexible)
+            .Where(t => t.IsRecurring && t.DateSource == DateSource.AutoFlexible)
             .ToList();
 
         if (recurringAutoFlexibleTasks.Count > 0)
@@ -66,7 +85,7 @@ public static class TaskDateNormalizer
         {
             foreach (var task in overdueManualTasks)
             {
-                task.DateSource = (task.IsRecurring || task.RecurrenceSourceId != null) ? DateSource.AutoFixed : DateSource.AutoFlexible;
+                task.DateSource = task.IsRecurring ? DateSource.AutoFixed : DateSource.AutoFlexible;
                 task.LastChangesOn = DateTime.UtcNow;
             }
             hasChanges = true;
@@ -75,7 +94,7 @@ public static class TaskDateNormalizer
         // 1.3. Сброс дат для заблокированных неактивным условием повторяющихся задач ("улетают" из расписания)
         var blockedRecurringTasks = context.Tasks
             .WhereActive()
-            .Where(t => t.IsRecurring || t.RecurrenceSourceId != null)
+            .Where(t => t.IsRecurring)
             .Where(t => t.DateSource != DateSource.Manual)
             .Where(t => t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))
             .Where(t => t.ScheduledDate != null)
@@ -103,7 +122,7 @@ public static class TaskDateNormalizer
 
         var activeRecurringTasks = context.Tasks
             .WhereActive()
-            .Where(t => t.IsRecurring || t.RecurrenceSourceId != null)
+            .Where(t => t.IsRecurring)
             .Where(t => t.DateSource != DateSource.Manual)
             .Where(t => !t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))
             .ToList();

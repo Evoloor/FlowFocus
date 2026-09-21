@@ -330,9 +330,9 @@ public partial class TaskEditDialog
                     _task.DateSource = DateSource.AutoFixed;
                 }
             }
-            else if (_task.ScheduledDate == null)
+            else
             {
-                _task.DateSource = DateSource.AutoFlexible;
+                _task.ResetRecurrence();
             }
 
             if (_task.Status == TaskStatus.NotConfigured)
@@ -511,12 +511,9 @@ public partial class TaskEditDialog
         }
         else
         {
-            if (_task.DateSource == DateSource.AutoFixed)
-            {
-                _task.DateSource = DateSource.AutoFlexible;
-                _scheduledDate = null;
-                _task.ScheduledDate = null;
-            }
+            _task.ResetRecurrence();
+            _scheduledDate = null;
+            _task.ScheduledDate = null;
         }
         await InvokeAsync(StateHasChanged);
     }

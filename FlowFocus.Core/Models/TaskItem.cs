@@ -83,7 +83,26 @@ public class TaskItem : WorkItemBase
     public int? RecurrenceWeekDays { get; set; }
 
     /// <summary>ID родительской повторяющейся задачи</summary>
-    public int? RecurrenceSourceId { get; init; }
+    public int? RecurrenceSourceId { get; set; }
+
+    /// <summary>
+    /// Сбрасывает параметры повторения задачи и отвязывает её от серии.
+    /// Если источник даты был AutoFixed (унаследован от повторения) или дата не назначена,
+    /// переводит источник в AutoFlexible (если дата не была задана вручную как Manual).
+    /// </summary>
+    public void ResetRecurrence()
+    {
+        IsRecurring = false;
+        RecurrenceSourceId = null;
+        RecurrenceType = RecurrenceType.None;
+        RecurrenceInterval = null;
+        RecurrenceWeekDays = null;
+
+        if (DateSource == DateSource.AutoFixed || (ScheduledDate == null && DateSource != DateSource.Manual))
+        {
+            DateSource = DateSource.AutoFlexible;
+        }
+    }
 
     // === Связи ===
     /// <summary>Подзадачи</summary>
