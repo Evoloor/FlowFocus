@@ -31,8 +31,8 @@ public interface ITaskRepository : IRepository<TaskItem>
     /// <summary>Получить все задачи для автодополнения (без подзадач)</summary>
     List<TaskItem> GetTasksForAutocomplete();
 
-    /// <summary>Пометить задачу как выполненную</summary>
-    void CompleteTask(int taskId);
+    /// <summary>Пометить задачу как выполненную (с возможностью указать явную дату завершения)</summary>
+    void CompleteTask(int taskId, DateTime? completedDate = null);
 
     /// <summary>Отменить пометку о выполнении (сделать незавершённой)</summary>
     void ReopenTask(int taskId);

@@ -205,17 +205,18 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
 
     #region Task Status & Lifecycle Management
 
-    public void CompleteTask(int taskId) => SetTaskStatusAndHandleRecurrence(taskId, TaskStatus.Completed);
+    public void CompleteTask(int taskId, DateTime? completedDate = null) =>
+        SetTaskStatusAndHandleRecurrence(taskId, TaskStatus.Completed, completedDate);
 
     public void MarkIrrelevant(int taskId) => SetTaskStatusAndHandleRecurrence(taskId, TaskStatus.Irrelevant);
 
-    private void SetTaskStatusAndHandleRecurrence(int taskId, TaskStatus targetStatus)
+    private void SetTaskStatusAndHandleRecurrence(int taskId, TaskStatus targetStatus, DateTime? explicitCompletedDate = null)
     {
         var task = GetById(taskId);
         if (task == null) return;
 
         var completedDate = targetStatus == TaskStatus.Completed
-            ? DetermineCompletionDate(task.ScheduledDate)
+            ? (explicitCompletedDate?.Date ?? DetermineCompletionDate(task.ScheduledDate))
             : (DateTime?)null;
 
         UpdatePartial(taskId, t =>

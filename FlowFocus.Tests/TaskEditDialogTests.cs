@@ -24,6 +24,7 @@ public class TaskEditDialogTests : IntegrationTestBase
     private readonly ITagSessionService _tagSessionService;
     private readonly ISnackbar _snackbar;
     private readonly IMudDialogInstance _mudDialog;
+    private readonly IDialogService _dialogService;
     private readonly BunitContext _ctx;
 
     public TaskEditDialogTests()
@@ -38,6 +39,7 @@ public class TaskEditDialogTests : IntegrationTestBase
         _tagSessionService.GetSuggestedTags(Arg.Any<int>()).Returns([]);
         _snackbar = Substitute.For<ISnackbar>();
         _mudDialog = Substitute.For<IMudDialogInstance>();
+        _dialogService = Substitute.For<IDialogService>();
 
         _ctx.Services.AddSingleton<ITaskRepository>(TaskRepo);
         _ctx.Services.AddSingleton<IPriorityRepository>(PriorityRepo);
@@ -48,6 +50,7 @@ public class TaskEditDialogTests : IntegrationTestBase
         _ctx.Services.AddSingleton<IPlannerService>(PlannerService);
         _ctx.Services.AddSingleton<INotificationService>(NotificationService);
         _ctx.Services.AddSingleton<ISnackbar>(_snackbar);
+        _ctx.Services.AddSingleton<IDialogService>(_dialogService);
         _ctx.JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
@@ -509,6 +512,172 @@ public class TaskEditDialogTests : IntegrationTestBase
         saved!.IsRecurring.Should().BeTrue();
         saved.DateSource.Should().Be(DateSource.AutoFixed);
         saved.ScheduledDate.Should().Be(TodoDay.Today.ToDateTime());
+    }
+
+    [Fact]
+    public async Task SaveTask_WithPastDate_WhenConfirmed_CompletesTaskRetroactively()
+    {
+        // Arrange
+        var pastDate = TodoDay.Today.ToDateTime().AddDays(-2);
+        _dialogService.ShowMessageBox(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<DialogOptions?>()
+        ).Returns(Task.FromResult<bool?>(true));
+
+        var cut = RenderTaskEditDialog(initialTitle: "Задача в прошлом");
+        var dialog = cut.Instance;
+
+        var onDateChangedMethod = typeof(TaskEditDialog).GetMethod("OnScheduledDateChanged", BindingFlags.Instance | BindingFlags.NonPublic);
+        onDateChangedMethod!.Invoke(dialog, [pastDate]);
+
+        // Act
+        await cut.InvokeAsync(() => InvokeSaveTaskAsync(dialog));
+
+        // Assert
+        var saved = TaskRepo.GetAll().FirstOrDefault(t => t.Title == "Задача в прошлом");
+        saved.Should().NotBeNull();
+        saved!.Status.Should().Be(TaskStatus.Completed);
+        saved.CompletedDate.Should().Be(pastDate.Date);
+        _mudDialog.Received().Close(Arg.Any<DialogResult>());
+    }
+
+    [Fact]
+    public async Task SaveTask_WithPastDate_WhenCancelled_DoesNotSaveTask()
+    {
+        // Arrange
+        var pastDate = TodoDay.Today.ToDateTime().AddDays(-2);
+        _dialogService.ShowMessageBox(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<DialogOptions?>()
+        ).Returns(Task.FromResult<bool?>(false));
+
+        var cut = RenderTaskEditDialog(initialTitle: "Несохранённая задача");
+        var dialog = cut.Instance;
+
+        var onDateChangedMethod = typeof(TaskEditDialog).GetMethod("OnScheduledDateChanged", BindingFlags.Instance | BindingFlags.NonPublic);
+        onDateChangedMethod!.Invoke(dialog, [pastDate]);
+
+        // Act
+        await cut.InvokeAsync(() => InvokeSaveTaskAsync(dialog));
+
+        // Assert
+        var saved = TaskRepo.GetAll().FirstOrDefault(t => t.Title == "Несохранённая задача");
+        saved.Should().BeNull();
+        _mudDialog.DidNotReceive().Close(Arg.Any<DialogResult>());
+    }
+
+    [Fact]
+    public async Task SaveTask_WithTodayDate_DoesNotPromptConfirmation()
+    {
+        // Arrange
+        var today = TodoDay.Today.ToDateTime();
+        var cut = RenderTaskEditDialog(initialTitle: "Сегодняшняя задача");
+        var dialog = cut.Instance;
+
+        var onDateChangedMethod = typeof(TaskEditDialog).GetMethod("OnScheduledDateChanged", BindingFlags.Instance | BindingFlags.NonPublic);
+        onDateChangedMethod!.Invoke(dialog, [today]);
+
+        // Act
+        await cut.InvokeAsync(() => InvokeSaveTaskAsync(dialog));
+
+        // Assert
+        await _dialogService.DidNotReceive().ShowMessageBox(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<DialogOptions?>()
+        );
+        var saved = TaskRepo.GetAll().FirstOrDefault(t => t.Title == "Сегодняшняя задача");
+        saved.Should().NotBeNull();
+        saved!.Status.Should().Be(TaskStatus.Planned);
+    }
+
+    [Fact]
+    public async Task SaveTask_EditExistingTask_WhenDateChangedToPast_PromptsAndCompletes()
+    {
+        // Arrange
+        var existing = new TaskItemBuilder()
+            .WithId(200)
+            .WithTitle("Существующая задача")
+            .WithScheduledDate(TodoDay.Today.ToDateTime(), DateSource.Manual)
+            .WithStatus(TaskStatus.Planned)
+            .Build();
+        TaskRepo.Add(existing);
+
+        var pastDate = TodoDay.Today.ToDateTime().AddDays(-3);
+        _dialogService.ShowMessageBox(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<DialogOptions?>()
+        ).Returns(Task.FromResult<bool?>(true));
+
+        var dialogTask = TaskRepo.GetById(200)!;
+        var cut = RenderTaskEditDialog(existingTask: dialogTask);
+        var dialog = cut.Instance;
+
+        var onDateChangedMethod = typeof(TaskEditDialog).GetMethod("OnScheduledDateChanged", BindingFlags.Instance | BindingFlags.NonPublic);
+        onDateChangedMethod!.Invoke(dialog, [pastDate]);
+
+        // Act
+        await cut.InvokeAsync(() => InvokeSaveTaskAsync(dialog));
+
+        // Assert
+        var saved = TaskRepo.GetById(200);
+        saved.Should().NotBeNull();
+        saved!.Status.Should().Be(TaskStatus.Completed);
+        saved.CompletedDate.Should().Be(pastDate.Date);
+    }
+
+    [Fact]
+    public async Task SaveTask_WithPastDate_WhenRecurringTaskConfirmed_CompletesAndSpawnsNextInstance()
+    {
+        // Arrange
+        var pastDate = TodoDay.Today.Yesterday.ToDateTime();
+        _dialogService.ShowMessageBox(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<DialogOptions?>()
+        ).Returns(Task.FromResult<bool?>(true));
+
+        var cut = RenderTaskEditDialog(initialTitle: "Ежедневная задача в прошлом");
+        var dialog = cut.Instance;
+
+        // Включаем повторение
+        var onRecurringMethod = typeof(TaskEditDialog).GetMethod("OnRecurringChanged", BindingFlags.Instance | BindingFlags.NonPublic);
+        var recTask = (Task)onRecurringMethod!.Invoke(dialog, [true])!;
+        await recTask;
+
+        var onDateChangedMethod = typeof(TaskEditDialog).GetMethod("OnScheduledDateChanged", BindingFlags.Instance | BindingFlags.NonPublic);
+        onDateChangedMethod!.Invoke(dialog, [pastDate]);
+
+        // Act
+        await cut.InvokeAsync(() => InvokeSaveTaskAsync(dialog));
+
+        // Assert
+        var allTasks = TaskRepo.GetAll().ToList();
+        var completed = allTasks.FirstOrDefault(t => t.Title == "Ежедневная задача в прошлом" && t.Status == TaskStatus.Completed);
+        completed.Should().NotBeNull();
+        completed!.CompletedDate.Should().Be(pastDate.Date);
+
+        var nextInstance = allTasks.FirstOrDefault(t => t.RecurrenceSourceId == completed.Id);
+        nextInstance.Should().NotBeNull();
+        nextInstance!.Status.Should().Be(TaskStatus.Planned);
     }
 
     protected override void Dispose(bool disposing)

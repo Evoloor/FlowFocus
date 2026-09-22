@@ -22,6 +22,7 @@ public partial class TaskEditDialog
     [Inject] public IPlannerService PlannerService { get; set; } = null!;
     [Inject] public INotificationService NotificationService { get; set; } = null!;
     [Inject] public ISnackbar Snackbar { get; set; } = null!;
+    [Inject] public IDialogService DialogService { get; set; } = null!;
 
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
 
@@ -310,6 +311,30 @@ public partial class TaskEditDialog
                 return;
             }
 
+            var shouldCompleteRetroactively = false;
+            var isDateNewlySetToPast = _task.Status != TaskStatus.Completed
+                && _scheduledDate.HasValue
+                && TodoDay.Today.IsOverdue(_scheduledDate)
+                && (_originalTask == null 
+                    || _originalTask.ScheduledDate != _scheduledDate 
+                    || _originalTask.DateSource != _task.DateSource);
+
+            if (isDateNewlySetToPast)
+            {
+                var confirmed = await DialogService.ShowMessageBox(
+                    "Завершение задачи",
+                    $"Указана дата в прошлом ({_scheduledDate!.Value:dd.MM.yyyy}). Завершить задачу этой датой?",
+                    yesText: "Да, завершить",
+                    cancelText: "Отмена");
+
+                if (confirmed != true)
+                {
+                    return;
+                }
+
+                shouldCompleteRetroactively = true;
+            }
+
             _task.EstimatedMinutes = _timeFormat switch
             {
                 TimeFormat.Hours => _estimatedValue * 60,
@@ -437,12 +462,20 @@ public partial class TaskEditDialog
             if (IsEdit)
             {
                 TaskRepo.Update(_task);
-                Snackbar.Add("Задача обновлена", Severity.Success);
             }
             else
             {
                 TaskRepo.Add(_task);
-                Snackbar.Add("Задача создана", Severity.Success);
+            }
+
+            if (shouldCompleteRetroactively)
+            {
+                TaskRepo.CompleteTask(_task.Id, _scheduledDate!.Value.Date);
+                Snackbar.Add(IsEdit ? "Задача обновлена и завершена" : "Задача создана и завершена", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(IsEdit ? "Задача обновлена" : "Задача создана", Severity.Success);
             }
 
             TaskRepo.NormalizeTaskDateSources();
@@ -461,7 +494,7 @@ public partial class TaskEditDialog
                     return Task.CompletedTask;
                 });
             }
-            else if (RelationsChanged())
+            else if (RelationsChanged() || shouldCompleteRetroactively)
             {
                 await InvokeAsync(() =>
                 {

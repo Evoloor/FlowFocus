@@ -61,6 +61,29 @@ public class TaskTimeMechanicsTests : IntegrationTestBase
     }
 
     [Fact]
+    public void CompletingTask_WithExplicitCompletedDate_SetsSpecifiedDate()
+    {
+        // Arrange
+        var explicitDate = new DateTime(2026, 5, 10);
+        var task = new TaskItemBuilder()
+            .WithId(103)
+            .WithScheduledDate(explicitDate, dateSource: DateSource.Manual)
+            .WithStatus(TaskStatus.Planned)
+            .Build();
+
+        TaskRepo.Add(task);
+
+        // Act
+        TaskRepo.CompleteTask(task.Id, explicitDate);
+
+        // Assert
+        var saved = TaskRepo.GetById(103);
+        saved.Should().NotBeNull();
+        saved!.CompletedDate.Should().Be(explicitDate);
+        saved.Status.Should().Be(TaskStatus.Completed);
+    }
+
+    [Fact]
     public void SystemTime0100AM_WithStartOfDay4AM_RecordsCompletionDateAsPreviousCalendarDayInRepository()
     {
         // Arrange
