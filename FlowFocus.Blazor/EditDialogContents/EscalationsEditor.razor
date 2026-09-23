@@ -2,29 +2,44 @@
 {
     <MudText Typo="Typo.subtitle2" Class="mb-2">Настройки автоматического повышения приоритета по времени</MudText>
 
-    @foreach (var escalation in Escalations)
+    @if (Escalations.Any(e => e.IsApplied))
     {
-        var isEscalationDateDisabled = escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date < TodoDay.Today.ToDateTime();
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1 d-block">Применённые повышения:</MudText>
+        @foreach (var applied in Escalations.Where(e => e.IsApplied))
+        {
+            <div class="applied-escalation-row d-flex align-center gap-2 mb-2 px-3 py-1 rounded">
+                <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Outlined">Применено</MudChip>
+                <MudText Typo="Typo.body2" Class="flex-grow-1">
+                    <b>@GetPriorityName(applied.TargetPriorityId)</b>
+                    @(applied.EscalationDate.HasValue ? $" ({applied.EscalationDate.Value:dd.MM.yyyy})" : "")
+                </MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                               Size="Size.Small"
+                               Color="Color.Error"
+                               OnClick="@(() => RemoveEscalation(applied))"
+                               Title="Удалить запись"/>
+            </div>
+        }
+    }
+
+    @foreach (var escalation in Escalations.Where(e => !e.IsApplied))
+    {
         <div class="escalation-row mb-2">
             <MudSelect T="int" @bind-Value="escalation.TargetPriorityId"
                        Label="Приоритет"
                        Variant="Variant.Outlined"
                        Margin="Margin.Dense"
-                       Dense="true"
-                       Disabled="@IsEscalationPriorityDisabled(escalation)">
-                @foreach (var p in GetAvailablePrioritiesForEscalation())
+                       Dense="true">
+                @foreach (var p in GetAvailablePrioritiesForEscalation(escalation))
                 {
                     <MudSelectItem Value="p.Id">@p.Name</MudSelectItem>
                 }
             </MudSelect>
-            <MudTooltip Text="@(isEscalationDateDisabled ? "Дата уже прошла и изменить её нельзя" : "")">
-                <MudDatePicker T="DateTime?" @bind-Date="escalation.EscalationDate"
-                               Label="Дата"
-                               Variant="Variant.Outlined"
-                               Margin="Margin.Dense"
-                               MinDate="@TodoDay.Today.ToDateTime()"
-                               Disabled="@isEscalationDateDisabled"/>
-            </MudTooltip>
+            <MudDatePicker @bind-Date="escalation.EscalationDate"
+                           Label="Дата"
+                           Variant="Variant.Outlined"
+                           Margin="Margin.Dense"
+                           MinDate="@TodoDay.Today.ToDateTime()"/>
             <MudIconButton Icon="@Icons.Material.Filled.Delete"
                            Size="Size.Small"
                            Color="Color.Error"
@@ -48,6 +63,10 @@
         opacity: 0.6;
         filter: grayscale(30%);
     }
+
+    .applied-escalation-row {
+        background-color: var(--mud-palette-background-grey);
+    }
 </style>
 
 @code {
@@ -61,37 +80,39 @@
 
     [Parameter] public bool IsTaskRecurring { get; set; }
 
-    private bool CanAddEscalation => GetAvailablePrioritiesForEscalation().Any(p => Escalations.All(e => e.TargetPriorityId != p.Id));
+    private bool CanAddEscalation => GetAvailablePrioritiesForEscalation().Any(p => Escalations.Where(e => !e.IsApplied).All(e => e.TargetPriorityId != p.Id));
 
-    private List<PriorityLevel> GetAvailablePrioritiesForEscalation()
+    private List<PriorityLevel> GetAvailablePrioritiesForEscalation(EscalationDto? current = null)
     {
         if (Task.PriorityId == null)
         {
             return Priorities;
         }
 
-        return Priorities.Where(p => p.Id != Task.PriorityId && p.Order < (Priorities.FirstOrDefault(pp => pp.Id == Task.PriorityId)?.Order ?? 0)).ToList();
+        var currentTaskPriorityOrder = Priorities.FirstOrDefault(pp => pp.Id == Task.PriorityId)?.Order ?? 99;
+        return Priorities.Where(p =>
+            p.Id != Task.PriorityId &&
+            p.Order < currentTaskPriorityOrder &&
+            (current?.TargetPriorityId == p.Id || Escalations.Where(e => !e.IsApplied).All(e => e.TargetPriorityId != p.Id))
+        ).ToList();
+    }
+
+    private string GetPriorityName(int priorityId)
+    {
+        return Priorities.FirstOrDefault(p => p.Id == priorityId)?.Name ?? $"Приоритет {priorityId}";
     }
 
     private void AddEscalation()
     {
         if (IsTaskRecurring) return;
 
-        var available = GetAvailablePrioritiesForEscalation().FirstOrDefault(p => Escalations.All(e => e.TargetPriorityId != p.Id));
+        var available = GetAvailablePrioritiesForEscalation().FirstOrDefault(p => Escalations.Where(e => !e.IsApplied).All(e => e.TargetPriorityId != p.Id));
         if (available == null) return;
-        Escalations.Add(new() { TargetPriorityId = available.Id, EscalationDate = TodoDay.Today.AddDays(7).ToDateTime() });
+        Escalations.Add(new() { TargetPriorityId = available.Id, EscalationDate = TodoDay.Today.AddDays(7).ToDateTime(), IsApplied = false });
     }
 
     private void RemoveEscalation(EscalationDto escalation)
     {
         Escalations.Remove(escalation);
     }
-
-    private bool IsEscalationPriorityDisabled(EscalationDto escalation)
-    {
-        var currentPriorityOrder = Task.PriorityId.HasValue ? Priorities.FirstOrDefault(p => p.Id == Task.PriorityId)?.Order ?? 99 : 99;
-        var escalationPriority = Priorities.FirstOrDefault(p => p.Id == escalation.TargetPriorityId);
-        return escalationPriority != null && escalationPriority.Order >= currentPriorityOrder;
-    }
-
-}
+}

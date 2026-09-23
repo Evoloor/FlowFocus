@@ -65,6 +65,15 @@ public class PriorityEscalationPlanner(ITaskRepository taskRepository)
                     if (targetOrder < blockerOrder)
                     {
                         blockerTask.PriorityId = task.PriorityId.Value;
+                        foreach (var pe in blockerTask.PriorityEscalations.Where(e => !e.IsApplied))
+                        {
+                            var peOrder = pe.TargetPriority?.Order ?? 99;
+                            if (peOrder >= targetOrder)
+                            {
+                                pe.IsApplied = true;
+                                pe.LastChangesOn = DateTime.UtcNow;
+                            }
+                        }
                         taskRepository.Update(blockerTask);
                         changed = true;
                     }

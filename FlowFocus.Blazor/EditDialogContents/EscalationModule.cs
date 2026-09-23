@@ -24,7 +24,7 @@ public static class EscalationModule
                         TaskId = task.Id > 0 ? task.Id : existing.TaskId,
                         TargetPriorityId = dto.TargetPriorityId,
                         EscalationDate = dto.EscalationDate ?? TodoDay.Today.ToDateTime(),
-                        IsApplied = existing.IsApplied,
+                        IsApplied = dto.IsApplied || existing.IsApplied,
                         LastChangesOn = DateTime.UtcNow
                     };
                     resultEscalations.Add(updatedEscalation);
@@ -36,7 +36,7 @@ public static class EscalationModule
                         TaskId = task.Id > 0 ? task.Id : 0,
                         TargetPriorityId = dto.TargetPriorityId,
                         EscalationDate = dto.EscalationDate ?? TodoDay.Today.ToDateTime(),
-                        IsApplied = false,
+                        IsApplied = dto.IsApplied,
                         LastChangesOn = DateTime.UtcNow
                     };
                     resultEscalations.Add(newEscalation);
@@ -49,7 +49,7 @@ public static class EscalationModule
                     TaskId = task.Id > 0 ? task.Id : 0,
                     TargetPriorityId = dto.TargetPriorityId,
                     EscalationDate = dto.EscalationDate ?? TodoDay.Today.ToDateTime(),
-                    IsApplied = false,
+                    IsApplied = dto.IsApplied,
                     LastChangesOn = DateTime.UtcNow
                 };
                 resultEscalations.Add(newEscalation);

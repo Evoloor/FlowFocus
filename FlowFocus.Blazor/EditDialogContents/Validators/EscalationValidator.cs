@@ -14,6 +14,8 @@ public static class EscalationValidator
             escalations?.Where(e => e.EscalationDate != null).OrderBy(e => e.EscalationDate).ToList() ??
             [];
 
+        var activeEscalations = escalationList.Where(e => !e.IsApplied).ToList();
+
         var currentPriorityOrder = task.PriorityId.HasValue
             ? priorities.FirstOrDefault(p => p.Id == task.PriorityId)?.Order ?? 99
             : 99;
@@ -21,7 +23,7 @@ public static class EscalationValidator
         var prevPriorityOrder = currentPriorityOrder;
         var prevDate = TodoDay.Today.ToDateTime();
 
-        foreach (var escalation in escalationList)
+        foreach (var escalation in activeEscalations)
         {
             var targetPriority = priorities.FirstOrDefault(p => p.Id == escalation.TargetPriorityId);
             if (targetPriority == null) continue;

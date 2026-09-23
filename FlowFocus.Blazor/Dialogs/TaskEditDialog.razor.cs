@@ -197,7 +197,8 @@ public partial class TaskEditDialog
             {
                 Id = pe.Id,
                 TargetPriorityId = pe.TargetPriorityId,
-                EscalationDate = pe.EscalationDate
+                EscalationDate = pe.EscalationDate,
+                IsApplied = pe.IsApplied
             });
         }
     }
@@ -209,7 +210,7 @@ public partial class TaskEditDialog
             var highestPriority = _priorities.FirstOrDefault();
             if (highestPriority == null) return false;
 
-            return _task.PriorityId == null || _task.PriorityId != highestPriority.Id;
+            return _task.PriorityId == null || _task.PriorityId != highestPriority.Id || _escalations.Count > 0;
         }
     }
 
@@ -300,6 +301,38 @@ public partial class TaskEditDialog
     {
         try
         {
+            var currentPriorityOrder = _task.PriorityId.HasValue
+                ? _priorities.FirstOrDefault(p => p.Id == _task.PriorityId)?.Order ?? 99
+                : 99;
+
+            var redundantUnappliedEscalations = _escalations
+                .Where(e => !e.IsApplied)
+                .Where(e =>
+                {
+                    var targetOrder = _priorities.FirstOrDefault(p => p.Id == e.TargetPriorityId)?.Order ?? 99;
+                    return targetOrder >= currentPriorityOrder;
+                })
+                .ToList();
+
+            if (redundantUnappliedEscalations.Count > 0)
+            {
+                var names = string.Join(", ", redundantUnappliedEscalations.Select(e =>
+                    _priorities.FirstOrDefault(p => p.Id == e.TargetPriorityId)?.Name ?? $"Id {e.TargetPriorityId}"));
+
+                var confirmed = await DialogService.ShowMessageBox(
+                    "Удаление неактуальных повышений",
+                    $"Выбранный приоритет делает следующие запланированные повышения неактуальными: {names}. Они будут бесследно удалены. Продолжить?",
+                    yesText: "Продолжить",
+                    cancelText: "Отмена");
+
+                if (confirmed != true)
+                {
+                    return;
+                }
+
+                _escalations.RemoveAll(e => redundantUnappliedEscalations.Contains(e));
+            }
+
             var validationErrors = ValidateTask();
             if (validationErrors.Any())
             {
