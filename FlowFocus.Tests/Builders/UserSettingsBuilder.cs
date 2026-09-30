@@ -49,6 +49,14 @@ public class UserSettingsBuilder : EntityBuilder<UserSettings, UserSettingsBuild
         return this;
     }
 
+    private DateTime? _todayPlanLockedDate;
+
+    public UserSettingsBuilder WithTodayPlanLockedDate(DateTime? lockedDate)
+    {
+        _todayPlanLockedDate = lockedDate;
+        return this;
+    }
+
     public override UserSettings Build()
     {
         return new()
@@ -61,7 +69,8 @@ public class UserSettingsBuilder : EntityBuilder<UserSettings, UserSettingsBuild
             AutoDistributeEnabled = AutoDistributeEnabled,
             IsDarkMode = IsDarkMode,
             HideTaskTitlesDefault = _hideTaskTitlesDefault,
-            DefaultPriorityId = _defaultPriorityId
+            DefaultPriorityId = _defaultPriorityId,
+            TodayPlanLockedDate = _todayPlanLockedDate
         };
     }
 }

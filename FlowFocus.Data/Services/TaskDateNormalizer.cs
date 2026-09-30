@@ -123,8 +123,9 @@ public static class TaskDateNormalizer
         var activeRecurringTasks = context.Tasks
             .WhereActive()
             .Where(t => t.IsRecurring)
-            .Where(t => t.DateSource != DateSource.Manual)
             .Where(t => !t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))
+            .ToList()
+            .Where(t => t.DateSource != DateSource.Manual)
             .ToList();
 
         foreach (var task in activeRecurringTasks)
@@ -137,10 +138,54 @@ public static class TaskDateNormalizer
                 nextDate = recurrenceService.CalculateNextRecurrenceDateFromBase(task, lastCompleted);
             }
 
-            // Если задача не выполнялась вовсе или рассчитанный очередной срок <= today, значит просрочена/должна выполняться сегодня
-            var targetDate = (nextDate == null || nextDate.Value.Date <= todayDt.Date)
-                ? todayDt
-                : nextDate.Value.Date;
+            DateTime targetDate;
+            var isSnoozedPastToday = task.SnoozedUntilDate.HasValue && new TodoDay(task.SnoozedUntilDate.Value) > today;
+
+            if (task.RecurrenceType == RecurrenceType.WeekDays && (task.RecurrenceWeekDays ?? 0) > 0)
+            {
+                var mask = task.RecurrenceWeekDays!.Value;
+                var currentDayOfWeek = (int)todayDt.DayOfWeek;
+                var todayMask = currentDayOfWeek == 0 ? 64 : 1 << (currentDayOfWeek - 1);
+                var isTodayAllowed = (mask & todayMask) != 0;
+
+                if (isSnoozedPastToday)
+                {
+                    // Задача отложена до SnoozedUntilDate. Ищем допустимый день недели, начиная с даты отсрочки
+                    var snoozeDt = task.SnoozedUntilDate!.Value.Date;
+                    var snoozeDayOfWeek = (int)snoozeDt.DayOfWeek;
+                    var snoozeMask = snoozeDayOfWeek == 0 ? 64 : 1 << (snoozeDayOfWeek - 1);
+                    targetDate = (mask & snoozeMask) != 0
+                        ? snoozeDt
+                        : recurrenceService.CalculateNextRecurrenceDateFromBase(task, snoozeDt)!.Value.Date;
+                }
+                else if (isTodayAllowed && (nextDate == null || nextDate.Value.Date <= todayDt.Date))
+                {
+                    targetDate = todayDt;
+                }
+                else if (nextDate != null && nextDate.Value.Date > todayDt.Date)
+                {
+                    targetDate = nextDate.Value.Date;
+                }
+                else
+                {
+                    // Сегодня недопустимый день недели (или задача не на сегодня). Ищем ближайший допустимый день вперед от сегодня
+                    targetDate = recurrenceService.CalculateNextRecurrenceDateFromBase(task, todayDt)!.Value.Date;
+                }
+            }
+            else
+            {
+                if (isSnoozedPastToday)
+                {
+                    targetDate = task.SnoozedUntilDate!.Value.Date;
+                }
+                else
+                {
+                    // Если задача не выполнялась вовсе или рассчитанный очередной срок <= today, значит просрочена/должна выполняться сегодня
+                    targetDate = (nextDate == null || nextDate.Value.Date <= todayDt.Date)
+                        ? todayDt
+                        : nextDate.Value.Date;
+                }
+            }
 
             if (task.ScheduledDate != targetDate || task.DateSource != DateSource.AutoFixed)
             {
@@ -163,7 +208,8 @@ public static class TaskDateNormalizer
         {
             foreach (var task in unassignedAutoFixed)
             {
-                task.ScheduledDate = todayDt;
+                var isSnoozed = task.SnoozedUntilDate.HasValue && new TodoDay(task.SnoozedUntilDate.Value) > today;
+                task.ScheduledDate = isSnoozed ? task.SnoozedUntilDate!.Value.Date : todayDt;
                 task.LastChangesOn = DateTime.UtcNow;
             }
             hasChanges = true;

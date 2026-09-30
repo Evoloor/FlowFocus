@@ -15,7 +15,7 @@ namespace FlowFocus.Data.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "9.0.10");
+            modelBuilder.HasAnnotation("ProductVersion", "9.0.20");
 
             modelBuilder.Entity("FlowFocus.Core.Models.ExternalCondition", b =>
                 {
@@ -324,6 +324,9 @@ namespace FlowFocus.Data.Migrations
                     b.Property<DateTime?>("ScheduledDate")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("SnoozedUntilDate")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");
 
@@ -418,6 +421,9 @@ namespace FlowFocus.Data.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("LastChangesOn")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("TodayPlanLockedDate")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");

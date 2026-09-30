@@ -28,6 +28,9 @@ public partial class TaskCard : WorkItemCardBase<TaskItem>
     public bool IsNested { get; set; }
 
     [Parameter]
+    public bool IsTodayTab { get; set; }
+
+    [Parameter]
     public EventCallback OnTaskChanged { get; set; }
 
     private string GetCardClass() => GetCardClass(IsNested, DisplayMode);
@@ -153,6 +156,23 @@ public partial class TaskCard : WorkItemCardBase<TaskItem>
             PlannerService.UpdateBlockedStatuses();
             Snackbar.Add("Задача удалена", Severity.Success);
             NotificationService.NotifyTasksChanged();
+            await OnTaskChanged.InvokeAsync();
+        }
+    }
+
+    private async Task OpenTriageDialog()
+    {
+        var parameters = new DialogParameters { ["Task"] = Task };
+        DialogOptions options = new()
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseOnEscapeKey = true
+        };
+        var dialog = await DialogService.ShowAsync<TaskTriageDialog>("Управление задачей", parameters, options);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
             await OnTaskChanged.InvokeAsync();
         }
     }

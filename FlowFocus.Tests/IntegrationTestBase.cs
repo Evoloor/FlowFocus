@@ -30,7 +30,7 @@ public abstract class IntegrationTestBase : IDisposable
         TagRepo = new(Context, NotificationService);
         ConditionRepo = new(Context, NotificationService);
         SettingsRepo = new(Context, NotificationService);
-        PlannerService = new(TaskRepo);
+        PlannerService = new(TaskRepo, SettingsRepo);
     }
 
     public void Dispose()

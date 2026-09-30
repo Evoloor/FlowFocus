@@ -5,7 +5,23 @@
         <div class="task-list-header">
             @if (ShowTitle && !string.IsNullOrEmpty(Title))
             {
-                <MudText Typo="Typo.h5" Class="mb-3">@Title</MudText>
+                <div class="d-flex align-center gap-3 mb-3">
+                    <MudText Typo="Typo.h5">@Title</MudText>
+                    @if (IsTodayTab)
+                    {
+                        <MudTooltip Text="@(IsTodayLocked ? "План зафиксирован от авто-досыпки из бэклога. Нажмите, чтобы разблокировать" : "План динамический (авто-распределение включено). Нажмите, чтобы зафиксировать текущий план")">
+                            <MudChip T="string"
+                                     Icon="@(IsTodayLocked ? Icons.Material.Filled.Lock : Icons.Material.Filled.LockOpen)"
+                                     Color="@(IsTodayLocked ? Color.Info : Color.Default)"
+                                     Variant="@(IsTodayLocked ? Variant.Filled : Variant.Outlined)"
+                                     Size="Size.Small"
+                                     OnClick="@ToggleTodayPlanLock"
+                                     Class="cursor-pointer">
+                                @(IsTodayLocked ? "План зафиксирован" : "План динамический")
+                            </MudChip>
+                        </MudTooltip>
+                    }
+                </div>
             }
 
             <div class="task-list-controls">
@@ -150,7 +166,7 @@
         {
             @foreach (var task in PagedTasks)
             {
-                <TaskCard @key="task.Id" Task="task" DisplayMode="_displayMode" OnTaskChanged="@HandleTaskChanged" />
+                <TaskCard @key="task.Id" Task="task" DisplayMode="_displayMode" IsTodayTab="IsTodayTab" OnTaskChanged="@HandleTaskChanged" />
             }
         }
     </div>

@@ -5,19 +5,28 @@
     <div class="task-actions">
         <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
                        OnClick="@OnEdit" Title="Редактировать" />
-        @if (Task.Status == TaskStatus.Irrelevant)
+
+        @if (IsTodayTab)
         {
-            <MudIconButton Icon="@Icons.Material.Filled.Restore" Size="Size.Small"
-                           OnClick="@OnRestoreFromIrrelevant" Title="Вернуть из неактуальных" />
+            <MudIconButton Icon="@Icons.Material.Filled.Tune" Size="Size.Small" Color="Color.Primary"
+                           OnClick="@OnOpenTriage" Title="Управление задачей (отложить, заменить...)" />
         }
         else
         {
-            <MudIconButton Icon="@Icons.Material.Filled.DoNotDisturb" Size="Size.Small"
-                           OnClick="@OnMarkIrrelevant" Title="Сделать неактуальным"
-                           Disabled="@(Task.Status == TaskStatus.Completed)" />
+            @if (Task.Status == TaskStatus.Irrelevant)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Restore" Size="Size.Small"
+                               OnClick="@OnRestoreFromIrrelevant" Title="Вернуть из неактуальных" />
+            }
+            else
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.DoNotDisturb" Size="Size.Small"
+                               OnClick="@OnMarkIrrelevant" Title="Сделать неактуальным"
+                               Disabled="@(Task.Status == TaskStatus.Completed)" />
+            }
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                           OnClick="@OnDelete" Title="Удалить" />
         }
-        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
-                       OnClick="@OnDelete" Title="Удалить" />
     </div>
 }
 
@@ -27,6 +36,12 @@
 
     [Parameter]
     public bool IsNested { get; set; }
+
+    [Parameter]
+    public bool IsTodayTab { get; set; }
+
+    [Parameter]
+    public EventCallback OnOpenTriage { get; set; }
 
     [Parameter]
     public EventCallback OnEdit { get; set; }

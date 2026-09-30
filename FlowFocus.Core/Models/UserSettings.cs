@@ -32,6 +32,11 @@ public class UserSettings : IAuditEntity
     /// <summary>Включено ли авто-распределение при добавлении/изменении задач</summary>
     public bool AutoDistributeEnabled { get; set; }
 
+    /// <summary>
+    /// Дата TodoDay, для которой зафиксирован план (запрещена авто-досыпка новых задач из бэклога)
+    /// </summary>
+    public DateTime? TodayPlanLockedDate { get; set; }
+
     // === Интерфейс ===
     /// <summary>Тёмная тема</summary>
     public bool IsDarkMode { get; set; } = true;

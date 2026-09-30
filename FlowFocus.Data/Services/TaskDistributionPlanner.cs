@@ -7,7 +7,10 @@ namespace FlowFocus.Data.Services;
 
 public class TaskDistributionPlanner(ITaskRepository taskRepository)
 {
-    public void DistributeTasks(UserSettings settings)
+    public void DistributeTasks(
+        UserSettings settings,
+        int? allowedReplacementMinutes = null,
+        int? allowedReplacementComplexity = null)
     {
         HandleRecurringBeforeDistribution();
 
@@ -52,6 +55,13 @@ public class TaskDistributionPlanner(ITaskRepository taskRepository)
         var today = TodoDay.Today;
         var tomorrow = today.AddDays(1);
 
+        var isTodayLocked = settings.TodayPlanLockedDate.HasValue &&
+                            new TodoDay(settings.TodayPlanLockedDate.Value) == today;
+
+        var defaultStartDate = isTodayLocked && allowedReplacementMinutes == null ? tomorrow : today;
+        var remainingReplacementMinutes = allowedReplacementMinutes ?? 0;
+        var remainingReplacementComplexity = allowedReplacementComplexity ?? 0;
+
         var allTasks = taskRepository.GetAll().ToList();
 
         Dictionary<TodoDay, DailyStats> dailyStatsMap = new();
@@ -78,7 +88,8 @@ public class TaskDistributionPlanner(ITaskRepository taskRepository)
                 else if (t.IsActive)
                 {
                     var isFixed = t.DateSource is DateSource.Manual or DateSource.AutoFixed;
-                    if (isFixed && t.ScheduledDate.HasValue && day.IsSameDay(t.ScheduledDate))
+                    var isLockedTodayTask = isTodayLocked && day == today;
+                    if ((isFixed || isLockedTodayTask) && t.ScheduledDate.HasValue && day.IsSameDay(t.ScheduledDate))
                     {
                         stats.TotalComplexity += t.TotalComplexity;
                         stats.TotalMinutes += t.TotalEstimatedMinutes;
@@ -91,31 +102,74 @@ public class TaskDistributionPlanner(ITaskRepository taskRepository)
             return stats;
         }
 
-        var currentDate = today;
+        var currentDate = defaultStartDate;
 
         foreach (var task in sortedTasks)
         {
+            // Если план на сегодня зафиксирован и задача уже была запланирована на сегодня — сохраняем её на месте
+            if (isTodayLocked && today.IsSameDay(task.ScheduledDate))
+            {
+                continue;
+            }
+
+            var taskDate = currentDate;
+            if (task.SnoozedUntilDate.HasValue && new TodoDay(task.SnoozedUntilDate.Value) > taskDate)
+            {
+                taskDate = tomorrow;
+                if (new TodoDay(task.SnoozedUntilDate.Value) > tomorrow)
+                {
+                    taskRepository.UpdateTaskSchedule(task.Id, null, saveChanges: false);
+                    continue;
+                }
+            }
+
             while (true)
             {
-                if (currentDate > tomorrow)
+                if (taskDate > tomorrow)
                 {
                     taskRepository.UpdateTaskSchedule(task.Id, null, saveChanges: false);
                     break;
                 }
 
-                var dailyStats = GetStatsForDay(currentDate);
+                // Если день заблокирован, но разрешена точечная замена
+                if (taskDate == today && isTodayLocked)
+                {
+                    if (allowedReplacementMinutes == null ||
+                        task.TotalEstimatedMinutes > remainingReplacementMinutes ||
+                        (allowedReplacementComplexity != null && task.TotalComplexity > remainingReplacementComplexity))
+                    {
+                        taskDate = tomorrow;
+                        continue;
+                    }
+                }
+
+                var dailyStats = GetStatsForDay(taskDate);
 
                 if (CanAddToDay(task, dailyStats, settings))
                 {
-                    taskRepository.UpdateTaskSchedule(task.Id, currentDate.ToDateTime(), saveChanges: false);
+                    taskRepository.UpdateTaskSchedule(task.Id, taskDate.ToDateTime(), saveChanges: false);
 
                     dailyStats.TotalComplexity += task.TotalComplexity;
                     dailyStats.TotalMinutes += task.TotalEstimatedMinutes;
                     dailyStats.TaskCount++;
+
+                    if (taskDate == today && isTodayLocked && allowedReplacementMinutes != null)
+                    {
+                        remainingReplacementMinutes -= task.TotalEstimatedMinutes;
+                        if (allowedReplacementComplexity != null)
+                        {
+                            remainingReplacementComplexity -= task.TotalComplexity;
+                        }
+                    }
+
                     break;
                 }
 
-                currentDate = currentDate.AddDays(1);
+                taskDate = taskDate.AddDays(1);
+                if (taskDate > currentDate)
+                {
+                    currentDate = taskDate;
+                }
             }
         }
     }

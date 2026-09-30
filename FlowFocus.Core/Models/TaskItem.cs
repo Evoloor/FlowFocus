@@ -26,6 +26,11 @@ public class TaskItem : WorkItemBase
     /// <summary>Определяет, кем и как была назначена дата <see cref="ScheduledDate"/>.</summary>
     public DateSource DateSource { get; set; } = DateSource.AutoFlexible;
 
+    /// <summary>
+    /// Дата TodoDay, до которой задача отложена (не должна назначаться/возвращаться алгоритмами до наступления этой даты)
+    /// </summary>
+    public DateTime? SnoozedUntilDate { get; set; }
+
     // === Повторение ===
     /// <summary>Включено ли повторение</summary>
     public bool IsRecurring { get; set; }
@@ -175,5 +180,6 @@ public class TaskItem : WorkItemBase
         RecurrenceInterval = source.RecurrenceInterval;
         RecurrenceWeekDays = source.RecurrenceWeekDays;
         RecurrenceSourceId = source.RecurrenceSourceId;
+        SnoozedUntilDate = source.SnoozedUntilDate;
     }
 }

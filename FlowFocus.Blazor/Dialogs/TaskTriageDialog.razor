@@ -1,0 +1,175 @@
+@using FlowFocus.Core
+@using FlowFocus.Core.Enums
+@using FlowFocus.Core.Models
+@using FlowFocus.Core.Services
+@inject ITaskRepository TaskRepo
+@inject IPlannerService PlannerService
+@inject ISettingsRepository SettingsRepo
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject INotificationService NotificationService
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.Tune" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Управление задачей дня</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (Task != null)
+        {
+            <div class="mb-4">
+                <TaskCard Task="Task" DisplayMode="DisplayMode.Compact" IsNested="true" />
+            </div>
+
+            <MudText Typo="Typo.subtitle2" Class="mb-2 font-weight-bold">
+                Цель для сегодняшнего дня:
+            </MudText>
+
+            <MudRadioGroup T="bool" @bind-Value="_replaceWithBacklog" Class="d-flex flex-column gap-2 mb-4">
+                <MudPaper Outlined="true" Class="@GetPaperClass(_replaceWithBacklog)" Style="cursor: pointer;"
+                          @onclick="@(() => _replaceWithBacklog = true)">
+                    <div class="pa-3 d-flex align-center">
+                        <MudRadio Value="true" Color="Color.Primary" Dense="true" T="bool" Class="mr-2" />
+                        <div>
+                            <div class="d-flex align-center gap-1 font-weight-bold">
+                                <MudIcon Icon="@Icons.Material.Filled.SwapHoriz" Size="Size.Small" Color="Color.Primary" />
+                                Заменить на другую задачу
+                            </div>
+                            <MudText Typo="Typo.caption" Class="text-muted">
+                                Снять с сегодня и досыпать подходящие дела из бэклога в пределах лимитов
+                            </MudText>
+                        </div>
+                    </div>
+                </MudPaper>
+
+                <MudPaper Outlined="true" Class="@GetPaperClass(!_replaceWithBacklog)" Style="cursor: pointer;"
+                          @onclick="@(() => _replaceWithBacklog = false)">
+                    <div class="pa-3 d-flex align-center">
+                        <MudRadio Value="false" Color="Color.Primary" Dense="true" T="bool" Class="mr-2" />
+                        <div>
+                            <div class="d-flex align-center gap-1 font-weight-bold">
+                                <MudIcon Icon="@Icons.Material.Filled.HourglassBottom" Size="Size.Small" Color="Color.Secondary" />
+                                Разгрузить день (без замены)
+                            </div>
+                            <MudText Typo="Typo.caption" Class="text-muted">
+                                Снять задачу и зафиксировать сегодняшний план от автоматической досыпки
+                            </MudText>
+                        </div>
+                    </div>
+                </MudPaper>
+            </MudRadioGroup>
+
+            <MudText Typo="Typo.subtitle2" Class="mb-2 font-weight-bold">
+                Куда отправить эту задачу?
+            </MudText>
+
+            <MudRadioGroup T="PostponeTarget" @bind-Value="_postponeTarget" Class="d-flex flex-column gap-1 mb-4">
+                <MudRadio Value="PostponeTarget.Auto" Color="Color.Primary" Dense="true">
+                    <div>
+                        <MudText Typo="Typo.body2">🤖 Автоматически (на завтра / повтор-день / бэклог)</MudText>
+                        <MudText Typo="Typo.caption" Class="text-muted">
+                            Алгоритм определит дату с учетом расписания повторений и лимитов
+                        </MudText>
+                    </div>
+                </MudRadio>
+                <MudRadio Value="PostponeTarget.StrictTomorrow" Color="Color.Primary" Dense="true">
+                    <div>
+                        <MudText Typo="Typo.body2">📅 Строго на завтра (ручная фиксация даты)</MudText>
+                        <MudText Typo="Typo.caption" Class="text-muted">
+                            Задача гарантированно будет назначена на завтрашний день
+                        </MudText>
+                    </div>
+                </MudRadio>
+            </MudRadioGroup>
+
+            <MudDivider Class="my-3" />
+
+            <div class="d-flex justify-space-between align-center">
+                <MudText Typo="Typo.caption" Class="text-muted">Другие действия:</MudText>
+                <div class="d-flex gap-2">
+                    <MudButton StartIcon="@Icons.Material.Filled.DoNotDisturb"
+                               Variant="Variant.Outlined"
+                               Color="Color.Default"
+                               Size="Size.Small"
+                               OnClick="@MarkIrrelevantAsync">
+                        Неактуально
+                    </MudButton>
+                    <MudButton StartIcon="@Icons.Material.Filled.Delete"
+                               Variant="Variant.Outlined"
+                               Color="Color.Error"
+                               Size="Size.Small"
+                               OnClick="@DeleteTaskAsync">
+                        Удалить
+                    </MudButton>
+                </div>
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="@Cancel">Отмена</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@ApplyAsync">
+            Применить
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public TaskItem Task { get; set; } = null!;
+
+    private bool _replaceWithBacklog = true;
+    private PostponeTarget _postponeTarget = PostponeTarget.Auto;
+
+    private static string GetPaperClass(bool isSelected) =>
+        isSelected ? "mud-theme-primary-hover border-solid border-2 mud-border-primary" : "mud-hover";
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void ApplyAsync()
+    {
+        PlannerService.PostponeTask(Task.Id, _postponeTarget, _replaceWithBacklog);
+
+        if (_replaceWithBacklog)
+        {
+            Snackbar.Add("Задача отложена. Освободившееся время заполнено из бэклога", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add("Задача отложена. План на сегодня зафиксирован", Severity.Info);
+        }
+
+        NotificationService.NotifyTasksChanged();
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void MarkIrrelevantAsync()
+    {
+        TaskRepo.MarkIrrelevant(Task.Id);
+        PlannerService.UpdateBlockedStatuses();
+        Snackbar.Add("Задача помечена как неактуальная", Severity.Info);
+        NotificationService.NotifyTasksChanged();
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private async Task DeleteTaskAsync()
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Удаление задачи",
+            $"Вы уверены, что хотите удалить задачу \"{Task.Title}\"?",
+            yesText: "Удалить", cancelText: "Отмена");
+
+        if (confirmed == true)
+        {
+            TaskRepo.Delete(Task.Id);
+            PlannerService.UpdateBlockedStatuses();
+            Snackbar.Add("Задача удалена", Severity.Success);
+            NotificationService.NotifyTasksChanged();
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+    }
+}

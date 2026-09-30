@@ -173,6 +173,14 @@ public class TaskItemBuilder : EntityBuilder<TaskItem, TaskItemBuilder>
         return this;
     }
 
+    private DateTime? _snoozedUntilDate;
+
+    public TaskItemBuilder WithSnoozedUntilDate(DateTime? date)
+    {
+        _snoozedUntilDate = date;
+        return this;
+    }
+
     public override TaskItem Build()
     {
         TaskItem item = new()
@@ -198,6 +206,7 @@ public class TaskItemBuilder : EntityBuilder<TaskItem, TaskItemBuilder>
             RecurrenceInterval = _recurrenceInterval,
             RecurrenceWeekDays = _recurrenceWeekDays,
             RecurrenceSourceId = _recurrenceSourceId,
+            SnoozedUntilDate = _snoozedUntilDate,
             Subtasks = [.. _subtasks],
             Relations = [.. _relations],
             InverseRelations = [.. _inverseRelations],

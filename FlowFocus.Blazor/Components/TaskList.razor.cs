@@ -14,6 +14,8 @@ public partial class TaskList : IDisposable
     [Inject] public ITaskRepository TaskRepo { get; set; } = null!;
     [Inject] public ISettingsRepository SettingsRepo { get; set; } = null!;
     [Inject] public INotificationService NotificationService { get; set; } = null!;
+    [Inject] public IPlannerService PlannerService { get; set; } = null!;
+    [Inject] public ISnackbar Snackbar { get; set; } = null!;
 
     // === Параметры отображения ===
     [Parameter] public string? Title { get; set; }
@@ -50,6 +52,27 @@ public partial class TaskList : IDisposable
 
     private int _currentPage = 1;
     private int _pageSize = 25;
+
+    private bool IsTodayTab => DefaultFilter?.Type == TaskListFilterType.Today;
+
+    private bool IsTodayLocked => _settings?.TodayPlanLockedDate.HasValue == true &&
+                                 new TodoDay(_settings.TodayPlanLockedDate.Value) == TodoDay.Today;
+
+    private void ToggleTodayPlanLock()
+    {
+        var newLocked = !IsTodayLocked;
+        PlannerService.SetTodayPlanLocked(newLocked);
+        _settings = SettingsRepo.GetUserSettings();
+        RefreshTasks();
+        if (newLocked)
+        {
+            Snackbar.Add("План на сегодня зафиксирован от авто-распределения", Severity.Info);
+        }
+        else
+        {
+            Snackbar.Add("Фиксация дня снята. План актуализирован", Severity.Success);
+        }
+    }
 
     private bool HideWithDates
     {
