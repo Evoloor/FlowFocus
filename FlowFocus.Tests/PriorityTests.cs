@@ -197,6 +197,40 @@ public class PriorityTests : IntegrationTestBase
     }
 
     [Fact]
+    public void ActualizePriorities_DoesNotDowngrade_WhenCurrentPriorityIsAlreadyHigher()
+    {
+        // Arrange
+        var priorities = Context.Priorities.OrderBy(p => p.Order).ToList();
+        var criticalPriority = priorities[0];
+        var mediumPriority = priorities[2];
+
+        var today = TodoDay.Today.ToDateTime();
+        var task = new TaskItemBuilder()
+            .WithId(501)
+            .WithPriorityId(criticalPriority.Id)
+            .Build();
+        task.PriorityEscalations.Add(new PriorityEscalation
+        {
+            TaskId = 501,
+            TargetPriorityId = mediumPriority.Id,
+            TargetPriority = mediumPriority,
+            EscalationDate = today,
+            IsApplied = false
+        });
+
+        TaskRepo.Add(task);
+
+        // Act
+        PlannerService.ActualizePriorities();
+
+        // Assert: Priority stays Critical, escalation is marked applied
+        var updatedTask = TaskRepo.GetById(501);
+        updatedTask.Should().NotBeNull();
+        updatedTask!.PriorityId.Should().Be(criticalPriority.Id);
+        updatedTask.PriorityEscalations.Should().ContainSingle(e => e.IsApplied);
+    }
+
+    [Fact]
     public void StartOfDayAt4AM_SystemTime230AM_EvaluatesPreviousLogicalDate()
     {
         // Arrange

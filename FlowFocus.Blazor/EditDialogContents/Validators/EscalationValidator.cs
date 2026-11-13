@@ -10,18 +10,25 @@ public static class EscalationValidator
         List<PriorityLevel> priorities)
     {
         List<string> errors = [];
-        var escalationList =
-            escalations?.Where(e => e.EscalationDate != null).OrderBy(e => e.EscalationDate).ToList() ??
-            [];
+        var allEscalations = escalations?.ToList() ?? [];
 
-        var activeEscalations = escalationList.Where(e => !e.IsApplied).ToList();
+        if (allEscalations.Any(e => !e.IsApplied && e.EscalationDate == null))
+        {
+            errors.Add("Укажите дату повышения приоритета.");
+        }
+
+        var activeEscalations = allEscalations
+            .Where(e => !e.IsApplied && e.EscalationDate != null)
+            .OrderBy(e => e.EscalationDate)
+            .ToList();
 
         var currentPriorityOrder = task.PriorityId.HasValue
             ? priorities.FirstOrDefault(p => p.Id == task.PriorityId)?.Order ?? 99
             : 99;
 
         var prevPriorityOrder = currentPriorityOrder;
-        var prevDate = TodoDay.Today.ToDateTime();
+        var today = TodoDay.Today.ToDateTime();
+        var prevDate = today;
 
         foreach (var escalation in activeEscalations)
         {
@@ -34,18 +41,20 @@ public static class EscalationValidator
                     $"Нельзя задать повышение приоритета до \"{targetPriority.Name}\" — он не выше предыдущего.");
             }
 
-            if (escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date < TodoDay.Today.ToDateTime())
+            var escalationDate = escalation.EscalationDate!.Value.Date;
+            if (escalationDate < today)
             {
-                errors.Add($"Дата повышения {escalation.EscalationDate.Value:dd.MM.yyyy} уже в прошлом");
+                errors.Add($"Дата повышения {escalationDate:dd.MM.yyyy} уже в прошлом");
             }
-
-            if (escalation.EscalationDate.HasValue && escalation.EscalationDate.Value.Date <= prevDate)
+            else if (escalationDate <= prevDate)
             {
-                errors.Add("Дата повышения должна быть позже предыдущей даты.");
+                errors.Add(prevDate == today
+                    ? "Дата повышения должна быть не раньше завтрашнего дня."
+                    : "Дата повышения должна быть позже предыдущей даты.");
             }
 
             prevPriorityOrder = targetPriority.Order;
-            prevDate = escalation.EscalationDate?.Date ?? prevDate;
+            prevDate = escalationDate;
         }
 
         return new(errors.Count == 0, errors);

@@ -350,22 +350,44 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
         lock (CacheLock)
         {
             var trackedTask = Context.Tasks
+                .Include(t => t.Priority)
                 .Include(t => t.PriorityEscalations)
                 .FirstOrDefault(t => t.Id == taskId);
 
             if (trackedTask == null || trackedTask.IsInactive) return;
 
-            trackedTask.PriorityId = targetPriorityId;
-            trackedTask.LastChangesOn = DateTime.UtcNow;
+            var changed = false;
+            var targetPriority = Context.Priorities
+                .AsNoTracking()
+                .FirstOrDefault(p => p.Id == targetPriorityId);
+
+            if (targetPriority != null)
+            {
+                var currentOrder = trackedTask.Priority?.Order
+                    ?? (trackedTask.PriorityId.HasValue
+                        ? Context.Priorities.AsNoTracking()
+                            .Where(p => p.Id == trackedTask.PriorityId.Value)
+                            .Select(p => (int?)p.Order)
+                            .FirstOrDefault() ?? int.MaxValue
+                        : int.MaxValue);
+
+                if (!trackedTask.PriorityId.HasValue || targetPriority.Order < currentOrder)
+                {
+                    trackedTask.PriorityId = targetPriorityId;
+                    trackedTask.LastChangesOn = DateTime.UtcNow;
+                    changed = true;
+                }
+            }
 
             var escalationSet = appliedEscalationIds.ToHashSet();
-            foreach (var escalation in trackedTask.PriorityEscalations.Where(e => escalationSet.Contains(e.Id)))
+            foreach (var escalation in trackedTask.PriorityEscalations.Where(e => escalationSet.Contains(e.Id) && !e.IsApplied))
             {
                 escalation.IsApplied = true;
                 escalation.LastChangesOn = DateTime.UtcNow;
+                changed = true;
             }
 
-            if (saveChanges)
+            if (saveChanges && changed)
             {
                 Context.SaveChanges();
                 MarkDirty();

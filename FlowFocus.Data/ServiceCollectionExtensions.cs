@@ -67,5 +67,8 @@ public static class ServiceCollectionExtensions
         // Инициализация TodoDay настройкой времени начала дня
         var settingsRepo = scope.ServiceProvider.GetRequiredService<ISettingsRepository>();
         TodoDay.Configure(settingsRepo.GetUserSettings().DayStartHour);
+
+        // Актуализация отложенных повышений приоритета на текущий Todo-день
+        scope.ServiceProvider.GetRequiredService<IPlannerService>().ActualizePriorities();
     }
 }

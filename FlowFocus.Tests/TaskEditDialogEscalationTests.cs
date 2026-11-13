@@ -347,4 +347,52 @@ public class TaskEditDialogEscalationTests : IntegrationTestBase
         result.IsValid.Should().BeFalse();
         result.Errors.Should().NotBeEmpty();
     }
+
+    [Fact]
+    public void EscalationValidator_RejectsUnappliedEscalationOnToday()
+    {
+        var priorities = PriorityRepo.GetAllOrdered();
+        var high = priorities[0];
+        var low = priorities[2];
+
+        var task = new TaskItem { PriorityId = low.Id };
+        List<EscalationDto> escalations =
+        [
+            new()
+            {
+                TargetPriorityId = high.Id,
+                EscalationDate = TodoDay.Today.ToDateTime(),
+                IsApplied = false
+            }
+        ];
+
+        var result = EscalationValidator.ValidateEscalations(escalations, task, priorities);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void EscalationValidator_RejectsUnappliedEscalationWithNullDate()
+    {
+        var priorities = PriorityRepo.GetAllOrdered();
+        var high = priorities[0];
+        var low = priorities[2];
+
+        var task = new TaskItem { PriorityId = low.Id };
+        List<EscalationDto> escalations =
+        [
+            new()
+            {
+                TargetPriorityId = high.Id,
+                EscalationDate = null,
+                IsApplied = false
+            }
+        ];
+
+        var result = EscalationValidator.ValidateEscalations(escalations, task, priorities);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().NotBeEmpty();
+    }
 }

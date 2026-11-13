@@ -301,6 +301,26 @@ public partial class TaskEditDialog
     {
         try
         {
+            if (_task.IsRecurring)
+            {
+                var recurringUnappliedEscalations = _escalations.Where(e => !e.IsApplied).ToList();
+                if (recurringUnappliedEscalations.Count > 0)
+                {
+                    var confirmed = await DialogService.ShowMessageBox(
+                        "Удаление повышений приоритета",
+                        "Для повторяющихся задач автоматическое повышение приоритета не применяется. Неприменённые правила будут удалены. Продолжить?",
+                        yesText: "Продолжить",
+                        cancelText: "Отмена");
+
+                    if (confirmed != true)
+                    {
+                        return;
+                    }
+
+                    _escalations.RemoveAll(e => !e.IsApplied);
+                }
+            }
+
             var currentPriorityOrder = _task.PriorityId.HasValue
                 ? _priorities.FirstOrDefault(p => p.Id == _task.PriorityId)?.Order ?? 99
                 : 99;
@@ -527,11 +547,20 @@ public partial class TaskEditDialog
                     return Task.CompletedTask;
                 });
             }
-            else if (RelationsChanged() || shouldCompleteRetroactively)
+            else if (RelationsChanged() || shouldCompleteRetroactively || PriorityChanged())
             {
                 await InvokeAsync(() =>
                 {
-                    PlannerService.UpdateBlockedStatuses();
+                    if (PriorityChanged() || RelationsChanged())
+                    {
+                        PlannerService.ActualizePriorities();
+                    }
+
+                    if (RelationsChanged() || shouldCompleteRetroactively)
+                    {
+                        PlannerService.UpdateBlockedStatuses();
+                    }
+
                     return Task.CompletedTask;
                 });
             }
@@ -619,6 +648,18 @@ public partial class TaskEditDialog
             return true;
         }
         return false;
+    }
+
+    private bool PriorityChanged()
+    {
+        try
+        {
+            return _originalTask == null || _originalTask.PriorityId != _task.PriorityId;
+        }
+        catch
+        {
+            return true;
+        }
     }
 
     private bool RelationsChanged()

@@ -12,6 +12,7 @@ public class PriorityEscalationPlanner(ITaskRepository taskRepository)
         var today = TodoDay.Today;
         var tasks = taskRepository.GetAll();
 
+        var anyApplied = false;
         foreach (var task in tasks)
         {
             if (task.IsInactive)
@@ -32,8 +33,14 @@ public class PriorityEscalationPlanner(ITaskRepository taskRepository)
                 task.Id,
                 highestEscalation.TargetPriorityId,
                 escalations.Select(e => e.Id),
-                saveChanges: true
+                saveChanges: false
             );
+            anyApplied = true;
+        }
+
+        if (anyApplied)
+        {
+            taskRepository.SaveChanges();
         }
 
         NormalizeBlockerPriorities();
@@ -64,17 +71,16 @@ public class PriorityEscalationPlanner(ITaskRepository taskRepository)
                     var blockerOrder = GetEffectivePriorityOrder(blockerTask);
                     if (targetOrder < blockerOrder)
                     {
-                        blockerTask.PriorityId = task.PriorityId.Value;
-                        foreach (var pe in blockerTask.PriorityEscalations.Where(e => !e.IsApplied))
-                        {
-                            var peOrder = pe.TargetPriority?.Order ?? 99;
-                            if (peOrder >= targetOrder)
-                            {
-                                pe.IsApplied = true;
-                                pe.LastChangesOn = DateTime.UtcNow;
-                            }
-                        }
-                        taskRepository.Update(blockerTask);
+                        var redundantEscalationIds = blockerTask.PriorityEscalations
+                            .Where(e => !e.IsApplied && (e.TargetPriority?.Order ?? 99) >= targetOrder)
+                            .Select(e => e.Id);
+
+                        taskRepository.ApplyPriorityEscalation(
+                            blockerTask.Id,
+                            task.PriorityId.Value,
+                            redundantEscalationIds,
+                            saveChanges: false
+                        );
                         changed = true;
                     }
                 }

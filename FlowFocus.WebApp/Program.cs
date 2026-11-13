@@ -11,6 +11,7 @@ _ = builder.Services.AddMudServices()
     .AddInteractiveServerComponents();
 
 _ = builder.Services.AddDataLayer();
+_ = builder.Services.AddHostedService<TodoDayRolloverHostedService>();
 
 var app = builder.Build();
 
