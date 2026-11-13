@@ -378,7 +378,7 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
         lock (CacheLock)
         {
             var hasChanges = TaskDateNormalizer.NormalizeDateSources(Context, _recurrenceService);
-            if (hasChanges && saveChanges)
+            if (saveChanges && (hasChanges || Context.ChangeTracker.HasChanges()))
             {
                 Context.SaveChanges();
                 MarkDirty();
@@ -391,7 +391,7 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
         lock (CacheLock)
         {
             var hasChanges = RelationNormalizer.NormalizeTaskRelations(Context, _tagRepository.Value);
-            if (hasChanges && saveChanges)
+            if (saveChanges && (hasChanges || Context.ChangeTracker.HasChanges()))
             {
                 Context.SaveChanges();
                 MarkDirty();

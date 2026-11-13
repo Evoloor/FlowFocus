@@ -85,6 +85,9 @@ public interface ITaskRepository : IRepository<TaskItem>
     /// <summary>Мутировать повторяющуюся задачу на месте (Scenario B)</summary>
     void MutateRecurringTaskInPlace(int taskId, DateTime assignedDate);
 
+    /// <summary>Сохранить пакетные изменения в БД и сбросить кэш без уведомления UI</summary>
+    void SaveChangesSilently();
+
     /// <summary>Сохранить пакетные изменения и уведомить UI 1 раз</summary>
     void SaveChangesAndNotify();
 }

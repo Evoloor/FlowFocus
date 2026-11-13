@@ -169,6 +169,18 @@ public abstract class CachedRepository<T>(StorageContext context, INotificationS
         MarkDirty();
     }
 
+    public void SaveChangesSilently()
+    {
+        lock (CacheLock)
+        {
+            if (Context.ChangeTracker.HasChanges())
+            {
+                Context.SaveChanges();
+                RefreshCache();
+            }
+        }
+    }
+
     public void SaveChangesAndNotify()
     {
         lock (CacheLock)

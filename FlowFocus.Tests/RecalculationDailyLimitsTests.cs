@@ -146,4 +146,81 @@ public class RecalculationDailyLimitsTests : IntegrationTestBase
         TaskRepo.GetById(403)!.ScheduledDate.Should().Be(_today, "Влезает в остаток лимита (150 <= 160)");
         TaskRepo.GetById(404)!.ScheduledDate.Should().Be(_tomorrow, "Не влезает в лимит и переносится");
     }
+
+    /// <summary>
+    /// Проверяет, что просроченные повторяющиеся (AutoFixed) задачи, переносимые нормализатором на сегодня
+    /// в ходе RecalculateAll, сразу учитываются в дневных лимитах (как по количеству, так и по времени)
+    /// и вытесняют AutoFlexible задачи на следующие дни даже при предварительно прогретом кэше репозитория.
+    /// </summary>
+    [Theory]
+    // [Лимиты дня: Время, Кол-во] | [Мануал: Время] | [Повтор-задача: Время] | [Флекс: Время]
+    [InlineData(300, 2, 30, 30, 30)] // 1 manual + 2 просроченные повтор-задачи = 3 > лимита 2 задач
+    [InlineData(60, 10, 30, 20, 15)] // 30 + 20 + 20 = 70 >= лимита 60 минут
+    public void RecalculateAll_WhenOverdueRecurringTasksNormalizedToToday_ConsumeTodayLimitsAndPushFlexibleToTomorrow(
+        int timeLimit, int countLimit, int manualMinutes, int recurringMinutes, int flexMinutes)
+    {
+        // Arrange
+        var yesterday = TodoDay.Today.Yesterday.ToDateTime();
+        var settings = new UserSettingsBuilder()
+            .WithDailyTimeLimit(timeLimit)
+            .WithDailyComplexityLimit(1000)
+            .WithDailyTaskLimit(countLimit)
+            .Build();
+
+        var manualTask = new TaskItemBuilder().WithId(501)
+            .WithScheduledDate(_today, DateSource.Manual)
+            .WithEstimatedMinutes(manualMinutes)
+            .WithStatus(TaskStatus.Planned)
+            .Build();
+
+        var overdueRecurring1 = new TaskItemBuilder().WithId(502)
+            .WithScheduledDate(yesterday, DateSource.AutoFixed)
+            .WithRecurrence(RecurrenceType.EveryN, interval: 1, unit: RecurrenceUnit.Days)
+            .WithEstimatedMinutes(recurringMinutes)
+            .WithStatus(TaskStatus.Planned)
+            .Build();
+
+        var overdueRecurring2 = new TaskItemBuilder().WithId(503)
+            .WithScheduledDate(yesterday, DateSource.AutoFixed)
+            .WithRecurrence(RecurrenceType.EveryN, interval: 1, unit: RecurrenceUnit.Days)
+            .WithEstimatedMinutes(recurringMinutes)
+            .WithStatus(TaskStatus.Planned)
+            .Build();
+
+        var flexTask = new TaskItemBuilder().WithId(504)
+            .WithDateSource(DateSource.AutoFlexible)
+            .WithEstimatedMinutes(flexMinutes)
+            .WithStatus(TaskStatus.Planned)
+            .Build();
+
+        TaskRepo.Add(manualTask);
+        TaskRepo.Add(overdueRecurring1);
+        TaskRepo.Add(overdueRecurring2);
+        TaskRepo.Add(flexTask);
+
+        // Прогреваем кэш репозитория, как в реальном UI до вызова пересчёта
+        _ = TaskRepo.GetAll();
+
+        // Act
+        PlannerService.RecalculateAll(settings);
+
+        // Assert
+        var savedManual = TaskRepo.GetById(501)!;
+        var savedRec1 = TaskRepo.GetById(502)!;
+        var savedRec2 = TaskRepo.GetById(503)!;
+        var savedFlex = TaskRepo.GetById(504)!;
+
+        savedManual.ScheduledDate.Should().Be(_today);
+        savedManual.DateSource.Should().Be(DateSource.Manual);
+
+        savedRec1.ScheduledDate.Should().Be(_today, "Просроченная повтор-задача должна перенестись на сегодня");
+        savedRec1.DateSource.Should().Be(DateSource.AutoFixed);
+
+        savedRec2.ScheduledDate.Should().Be(_today, "Просроченная повтор-задача должна перенестись на сегодня");
+        savedRec2.DateSource.Should().Be(DateSource.AutoFixed);
+
+        savedFlex.ScheduledDate.Should().Be(_tomorrow,
+            "Перенесённые на сегодня повтор-задачи вместе с manual-задачей уже исчерпали дневной лимит");
+        savedFlex.DateSource.Should().Be(DateSource.AutoFlexible);
+    }
 }

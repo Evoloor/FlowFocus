@@ -22,6 +22,7 @@ public class PlannerService(ITaskRepository taskRepository) : IPlannerService
     {
         taskRepository.NormalizeTaskRelations(saveChanges: false);
         taskRepository.NormalizeTaskDateSources(saveChanges: false);
+        taskRepository.SaveChangesSilently();
         ActualizePriorities();
         DistributeTasks(settings);
         UpdateBlockedStatuses();
