@@ -49,6 +49,13 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
             TaskGraphSyncHelper.PrepareEscalationsForAdd(entity);
 
             GetDbSet().Add(entity);
+
+            if (entity.IsActive)
+            {
+                EnsureBlockerSourcesLoaded(entity);
+                entity.Status = FlowFocus.Core.Helpers.TaskStatusCalculator.DetermineActiveStatus(entity);
+            }
+
             Context.SaveChanges();
             MarkDirty();
         }
@@ -68,7 +75,7 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
                                     .Include(t => t.Conditions).ThenInclude(tc => tc.Condition)
                                     .Include(t => t.Subtasks)
                                     .Include(t => t.Relations)
-                                    .Include(t => t.InverseRelations)
+                                    .Include(t => t.InverseRelations).ThenInclude(r => r.SourceTask)
                                     .Include(t => t.PriorityEscalations)
                                     .FirstOrDefault(e => e.Id == entity.Id)
                                 ?? throw new InvalidOperationException($"Entity with ID {entity.Id} not found");
@@ -83,6 +90,7 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
 
             if (trackedEntity.IsActive)
             {
+                EnsureBlockerSourcesLoaded(trackedEntity);
                 trackedEntity.Status = FlowFocus.Core.Helpers.TaskStatusCalculator.DetermineActiveStatus(trackedEntity);
             }
 
@@ -91,6 +99,20 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
 
             CleanupTagsIfAny(removedTagIds);
             MarkDirty();
+        }
+    }
+
+    private void EnsureBlockerSourcesLoaded(TaskItem task)
+    {
+        var missingSourceIds = task.InverseRelations
+            .Where(r => r.Type == RelationType.Blocks && r.SourceTask == null && r.SourceTaskId > 0)
+            .Select(r => r.SourceTaskId)
+            .Distinct()
+            .ToList();
+
+        if (missingSourceIds.Count > 0)
+        {
+            Context.Tasks.Where(t => missingSourceIds.Contains(t.Id)).Load();
         }
     }
 

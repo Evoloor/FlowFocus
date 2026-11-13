@@ -388,4 +388,86 @@ public class RelationsEngineTests : IntegrationTestBase
         updatedBlocked!.PriorityId.Should().Be(critical.Id);
         updatedBlocker!.PriorityId.Should().Be(critical.Id);
     }
+
+    /// <summary>
+    /// Verifies that updating a task whose blocker is completed or irrelevant does not mark it as Blocked,
+    /// even when the blocker is not tracked in the DbContext ChangeTracker.
+    /// </summary>
+    [Theory]
+    [InlineData(TaskStatus.Completed)]
+    [InlineData(TaskStatus.Irrelevant)]
+    public void UpdateTask_WithInactiveBlocker_DoesNotTransitionToBlockedStatus(TaskStatus blockerStatus)
+    {
+        // Arrange
+        var blocker = new TaskItemBuilder().WithId(601).WithStatus(blockerStatus).Build();
+        var task = new TaskItemBuilder().WithId(602).WithTitle("Original").WithStatus(TaskStatus.Planned).Build();
+
+        Context.Tasks.AddRange(blocker, task);
+        Context.TaskRelations.Add(new() { Id = 6001, SourceTaskId = blocker.Id, TargetTaskId = task.Id, Type = RelationType.Blocks });
+        Context.SaveChanges();
+
+        // Clear ChangeTracker so blocker is not fixed up in memory unless explicitly loaded
+        Context.ChangeTracker.Clear();
+
+        var taskToEdit = TaskRepo.GetById(task.Id)!;
+        taskToEdit.Title = "Updated Title";
+
+        // Act
+        TaskRepo.Update(taskToEdit);
+
+        // Assert
+        var savedTask = TaskRepo.GetById(task.Id);
+        savedTask!.Status.Should().Be(TaskStatus.Planned);
+        savedTask.IsBlocked.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Verifies that TaskItem.IsBlocked does not treat a relation with null SourceTask as an active blocker.
+    /// </summary>
+    [Fact]
+    public void IsBlocked_WhenSourceTaskIsNull_ReturnsFalse()
+    {
+        // Arrange
+        var task = new TaskItemBuilder().WithId(610).WithStatus(TaskStatus.Planned).Build();
+        task.InverseRelations.Add(new TaskRelation
+        {
+            SourceTaskId = 999,
+            TargetTaskId = task.Id,
+            Type = RelationType.Blocks,
+            SourceTask = null
+        });
+
+        // Assert
+        task.IsBlocked.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Verifies that adding a new task with an incoming blocker relation resolves blocker status on save.
+    /// </summary>
+    [Theory]
+    [InlineData(TaskStatus.Planned, TaskStatus.Blocked)]
+    [InlineData(TaskStatus.Completed, TaskStatus.Planned)]
+    public void AddTask_WithIncomingBlockerRelation_SetsExpectedStatus(TaskStatus blockerStatus, TaskStatus expectedStatus)
+    {
+        // Arrange
+        var blocker = new TaskItemBuilder().WithId(620).WithStatus(blockerStatus).Build();
+        Context.Tasks.Add(blocker);
+        Context.SaveChanges();
+        Context.ChangeTracker.Clear();
+
+        var newTask = new TaskItemBuilder().WithId(621).WithStatus(TaskStatus.Planned).Build();
+        newTask.InverseRelations.Add(new TaskRelation
+        {
+            SourceTaskId = blocker.Id,
+            TargetTaskId = newTask.Id,
+            Type = RelationType.Blocks
+        });
+
+        // Act
+        TaskRepo.Add(newTask);
+
+        // Assert
+        var savedTask = TaskRepo.GetById(newTask.Id);
+        savedTask!.Status.Should().Be(expectedStatus);
+    }
 }

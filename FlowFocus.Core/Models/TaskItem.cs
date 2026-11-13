@@ -128,8 +128,9 @@ public class TaskItem : WorkItemBase
     public bool IsBlocked =>
         // Учёт через обратные связи (блокеры) или неактивные внешние условия
         InverseRelations.Any(r => r.Type == RelationType.Blocks &&
-                                   r.SourceTask?.Status != TaskStatus.Completed &&
-                                   r.SourceTask?.Status != TaskStatus.Irrelevant)
+                                   r.SourceTask != null &&
+                                   r.SourceTask.Status != TaskStatus.Completed &&
+                                   r.SourceTask.Status != TaskStatus.Irrelevant)
         || Conditions.Any(c => c.Condition != null && !c.Condition.IsActive);
 
     /// <summary>

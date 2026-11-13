@@ -36,6 +36,8 @@ public static class RelationValidator
                 blocked = task;
             }
 
+            if (blocker.Status is Core.Enums.TaskStatus.Completed or Core.Enums.TaskStatus.Irrelevant) continue;
+
             var blockerDate = blocker.ScheduledDate;
             var blockedDate = blocked.ScheduledDate;
 

@@ -151,4 +151,46 @@ public class ValidationTests : IntegrationTestBase
         subtask.Should().BeOfType<SubtaskItem>();
         subtask.Should().NotBeAssignableTo<TaskItem>();
     }
+
+    /// <summary>
+    /// Verifies that inactive (Completed or Irrelevant) blockers do not fail date/priority relation validation.
+    /// </summary>
+    [Theory]
+    [InlineData(FlowFocus.Core.Enums.TaskStatus.Completed)]
+    [InlineData(FlowFocus.Core.Enums.TaskStatus.Irrelevant)]
+    public void ValidateRelations_WithInactiveBlocker_IgnoresDateAndPriorityConflicts(FlowFocus.Core.Enums.TaskStatus blockerStatus)
+    {
+        // Arrange
+        var priorities = Context.Priorities.OrderBy(p => p.Order).ToList();
+        var critical = priorities[0];
+        var low = priorities[^1];
+
+        var blocker = new TaskItemBuilder()
+            .WithId(7010)
+            .WithTitle("Done Blocker")
+            .WithStatus(blockerStatus)
+            .WithPriorityId(low.Id)
+            .WithScheduledDate(DateTime.Today.AddDays(5))
+            .Build();
+
+        var task = new TaskItemBuilder()
+            .WithId(7011)
+            .WithTitle("Task")
+            .WithStatus(FlowFocus.Core.Enums.TaskStatus.Planned)
+            .WithPriorityId(critical.Id)
+            .WithScheduledDate(DateTime.Today)
+            .Build();
+
+        var relations = new List<FlowFocus.Blazor.EditDialogContents.RelationDto>
+        {
+            new() { Id = 1, Type = RelationType.BlockedBy, TargetTask = blocker }
+        };
+
+        // Act
+        var result = FlowFocus.Blazor.EditDialogContents.Validators.RelationValidator.ValidateRelations(relations, task, priorities);
+
+        // Assert
+        result.IsValid.Should().BeTrue();
+        result.Errors.Should().BeEmpty();
+    }
 }
