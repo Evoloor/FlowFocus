@@ -1,10 +1,63 @@
+@using System.Globalization
+@using FlowFocus.Core.Helpers
+
 <DistributionPieChart Title="Распределение по тегам"
                       Data="@Data"
-                      Palette="@Palette" />
+                      AggregationMode="@AggregationMode"
+                      Palette="@Palette">
+    <FooterContent>
+        @if (UntaggedTasksCount > 0)
+        {
+            <div class="untagged-footer-row">
+                <div class="d-flex align-center gap-2">
+                    <MudIcon Icon="@Icons.Material.Filled.LabelOff" Size="Size.Small" Style="opacity: 0.7;" />
+                    <span>Без тегов:</span>
+                </div>
+                <div>
+                    <strong title="@ExactUntaggedTooltip">@DurationFormatHelper.FormatCompactMetricValue(UntaggedTasksValue, AggregationMode, UntaggedScale, "0")</strong>
+                    <span class="untagged-percent">(@UntaggedTasksPercentage.ToString("F1", CultureInfo.InvariantCulture)%)</span>
+                </div>
+            </div>
+            <style>
+                .untagged-footer-row {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    font-size: 0.85rem;
+                    color: var(--mud-palette-text-secondary);
+                }
+
+                .untagged-percent {
+                    opacity: 0.8;
+                    margin-left: 4px;
+                }
+            </style>
+        }
+    </FooterContent>
+</DistributionPieChart>
 
 @code {
     [Parameter]
     public Dictionary<string, int> Data { get; set; } = new();
+
+    [Parameter]
+    public DashboardAggregationMode AggregationMode { get; set; } = DashboardAggregationMode.TaskCount;
+
+    [Parameter]
+    public int UntaggedTasksCount { get; set; }
+
+    [Parameter]
+    public int UntaggedTasksValue { get; set; }
+
+    [Parameter]
+    public double UntaggedTasksPercentage { get; set; }
+
+    private DurationDisplayScale UntaggedScale => DurationFormatHelper.ResolveCompactScale(
+        Math.Max(UntaggedTasksValue, Data.Values.DefaultIfEmpty(0).Max()));
+
+    private string? ExactUntaggedTooltip => AggregationMode == DashboardAggregationMode.TimeMinutes
+        ? DurationFormatHelper.FormatMinutes(UntaggedTasksValue)
+        : null;
 
     private static readonly string[] Palette =
     [

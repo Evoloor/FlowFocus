@@ -1,4 +1,5 @@
 @using FlowFocus.Core.Enums
+@using FlowFocus.Core.Helpers
 @using FlowFocus.Core.Models
 
 <MudCard Elevation="3" Class="chart-card glass-card">
@@ -39,7 +40,7 @@
             <div class="histogram-chart-container">
                 <DashboardHistogramChart Items="@CurrentItems"
                                         DefaultColor="@CurrentDefaultColor"
-                                        Unit="задач"
+                                        Unit="@CurrentUnit"
                                         IsHorizontal="false" />
             </div>
         }
@@ -143,6 +144,10 @@
         _ => "#6366f1"
     };
 
+    private string CurrentUnit => Metrics.AggregationMode == DashboardAggregationMode.TimeMinutes
+        ? string.Empty
+        : "задач";
+
     private List<DashboardHistogramChart.HistogramItem> CurrentItems
     {
         get
@@ -155,11 +160,19 @@
                 _ => new()
             };
 
+            var blockScale = DurationFormatHelper.ResolveCompactScale(sourceDict.Values);
+
             return sourceDict
                 .Select(kvp => new DashboardHistogramChart.HistogramItem
                 {
                     Label = kvp.Key,
-                    Value = kvp.Value
+                    Value = kvp.Value,
+                    FormattedValue = Metrics.AggregationMode == DashboardAggregationMode.TimeMinutes
+                        ? DurationFormatHelper.FormatCompact(kvp.Value, blockScale, "0")
+                        : null,
+                    TooltipValue = Metrics.AggregationMode == DashboardAggregationMode.TimeMinutes
+                        ? DurationFormatHelper.FormatMinutes(kvp.Value)
+                        : null
                 })
                 .ToList();
         }

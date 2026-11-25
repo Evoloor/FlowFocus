@@ -1,4 +1,5 @@
 @using FlowFocus.Core.Enums
+@using FlowFocus.Core.Helpers
 @using FlowFocus.Core.Models
 
 <MudCard Elevation="3" Class="chart-card glass-card">
@@ -9,9 +10,11 @@
                     <MudIcon Icon="@Icons.Material.Filled.LowPriority" Size="Size.Medium" Style="color: #a855f7;" />
                     <MudText Typo="Typo.h6" Class="chart-title">Аналитика приоритетов</MudText>
                 </div>
-                <MudSelect T="HistogramMetricType"
+                <MudSelect @key="@Metrics.AggregationMode"
+                           T="HistogramMetricType"
                            Value="@SelectedMetric"
                            ValueChanged="OnMetricChanged"
+                           ToStringFunc="GetMetricLabel"
                            Label="Параметр"
                            Variant="Variant.Outlined"
                            Dense="true"
@@ -93,14 +96,18 @@
                 new()
                 {
                     Metric = HistogramMetricType.Priority,
-                    Label = "Количество задач",
-                    TooltipText = IsPriorityDisabled ? "Нет данных по приоритету для выбранного фильтра" : "Распределение по приоритетам",
+                    Label = GetMetricLabel(HistogramMetricType.Priority),
+                    TooltipText = IsPriorityDisabled
+                        ? "Нет данных по приоритету для выбранного фильтра"
+                        : (Metrics.AggregationMode == DashboardAggregationMode.TimeMinutes
+                            ? "Распределение суммы времени по приоритетам"
+                            : "Распределение по приоритетам"),
                     IsDisabled = IsPriorityDisabled
                 },
                 new()
                 {
                     Metric = HistogramMetricType.InterestPriority,
-                    Label = "Средняя интересность",
+                    Label = GetMetricLabel(HistogramMetricType.InterestPriority),
                     TooltipText = IsInterestPriorityDisabled ? "Нет данных по соотнесению интересности к приоритетам" : "Интересность по приоритетам (1–10)",
                     IsDisabled = IsInterestPriorityDisabled
                 }
@@ -123,6 +130,15 @@
         }
     }
 
+    private string GetMetricLabel(HistogramMetricType metric) => metric switch
+    {
+        HistogramMetricType.Priority => Metrics.AggregationMode == DashboardAggregationMode.TimeMinutes
+            ? "Сумма времени"
+            : "Количество задач",
+        HistogramMetricType.InterestPriority => "Средняя интересность",
+        _ => metric.ToString()
+    };
+
     private bool IsMetricDisabled(HistogramMetricType metric) => metric switch
     {
         HistogramMetricType.Priority => IsPriorityDisabled,
@@ -133,7 +149,7 @@
     private string CurrentUnit => SelectedMetric switch
     {
         HistogramMetricType.InterestPriority => string.Empty,
-        _ => "задач"
+        _ => Metrics.AggregationMode == DashboardAggregationMode.TimeMinutes ? string.Empty : "задач"
     };
 
     private double? CurrentMaxValue => SelectedMetric switch
@@ -161,12 +177,19 @@
             // Metric == Priority
             var priorityColorMap = Metrics.PriorityInterestHistogram
                 .ToDictionary(p => p.PriorityName, p => p.Color);
+            var blockScale = DurationFormatHelper.ResolveCompactScale(Metrics.PriorityHistogram.Values);
 
             return Metrics.PriorityHistogram
                 .Select(kvp => new DashboardHistogramChart.HistogramItem
                 {
                     Label = kvp.Key,
                     Value = kvp.Value,
+                    FormattedValue = Metrics.AggregationMode == DashboardAggregationMode.TimeMinutes
+                        ? DurationFormatHelper.FormatCompact(kvp.Value, blockScale, "0")
+                        : null,
+                    TooltipValue = Metrics.AggregationMode == DashboardAggregationMode.TimeMinutes
+                        ? DurationFormatHelper.FormatMinutes(kvp.Value)
+                        : null,
                     Color = priorityColorMap.GetValueOrDefault(kvp.Key)
                 })
                 .ToList();

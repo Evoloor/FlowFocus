@@ -13,7 +13,11 @@
                 var item = Items[i];
                 var barColor = !string.IsNullOrWhiteSpace(item.Color) ? item.Color : DefaultColor;
                 var percentage = CalculatedMax > 0 ? Math.Min(100, Math.Max(2, (item.Value / CalculatedMax) * 100)) : 0;
-                var displayVal = item.Value % 1 == 0 ? item.Value.ToString("F0") : item.Value.ToString("F1", CultureInfo.InvariantCulture);
+                var displayVal = !string.IsNullOrEmpty(item.FormattedValue)
+                    ? item.FormattedValue
+                    : (item.Value % 1 == 0 ? item.Value.ToString("F0") : item.Value.ToString("F1", CultureInfo.InvariantCulture));
+                var valueWithUnit = string.IsNullOrEmpty(Unit) ? displayVal : $"{displayVal} {Unit}";
+                var tooltipText = !string.IsNullOrEmpty(item.TooltipValue) ? item.TooltipValue : valueWithUnit;
 
                 if (IsHorizontal)
                 {
@@ -23,17 +27,17 @@
                             <span class="row-label-text text-truncate">@item.Label</span>
                         </div>
                         <div class="row-bar-track">
-                            <div class="row-bar-fill" style="width: @(percentage.ToString("F1", CultureInfo.InvariantCulture))%; background: @GetBarStyle(barColor);" title="@item.Label: @displayVal @Unit"></div>
+                            <div class="row-bar-fill" style="width: @(percentage.ToString("F1", CultureInfo.InvariantCulture))%; background: @GetBarStyle(barColor);" title="@item.Label: @tooltipText"></div>
                         </div>
-                        <div class="row-bar-value">@displayVal @Unit</div>
+                        <div class="row-bar-value">@valueWithUnit</div>
                     </div>
                 }
                 else
                 {
                     <div class="histogram-vertical-col">
-                        <div class="col-bar-value">@displayVal</div>
+                        <div class="col-bar-value" title="@tooltipText">@displayVal</div>
                         <div class="col-bar-track">
-                            <div class="col-bar-fill" style="height: @(percentage.ToString("F1", CultureInfo.InvariantCulture))%; background: @GetBarStyle(barColor);" title="@item.Label: @displayVal @Unit">
+                            <div class="col-bar-fill" style="height: @(percentage.ToString("F1", CultureInfo.InvariantCulture))%; background: @GetBarStyle(barColor);" title="@item.Label: @tooltipText">
                             </div>
                         </div>
                         <div class="col-label" title="@item.Label">@item.Label</div>
@@ -72,7 +76,7 @@
     }
 
     .col-bar-value {
-        font-size: 0.85rem;
+        font-size: 0.78rem;
         font-weight: 700;
         color: var(--mud-palette-text-primary);
         margin-bottom: 6px;
@@ -191,9 +195,9 @@
     }
 
     .row-bar-value {
-        flex: 0 0 65px;
-        width: 65px;
-        min-width: 65px;
+        flex: 0 0 90px;
+        width: 90px;
+        min-width: 90px;
         font-size: 0.85rem;
         font-weight: 700;
         color: var(--mud-palette-text-primary);
@@ -207,6 +211,8 @@
     {
         public string Label { get; set; } = string.Empty;
         public double Value { get; set; }
+        public string? FormattedValue { get; set; }
+        public string? TooltipValue { get; set; }
         public string? Color { get; set; }
     }
 

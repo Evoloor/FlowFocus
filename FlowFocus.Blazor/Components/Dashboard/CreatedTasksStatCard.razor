@@ -1,15 +1,17 @@
+@using FlowFocus.Core.Helpers
+
 <MudCard Elevation="3" Class="kpi-card glass-card">
     <MudCardContent>
         <div class="kpi-header">
-            <span class="kpi-title">Создано задач</span>
+            <span class="kpi-title">@CardTitle</span>
             <MudIcon Icon="@Icons.Material.Filled.AddCircleOutline" Size="Size.Small" Style="color: #ec4899;" />
         </div>
         <div class="kpi-body d-flex align-baseline gap-2">
-            <span class="kpi-value pink-gradient-text">@Count</span>
+            <span class="kpi-value pink-gradient-text" title="@ExactTimeTooltip">@DisplayValue</span>
             <span class="kpi-unit">за период</span>
         </div>
         <div class="kpi-footer">
-            <MudText Typo="Typo.caption" Class="mud-text-secondary">Новые задачи за выбранный интервал</MudText>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">@FooterText</MudText>
         </div>
     </MudCardContent>
 </MudCard>
@@ -31,4 +33,29 @@
 @code {
     [Parameter]
     public int Count { get; set; }
+
+    [Parameter]
+    public int? TotalTimeMinutes { get; set; }
+
+    [Parameter]
+    public DashboardAggregationMode AggregationMode { get; set; } = DashboardAggregationMode.TaskCount;
+
+    private string CardTitle => AggregationMode == DashboardAggregationMode.TimeMinutes
+        ? "Создано времени"
+        : "Создано задач";
+
+    private string DisplayValue => AggregationMode == DashboardAggregationMode.TimeMinutes
+        ? DurationFormatHelper.FormatCompact(
+            TotalTimeMinutes ?? 0,
+            DurationFormatHelper.ResolveCompactScale(TotalTimeMinutes ?? 0),
+            "0 мин")
+        : Count.ToString();
+
+    private string? ExactTimeTooltip => AggregationMode == DashboardAggregationMode.TimeMinutes
+        ? DurationFormatHelper.FormatMinutes(TotalTimeMinutes ?? 0)
+        : null;
+
+    private string FooterText => AggregationMode == DashboardAggregationMode.TimeMinutes
+        ? "Объём новых задач за выбранный интервал"
+        : "Новые задачи за выбранный интервал";
 }

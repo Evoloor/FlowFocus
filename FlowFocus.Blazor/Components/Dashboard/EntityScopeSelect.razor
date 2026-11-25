@@ -14,16 +14,22 @@
 
     @if (Filter.Scope == EntityScopeType.Tag)
     {
-        <MudSelect T="int?"
-                   Value="@Filter.TagId"
-                   ValueChanged="OnTagChanged"
+        <MudSelect T="TagFilterSelection"
+                   Value="@SelectedTagSelection"
+                   ValueChanged="OnTagSelectionChanged"
+                   ToStringFunc="FormatTagSelection"
                    Label="Выберите тег"
                    Variant="Variant.Outlined"
                    Class="scope-sub-select">
+            <MudSelectItem Value="@(new TagFilterSelection(TagFilterMode.Untagged, null))">
+                Без тегов (@UntaggedTaskCount)
+            </MudSelectItem>
             @foreach (var tag in SortedTags)
             {
                 var count = TagTaskCounts.GetValueOrDefault(tag.Id, 0);
-                <MudSelectItem Value="@((int?)tag.Id)">@tag.Name (@count)</MudSelectItem>
+                <MudSelectItem Value="@(new TagFilterSelection(TagFilterMode.SpecificTag, tag.Id))">
+                    @tag.Name (@count)
+                </MudSelectItem>
             }
         </MudSelect>
     }
@@ -72,6 +78,9 @@
     public Dictionary<int, int> TagTaskCounts { get; set; } = new();
 
     [Parameter]
+    public int UntaggedTaskCount { get; set; }
+
+    [Parameter]
     public List<ExternalCondition> Conditions { get; set; } = [];
 
     [Parameter]
@@ -88,15 +97,38 @@
         .OrderByDescending(c => ConditionTaskCounts.GetValueOrDefault(c.Id, 0))
         .ThenBy(c => c.Name);
 
+    private TagFilterSelection SelectedTagSelection => new(Filter.TagFilterMode, Filter.TagId);
+
+    private string FormatTagSelection(TagFilterSelection selection)
+    {
+        if (selection.Mode == TagFilterMode.Untagged)
+        {
+            return $"Без тегов ({UntaggedTaskCount})";
+        }
+
+        var tag = Tags.FirstOrDefault(t => t.Id == selection.TagId);
+        if (tag == null) return string.Empty;
+
+        var count = TagTaskCounts.GetValueOrDefault(tag.Id, 0);
+        return $"{tag.Name} ({count})";
+    }
+
     private async Task OnScopeChanged(EntityScopeType scope)
     {
         Filter.Scope = scope;
         var tagList = SortedTags.ToList();
         var condList = SortedConditions.ToList();
 
-        if (scope == EntityScopeType.Tag && tagList.Count > 0 && !Filter.TagId.HasValue)
+        if (scope == EntityScopeType.Tag && Filter.TagFilterMode == TagFilterMode.SpecificTag && !Filter.TagId.HasValue)
         {
-            Filter.TagId = tagList[0].Id;
+            if (tagList.Count > 0)
+            {
+                Filter.TagId = tagList[0].Id;
+            }
+            else
+            {
+                Filter.TagFilterMode = TagFilterMode.Untagged;
+            }
         }
         else if (scope == EntityScopeType.Condition && condList.Count > 0 && !Filter.ConditionId.HasValue)
         {
@@ -106,9 +138,10 @@
         await FilterChanged.InvokeAsync(Filter);
     }
 
-    private async Task OnTagChanged(int? tagId)
+    private async Task OnTagSelectionChanged(TagFilterSelection selection)
     {
-        Filter.TagId = tagId;
+        Filter.TagFilterMode = selection.Mode;
+        Filter.TagId = selection.TagId;
         await FilterChanged.InvokeAsync(Filter);
     }
 

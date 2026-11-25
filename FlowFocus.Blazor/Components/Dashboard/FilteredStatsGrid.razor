@@ -1,3 +1,5 @@
+@using FlowFocus.Core.Helpers
+
 <MudCard Elevation="3" Class="analytics-grid-card glass-card">
     <MudCardHeader>
         <CardHeaderContent>
@@ -19,19 +21,19 @@
                     </div>
                     <div class="stat-row">
                         <span class="stat-name">Суммарное время</span>
-                        <span class="stat-val">@FormatMinutes(Metrics.FilteredTotalTimeMinutes)</span>
+                        <span class="stat-val">@DurationFormatHelper.FormatMinutes(Metrics.FilteredTotalTimeMinutes)</span>
                     </div>
                     <div class="stat-row">
                         <span class="stat-name">Среднее время</span>
-                        <span class="stat-val">@(Metrics.FilteredAvgTimeMinutes.HasValue ? FormatMinutes((int)Metrics.FilteredAvgTimeMinutes.Value) : "—")</span>
+                        <span class="stat-val">@(Metrics.FilteredAvgTimeMinutes.HasValue ? DurationFormatHelper.FormatMinutes(Metrics.FilteredAvgTimeMinutes.Value) : "—")</span>
                     </div>
                     <div class="stat-row">
                         <span class="stat-name">Мин. время</span>
-                        <span class="stat-val">@(Metrics.FilteredMinTimeMinutes.HasValue ? FormatMinutes(Metrics.FilteredMinTimeMinutes.Value) : "—")</span>
+                        <span class="stat-val">@(Metrics.FilteredMinTimeMinutes.HasValue ? DurationFormatHelper.FormatMinutes(Metrics.FilteredMinTimeMinutes.Value) : "—")</span>
                     </div>
                     <div class="stat-row">
                         <span class="stat-name">Макс. время</span>
-                        <span class="stat-val">@(Metrics.FilteredMaxTimeMinutes.HasValue ? FormatMinutes(Metrics.FilteredMaxTimeMinutes.Value) : "—")</span>
+                        <span class="stat-val">@(Metrics.FilteredMaxTimeMinutes.HasValue ? DurationFormatHelper.FormatMinutes(Metrics.FilteredMaxTimeMinutes.Value) : "—")</span>
                     </div>
                 </div>
             </div>
@@ -142,13 +144,4 @@
 @code {
     [Parameter]
     public DashboardMetricsDto Metrics { get; set; } = new();
-
-    private static string FormatMinutes(int minutes)
-    {
-        if (minutes <= 0) return "0 мин";
-        if (minutes < 60) return $"{minutes} мин";
-        var hours = minutes / 60;
-        var mins = minutes % 60;
-        return mins > 0 ? $"{hours} ч {mins} мин" : $"{hours} ч";
-    }
 }

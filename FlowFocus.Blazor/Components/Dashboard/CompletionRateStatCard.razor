@@ -1,8 +1,13 @@
 <MudCard Elevation="3" Class="kpi-card glass-card">
     <MudCardContent>
         <div class="kpi-header">
-            <span class="kpi-title">Выполненные задачи</span>
-            <MudIcon Icon="@Icons.Material.Filled.TaskAlt" Size="Size.Small" Style="color: #10b981;" />
+            <span class="kpi-title">@CardTitle</span>
+            <div class="d-flex align-center gap-1">
+                <MudTooltip Text="@TooltipText" Arrow="true" Placement="Placement.Top">
+                    <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="kpi-info-icon" />
+                </MudTooltip>
+                <MudIcon Icon="@Icons.Material.Filled.TaskAlt" Size="Size.Small" Style="color: #10b981;" />
+            </div>
         </div>
         <div class="kpi-body">
             <span class="kpi-value success-gradient-text">@Value.ToString("F1")%</span>
@@ -24,4 +29,15 @@
 @code {
     [Parameter]
     public double Value { get; set; }
+
+    [Parameter]
+    public DashboardAggregationMode AggregationMode { get; set; } = DashboardAggregationMode.TaskCount;
+
+    private string CardTitle => AggregationMode == DashboardAggregationMode.TimeMinutes
+        ? "Выполненное время"
+        : "Выполненные задачи";
+
+    private string TooltipText => AggregationMode == DashboardAggregationMode.TimeMinutes
+        ? "Доля выполненного времени среди разовых задач (без учёта повторяющихся, неактуальных и ненастроенных задач)"
+        : "Доля выполненных разовых задач среди активных и завершённых (без учёта повторяющихся, неактуальных и ненастроенных задач)";
 }

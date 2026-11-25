@@ -1,0 +1,217 @@
+@using System.Globalization
+@using FlowFocus.Core.Helpers
+
+<MudCard Elevation="3" Class="weekly-comparison-card glass-card">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+                <div class="d-flex align-center gap-2">
+                    <MudIcon Icon="@Icons.Material.Filled.CompareArrows" Size="Size.Medium" Style="color: #6366f1;" />
+                    <MudText Typo="Typo.h6" Class="chart-title">Динамика за 7 дней</MudText>
+                </div>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                    последние 7 туду-дн. vs предыдущие 7 туду-дн.
+                </MudText>
+            </div>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        <div class="weekly-metrics-grid">
+            <!-- Выполнено задач -->
+            <div class="weekly-metric-col">
+                <span class="weekly-metric-label">Выполнено задач</span>
+                <div class="weekly-metric-main">
+                    <span class="weekly-metric-value">@FormatIntValue(Data.CompletedTasksCount.CurrentValue)</span>
+                    @if (Data.CompletedTasksCount.AbsoluteDelta.HasValue)
+                    {
+                        var delta = (int)Math.Round(Data.CompletedTasksCount.AbsoluteDelta.Value);
+                        <span class="weekly-delta-badge @GetDirectionalClass(delta)">
+                            @FormatCountDelta(delta, Data.CompletedTasksCount.PercentDelta)
+                        </span>
+                    }
+                </div>
+                <span class="weekly-metric-prev">пред. 7 дн: @FormatIntValue(Data.CompletedTasksCount.PreviousValue)</span>
+            </div>
+
+            <!-- Выполнено времени -->
+            <div class="weekly-metric-col">
+                <span class="weekly-metric-label">Выполнено времени</span>
+                <div class="weekly-metric-main">
+                    <span class="weekly-metric-value">@DurationFormatHelper.FormatMinutes((int)Math.Round(Data.CompletedTimeMinutes.CurrentValue ?? 0))</span>
+                    @if (Data.CompletedTimeMinutes.AbsoluteDelta.HasValue)
+                    {
+                        var deltaMins = (int)Math.Round(Data.CompletedTimeMinutes.AbsoluteDelta.Value);
+                        <span class="weekly-delta-badge @GetDirectionalClass(deltaMins)">
+                            @FormatTimeDelta(deltaMins, Data.CompletedTimeMinutes.PercentDelta)
+                        </span>
+                    }
+                </div>
+                <span class="weekly-metric-prev">пред. 7 дн: @DurationFormatHelper.FormatMinutes((int)Math.Round(Data.CompletedTimeMinutes.PreviousValue ?? 0))</span>
+            </div>
+
+            <!-- Средняя сложность -->
+            <div class="weekly-metric-col">
+                <span class="weekly-metric-label">Средняя сложность</span>
+                <div class="weekly-metric-main">
+                    <span class="weekly-metric-value">@FormatRatingValue(Data.AverageComplexity.CurrentValue)</span>
+                    @if (Data.AverageComplexity.AbsoluteDelta.HasValue)
+                    {
+                        var delta = Data.AverageComplexity.AbsoluteDelta.Value;
+                        <MudTooltip Text="@GetPercentTooltip(Data.AverageComplexity.PercentDelta)" Disabled="@(!Data.AverageComplexity.PercentDelta.HasValue)">
+                            <span class="weekly-delta-badge delta-neutral">
+                                @FormatSignedDecimal(delta)
+                            </span>
+                        </MudTooltip>
+                    }
+                </div>
+                <span class="weekly-metric-prev">пред. 7 дн: @FormatRatingValue(Data.AverageComplexity.PreviousValue)</span>
+            </div>
+
+            <!-- Средняя интересность -->
+            <div class="weekly-metric-col">
+                <span class="weekly-metric-label">Средняя интересность</span>
+                <div class="weekly-metric-main">
+                    <span class="weekly-metric-value">@FormatRatingValue(Data.AverageInterest.CurrentValue)</span>
+                    @if (Data.AverageInterest.AbsoluteDelta.HasValue)
+                    {
+                        var delta = Data.AverageInterest.AbsoluteDelta.Value;
+                        <MudTooltip Text="@GetPercentTooltip(Data.AverageInterest.PercentDelta)" Disabled="@(!Data.AverageInterest.PercentDelta.HasValue)">
+                            <span class="weekly-delta-badge @GetDirectionalClass(delta)">
+                                @FormatSignedDecimal(delta)
+                            </span>
+                        </MudTooltip>
+                    }
+                </div>
+                <span class="weekly-metric-prev">пред. 7 дн: @FormatRatingValue(Data.AverageInterest.PreviousValue)</span>
+            </div>
+        </div>
+    </MudCardContent>
+</MudCard>
+
+<style>
+    .weekly-comparison-card {
+        border-radius: 16px;
+        background: rgba(30, 34, 45, 0.6);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .weekly-metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 14px;
+    }
+
+    .weekly-metric-col {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .weekly-metric-label {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: var(--mud-palette-text-secondary);
+        font-weight: 500;
+    }
+
+    .weekly-metric-main {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .weekly-metric-value {
+        font-size: 1.45rem;
+        font-weight: 700;
+        color: var(--mud-palette-text-primary);
+        line-height: 1.2;
+    }
+
+    .weekly-delta-badge {
+        font-size: 0.78rem;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 999px;
+        white-space: nowrap;
+    }
+
+    .delta-positive {
+        background: rgba(16, 185, 129, 0.16);
+        color: #34d399;
+    }
+
+    .delta-negative {
+        background: rgba(239, 68, 68, 0.16);
+        color: #f87171;
+    }
+
+    .delta-neutral {
+        background: rgba(148, 163, 184, 0.16);
+        color: #cbd5e1;
+    }
+
+    .weekly-metric-prev {
+        font-size: 0.78rem;
+        color: var(--mud-palette-text-secondary);
+    }
+</style>
+
+@code {
+    [Parameter]
+    public WeeklyComparisonDto Data { get; set; } = new();
+
+    private static string FormatIntValue(double? value) =>
+        value.HasValue ? ((int)Math.Round(value.Value)).ToString(CultureInfo.InvariantCulture) : "0";
+
+    private static string FormatRatingValue(double? value) =>
+        value.HasValue ? value.Value.ToString("F1", CultureInfo.InvariantCulture) : "—";
+
+    private static string FormatSignedDecimal(double delta)
+    {
+        if (delta == 0) return "0.0";
+        var formatted = Math.Abs(delta).ToString("F1", CultureInfo.InvariantCulture);
+        return delta > 0 ? $"+{formatted}" : $"-{formatted}";
+    }
+
+    private static string FormatCountDelta(int delta, double? percentDelta)
+    {
+        var absPart = delta > 0 ? $"+{delta}" : delta.ToString(CultureInfo.InvariantCulture);
+        if (!percentDelta.HasValue) return absPart;
+        return $"{absPart} ({FormatSignedPercent(percentDelta.Value)})";
+    }
+
+    private static string FormatTimeDelta(int deltaMinutes, double? percentDelta)
+    {
+        var absPart = DurationFormatHelper.FormatSignedMinutes(deltaMinutes);
+        if (!percentDelta.HasValue) return absPart;
+        return $"{absPart} ({FormatSignedPercent(percentDelta.Value)})";
+    }
+
+    private static string FormatSignedPercent(double percent)
+    {
+        var rounded = Math.Round(percent, 1);
+        var formatted = Math.Abs(rounded) % 1 == 0
+            ? Math.Abs(rounded).ToString("F0", CultureInfo.InvariantCulture)
+            : Math.Abs(rounded).ToString("F1", CultureInfo.InvariantCulture);
+        if (rounded > 0) return $"+{formatted}%";
+        if (rounded < 0) return $"-{formatted}%";
+        return "0%";
+    }
+
+    private static string GetPercentTooltip(double? percentDelta) =>
+        percentDelta.HasValue ? $"Относительное изменение: {FormatSignedPercent(percentDelta.Value)}" : string.Empty;
+
+    private static string GetDirectionalClass(double delta) => delta switch
+    {
+        > 0 => "delta-positive",
+        < 0 => "delta-negative",
+        _ => "delta-neutral"
+    };
+}

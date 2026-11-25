@@ -1,0 +1,49 @@
+<MudSelect T="DashboardAggregationMode"
+           Value="@Value"
+           ValueChanged="OnValueChanged"
+           ToStringFunc="GetModeLabel"
+           Label="Срез данных"
+           Variant="Variant.Outlined"
+           AnchorOrigin="Origin.BottomCenter"
+           Class="dashboard-aggregation-select">
+    <MudSelectItem Value="DashboardAggregationMode.TaskCount">
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.FormatListNumbered" Size="Size.Small" />
+            <span>Количество задач</span>
+        </div>
+    </MudSelectItem>
+    <MudSelectItem Value="DashboardAggregationMode.TimeMinutes">
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" />
+            <span>Сумма времени</span>
+        </div>
+    </MudSelectItem>
+</MudSelect>
+
+<style>
+    .dashboard-aggregation-select {
+        min-width: 210px;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public DashboardAggregationMode Value { get; set; } = DashboardAggregationMode.TaskCount;
+
+    [Parameter]
+    public EventCallback<DashboardAggregationMode> ValueChanged { get; set; }
+
+    private static string GetModeLabel(DashboardAggregationMode mode) => mode switch
+    {
+        DashboardAggregationMode.TaskCount => "Количество задач",
+        DashboardAggregationMode.TimeMinutes => "Сумма времени",
+        _ => mode.ToString()
+    };
+
+    private async Task OnValueChanged(DashboardAggregationMode newValue)
+    {
+        if (Value == newValue) return;
+        Value = newValue;
+        await ValueChanged.InvokeAsync(newValue);
+    }
+}

@@ -384,4 +384,205 @@ public class DashboardUiTests : IntegrationTestBase
         cut.Markup.Should().Contain("Autofixed (Повтор)");
         cut.Markup.Should().Contain("50%");
     }
+
+    [Fact]
+    public void DashboardPage_AggregationModeSelect_SwitchesToTimeModeWithoutHidingCards()
+    {
+        Tag tag1 = new() { Name = "Work" };
+        Tag tag2 = new() { Name = "Home" };
+        TagRepo.Add(tag1);
+        TagRepo.Add(tag2);
+        var savedWork = TagRepo.GetByName("Work")!;
+        var savedHome = TagRepo.GetByName("Home")!;
+
+        var t1 = new TaskItemBuilder().WithId(0).WithTitle("Work Done").WithStatus(TaskStatus.Completed).WithEstimatedMinutes(90).WithPriorityId(1).Build();
+        t1.Tags.Add(new() { TagId = savedWork.Id });
+        var t2 = new TaskItemBuilder().WithId(0).WithTitle("Home Planned").WithStatus(TaskStatus.Planned).WithEstimatedMinutes(30).WithPriorityId(2).Build();
+        t2.Tags.Add(new() { TagId = savedHome.Id });
+
+        TaskRepo.Add(t1);
+        TaskRepo.Add(t2);
+
+        var cut = _ctx.Render<Dashboard>();
+
+        var priorityCard = cut.FindComponent<PriorityHistogramCard>();
+        priorityCard.Markup.Should().Contain("Количество задач");
+
+        var modeSelect = cut.FindComponent<AggregationModeSelect>();
+        cut.InvokeAsync(() => modeSelect.Instance.ValueChanged.InvokeAsync(DashboardAggregationMode.TimeMinutes));
+
+        var totalCard = cut.FindComponent<TotalCountStatCard>();
+        totalCard.Markup.Should().Contain("Суммарное время");
+        totalCard.Markup.Should().Contain("2 ч");
+        totalCard.Markup.Should().Contain("2 из 2");
+
+        var completionCard = cut.FindComponent<CompletionRateStatCard>();
+        completionCard.Markup.Should().Contain("Выполненное время");
+        completionCard.Instance.Value.Should().Be(75.0);
+
+        var tagsChart = cut.FindComponent<TagsPieChart>();
+        tagsChart.Markup.Should().Contain("1.5 ч");
+        tagsChart.Markup.Should().Contain("0.5 ч");
+        tagsChart.Markup.Should().Contain("1 ч 30 мин");
+
+        priorityCard = cut.FindComponent<PriorityHistogramCard>();
+        priorityCard.Markup.Should().Contain("Сумма времени");
+        priorityCard.Markup.Should().NotContain("Количество задач");
+        priorityCard.Markup.Should().Contain("1.5 ч");
+        priorityCard.Markup.Should().Contain("0.5 ч");
+        priorityCard.Markup.Should().Contain("1 ч 30 мин");
+
+        cut.InvokeAsync(() => modeSelect.Instance.ValueChanged.InvokeAsync(DashboardAggregationMode.TaskCount));
+        priorityCard = cut.FindComponent<PriorityHistogramCard>();
+        priorityCard.Markup.Should().Contain("Количество задач");
+        priorityCard.Markup.Should().NotContain("Сумма времени");
+    }
+
+    [Fact]
+    public void PriorityHistogramCard_UpdatesLabel_WhenAggregationModeChanges()
+    {
+        var countMetrics = new DashboardMetricsDto
+        {
+            AggregationMode = DashboardAggregationMode.TaskCount,
+            PriorityHistogram = new() { { "Высокий", 2 } }
+        };
+
+        var cut = _ctx.Render<PriorityHistogramCard>(p => p.Add(x => x.Metrics, countMetrics));
+        cut.Markup.Should().Contain("Количество задач");
+        cut.Markup.Should().NotContain("Сумма времени");
+
+        var timeMetrics = new DashboardMetricsDto
+        {
+            AggregationMode = DashboardAggregationMode.TimeMinutes,
+            PriorityHistogram = new() { { "Высокий", 90 } }
+        };
+
+        cut.Render(p => p.Add(x => x.Metrics, timeMetrics));
+        cut.Markup.Should().Contain("Сумма времени");
+        cut.Markup.Should().NotContain("Количество задач");
+        cut.Markup.Should().Contain("1.5 ч");
+        cut.Markup.Should().Contain("1 ч 30 мин");
+    }
+
+    [Fact]
+    public void CompletionRateStatCard_RendersInfoTooltipIcon()
+    {
+        var cut = _ctx.Render<CompletionRateStatCard>(p => p
+            .Add(x => x.Value, 28.9)
+            .Add(x => x.AggregationMode, DashboardAggregationMode.TimeMinutes));
+
+        cut.FindComponents<MudTooltip>().Should().ContainSingle();
+        cut.FindAll(".kpi-info-icon").Should().ContainSingle();
+    }
+
+    [Fact]
+    public void DistributionPieChart_InTimeMinutesMode_FormatsLargeHoursCompactly()
+    {
+        Dictionary<string, int> data = new()
+        {
+            { "Завершена", 28074 },
+            { "Запланирована", 26569 }
+        };
+
+        var cut = _ctx.Render<DistributionPieChart>(p => p
+            .Add(x => x.Title, "Тест")
+            .Add(x => x.Data, data)
+            .Add(x => x.AggregationMode, DashboardAggregationMode.TimeMinutes));
+
+        cut.Markup.Should().Contain("468 ч");
+        cut.Markup.Should().Contain("443 ч");
+        cut.Markup.Should().NotContain("467 ч 54 мин</span>");
+        cut.Markup.Should().NotContain(">28074<");
+    }
+
+    [Fact]
+    public void DashboardPage_UntaggedFilterAndFooter_DisplaysUntaggedStatsSeparatelyFromPieSlices()
+    {
+        TagRepo.Add(new() { Name = "Work" });
+        TagRepo.Add(new() { Name = "Home" });
+        var savedWork = TagRepo.GetByName("Work")!;
+        var savedHome = TagRepo.GetByName("Home")!;
+
+        var tWork = new TaskItemBuilder().WithId(0).WithTitle("Work Task").WithStatus(TaskStatus.Planned).Build();
+        tWork.Tags.Add(new() { TagId = savedWork.Id });
+        var tHome = new TaskItemBuilder().WithId(0).WithTitle("Home Task").WithStatus(TaskStatus.Planned).Build();
+        tHome.Tags.Add(new() { TagId = savedHome.Id });
+        var tUntagged = new TaskItemBuilder().WithId(0).WithTitle("Untagged Task").WithStatus(TaskStatus.Planned).Build();
+
+        TaskRepo.Add(tWork);
+        TaskRepo.Add(tHome);
+        TaskRepo.Add(tUntagged);
+
+        var cut = _ctx.Render<Dashboard>();
+
+        var tagsChart = cut.FindComponent<TagsPieChart>();
+        tagsChart.FindAll(".legend-item").Should().HaveCount(2);
+        tagsChart.Markup.Should().Contain("Без тегов:");
+        tagsChart.Markup.Should().Contain("33.3%");
+
+        var scopeSelect = cut.FindComponent<EntityScopeSelect>();
+        scopeSelect.Instance.UntaggedTaskCount.Should().Be(1);
+
+        cut.InvokeAsync(() => scopeSelect.Instance.FilterChanged.InvokeAsync(new()
+        {
+            Scope = EntityScopeType.Tag,
+            TagFilterMode = TagFilterMode.Untagged
+        }));
+
+        cut.FindComponent<TotalCountStatCard>().Instance.TotalTasks.Should().Be(1);
+    }
+
+    [Fact]
+    public void DashboardPage_WeeklyComparisonCard_ShowsOnAllScopeAndHidesOnActiveScope()
+    {
+        var completed = new TaskItemBuilder()
+            .WithId(0)
+            .WithTitle("Done Recently")
+            .WithStatus(TaskStatus.Completed)
+            .WithCompletedDate(TodoDay.Today.ToDateTime())
+            .Build();
+        TaskRepo.Add(completed);
+
+        var cut = _ctx.Render<Dashboard>();
+        cut.FindComponents<WeeklyComparisonCard>().Should().NotBeEmpty();
+        cut.FindComponent<WeeklyComparisonCard>().Markup.Should().Contain("Динамика за 7 дней");
+
+        var scopeSelect = cut.FindComponent<EntityScopeSelect>();
+        cut.InvokeAsync(() => scopeSelect.Instance.FilterChanged.InvokeAsync(new()
+        {
+            Scope = EntityScopeType.Active
+        }));
+
+        cut.FindComponents<WeeklyComparisonCard>().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void DashboardPage_RecordsCard_DisplaysMaxTransitiveBlocker()
+    {
+        var leaf = new TaskItemBuilder().WithId(203).WithTitle("Leaf").WithStatus(TaskStatus.Blocked).Build();
+        var mid = new TaskItemBuilder().WithId(202).WithTitle("Mid").WithStatus(TaskStatus.Blocked).WithRelation(leaf, RelationType.Blocks).Build();
+        var root = new TaskItemBuilder().WithId(201).WithTitle("Root").WithStatus(TaskStatus.Planned).WithRelation(mid, RelationType.Blocks).Build();
+
+        TaskRepo.Add(leaf);
+        TaskRepo.Add(mid);
+        TaskRepo.Add(root);
+
+        var cut = _ctx.Render<Dashboard>();
+
+        var record = cut.FindComponent<DashboardRecordsCard>().Instance.Records
+            .Single(r => r.Title == "Блокирует больше всего задач");
+        record.Value.Should().Be("2 задач (Root)");
+    }
+
+    [Fact]
+    public void TagsPieChart_DoesNotRenderUntaggedFooter_WhenUntaggedTasksCountIsZero()
+    {
+        Dictionary<string, int> data = new() { { "Work", 5 }, { "Home", 3 } };
+
+        var cut = _ctx.Render<TagsPieChart>(p => p
+            .Add(x => x.Data, data)
+            .Add(x => x.UntaggedTasksCount, 0));
+
+        cut.Markup.Should().NotContain("Без тегов");
+    }
 }

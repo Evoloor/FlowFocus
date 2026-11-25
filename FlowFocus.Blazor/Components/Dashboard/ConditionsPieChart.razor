@@ -1,10 +1,14 @@
 <DistributionPieChart Title="Распределение по условиям"
                       Data="@Data"
+                      AggregationMode="@AggregationMode"
                       Palette="@Palette" />
 
 @code {
     [Parameter]
     public Dictionary<string, int> Data { get; set; } = new();
+
+    [Parameter]
+    public DashboardAggregationMode AggregationMode { get; set; } = DashboardAggregationMode.TaskCount;
 
     private static readonly string[] Palette =
     [

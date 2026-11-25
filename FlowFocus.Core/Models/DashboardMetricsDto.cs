@@ -8,6 +8,9 @@ namespace FlowFocus.Core.Models;
 /// </summary>
 public class DashboardMetricsDto
 {
+    /// <summary>Активный режим агрегации метрик</summary>
+    public DashboardAggregationMode AggregationMode { get; set; } = DashboardAggregationMode.TaskCount;
+
     // === Summary Grid ===
     /// <summary>Активность в приложении (% дней с хотя бы 1 выполненной задачей)</summary>
     public double ActivityPercentage { get; set; }
@@ -18,11 +21,17 @@ public class DashboardMetricsDto
     /// <summary>Всего подзадач (число вложенных подзадач)</summary>
     public int TotalSubtasksCount { get; set; }
 
+    /// <summary>Количество задач с ненулевой оценкой времени в выборке</summary>
+    public int TasksWithTimeEstimateCount { get; set; }
+
     /// <summary>Процент оставшихся (активных) задач</summary>
     public double CompletionRatePercentage { get; set; }
 
     /// <summary>Создано задач за выбранный период (null если за все время)</summary>
     public int? CreatedTasksCount { get; set; }
+
+    /// <summary>Суммарное время созданных задач за выбранный период в минутах (null если за все время)</summary>
+    public int? CreatedTasksTimeMinutes { get; set; }
 
     // === Task Structure & Types ===
     /// <summary>Распределение по статусам</summary>
@@ -34,8 +43,20 @@ public class DashboardMetricsDto
     /// <summary>Распределение по тегам</summary>
     public Dictionary<string, int> TagsDistribution { get; set; } = new();
 
+    /// <summary>Количество задач без тегов в текущей выборке</summary>
+    public int UntaggedTasksCount { get; set; }
+
+    /// <summary>Значение задач без тегов (количество или минуты в зависимости от AggregationMode)</summary>
+    public int UntaggedTasksValue { get; set; }
+
+    /// <summary>Доля задач без тегов от выборки в процентах</summary>
+    public double UntaggedTasksPercentage { get; set; }
+
     /// <summary>Распределение по условиям</summary>
     public Dictionary<string, int> ConditionsDistribution { get; set; } = new();
+
+    /// <summary>Сравнение последних 7 туду-дней против предыдущих 7</summary>
+    public WeeklyComparisonDto WeeklyComparison { get; set; } = new();
 
     // === Deep Analytics Grid ===
     /// <summary>Количество задач с учётом Scope</summary>

@@ -1,5 +1,7 @@
 namespace FlowFocus.Blazor.Components.Dashboard;
 
+using FlowFocus.Core.Enums;
+using FlowFocus.Core.Helpers;
 using FlowFocus.Core.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
@@ -14,6 +16,9 @@ public abstract class BaseEnumDistributionCard<TEnum> : ComponentBase
 {
     [Parameter]
     public BaseEnumDistribution<TEnum>? Data { get; set; }
+
+    [Parameter]
+    public DashboardAggregationMode AggregationMode { get; set; } = DashboardAggregationMode.TaskCount;
 
     protected abstract string CardTitle { get; }
     protected abstract string EmptyStateMessage { get; }
@@ -58,6 +63,8 @@ public abstract class BaseEnumDistributionCard<TEnum> : ComponentBase
                     builder3.OpenElement(15, "div");
                     builder3.AddAttribute(16, "class", "date-type-grid");
 
+                    var blockScale = DurationFormatHelper.ResolveCompactScale((IEnumerable<int>?)Data?.Values ?? []);
+
                     int seq = 17;
                     foreach (var item in GetItemConfigs())
                     {
@@ -87,7 +94,11 @@ public abstract class BaseEnumDistributionCard<TEnum> : ComponentBase
 
                         builder3.OpenElement(seq++, "span");
                         builder3.AddAttribute(seq++, "class", "date-type-count");
-                        builder3.AddContent(seq++, count.ToString());
+                        if (AggregationMode == DashboardAggregationMode.TimeMinutes)
+                        {
+                            builder3.AddAttribute(seq++, "title", DurationFormatHelper.FormatMinutes(count));
+                        }
+                        builder3.AddContent(seq++, DurationFormatHelper.FormatCompactMetricValue(count, AggregationMode, blockScale, "0"));
                         builder3.CloseElement();
 
                         builder3.OpenElement(seq++, "span");

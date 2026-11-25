@@ -1,3 +1,4 @@
+@using System.Globalization
 @using FlowFocus.Core.Helpers
 
 @if (ProcessedData.Count >= 2)
@@ -8,7 +9,9 @@
                 <div class="d-flex align-center justify-space-between width-100">
                     <MudText Typo="Typo.h6" Class="chart-title">@Title</MudText>
                     <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Secondary" Class="total-chip">
-                        Всего: @TotalCount
+                        <span title="@ExactTotalTooltip">
+                            Всего: @DurationFormatHelper.FormatCompactMetricValue(TotalCount, AggregationMode, TotalScale, "0 мин")
+                        </span>
                     </MudChip>
                 </div>
             </CardHeaderContent>
@@ -18,29 +21,39 @@
                 <div class="chart-donut-container">
                     <MudChart ChartType="ChartType.Donut"
                               InputData="@ChartData"
-                              InputLabels="@ChartLabels"
+                              InputLabels="@DonutLabels"
                               ChartOptions="@ChartOptions"
                               Width="180px"
                               Height="180px" />
                 </div>
 
                 <div class="chart-legend-grid">
-                    @for (var i = 0; i < ChartLabels.Length; i++)
+                    @for (var i = 0; i < LegendKeys.Length; i++)
                     {
                         var index = i;
-                        var label = ChartLabels[index];
-                        var count = (int)ChartData[index];
-                        var percent = TotalCount > 0 ? Math.Round((double)count / TotalCount * 100, 1) : 0;
+                        var label = LegendKeys[index];
+                        var rawVal = RawValues[index];
+                        var percent = TotalCount > 0 ? Math.Round((double)rawVal / TotalCount * 100, 1) : 0;
                         var color = ResolvedPalette[index % ResolvedPalette.Length];
+                        var exactTitle = AggregationMode == DashboardAggregationMode.TimeMinutes
+                            ? DurationFormatHelper.FormatMinutes(rawVal)
+                            : null;
 
                         <div class="legend-item">
                             <span class="legend-badge" style="background-color: @color"></span>
                             <span class="legend-label text-truncate">@label</span>
-                            <span class="legend-value">@count</span>
+                            <span class="legend-value" title="@exactTitle">@DurationFormatHelper.FormatCompactMetricValue(rawVal, AggregationMode, BlockScale, "0")</span>
                             <span class="legend-percent">(@percent%)</span>
                         </div>
                     }
                 </div>
+
+                @if (FooterContent != null)
+                {
+                    <div class="chart-footer">
+                        @FooterContent
+                    </div>
+                }
             </div>
         </MudCardContent>
     </MudCard>
@@ -85,7 +98,7 @@
         .chart-legend-grid {
             width: 100%;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
             gap: 8px;
             padding-top: 12px;
             border-top: 1px solid rgba(255, 255, 255, 0.06);
@@ -124,6 +137,12 @@
             color: var(--mud-palette-text-secondary);
             opacity: 0.8;
         }
+
+        .chart-footer {
+            width: 100%;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
     </style>
 }
 
@@ -133,6 +152,12 @@
 
     [Parameter]
     public Dictionary<string, int> Data { get; set; } = new();
+
+    [Parameter]
+    public DashboardAggregationMode AggregationMode { get; set; } = DashboardAggregationMode.TaskCount;
+
+    [Parameter]
+    public RenderFragment? FooterContent { get; set; }
 
     [Parameter]
     public string OtherLabel { get; set; } = "Другое";
@@ -151,9 +176,26 @@
 
     private Dictionary<string, int> ProcessedData => PieChartGroupingHelper.GroupSmallSlices(Data ?? new(), OtherLabel, MaxSlices, ThresholdPercent);
 
-    private double[] ChartData => ProcessedData.Values.Select(v => (double)v).ToArray();
-    private string[] ChartLabels => ProcessedData.Keys.ToArray();
+    private DurationDisplayScale BlockScale => DurationFormatHelper.ResolveCompactScale(ProcessedData.Values);
+    private DurationDisplayScale TotalScale => DurationFormatHelper.ResolveCompactScale(TotalCount);
+
+    private string[] LegendKeys => ProcessedData.Keys.ToArray();
+    private int[] RawValues => ProcessedData.Values.ToArray();
     private int TotalCount => ProcessedData.Values.Sum();
+
+    private string? ExactTotalTooltip => AggregationMode == DashboardAggregationMode.TimeMinutes
+        ? DurationFormatHelper.FormatMinutes(TotalCount)
+        : null;
+
+    private double[] ChartData =>
+        AggregationMode == DashboardAggregationMode.TimeMinutes && BlockScale == DurationDisplayScale.CompactHours
+            ? ProcessedData.Values.Select(v => Math.Max(0.1, Math.Round(v / 60.0, 1))).ToArray()
+            : ProcessedData.Values.Select(v => (double)v).ToArray();
+
+    private string[] DonutLabels =>
+        AggregationMode == DashboardAggregationMode.TimeMinutes && BlockScale == DurationDisplayScale.CompactHours
+            ? ProcessedData.Select(kv => $"{kv.Key} ({DurationFormatHelper.FormatCompact(kv.Value, BlockScale, "0")})").ToArray()
+            : ProcessedData.Keys.ToArray();
 
     private static readonly string[] DefaultPalette =
     [

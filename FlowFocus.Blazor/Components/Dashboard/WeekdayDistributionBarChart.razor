@@ -1,3 +1,5 @@
+@using FlowFocus.Core.Helpers
+
 <MudCard Elevation="3" Class="chart-card glass-card">
     <MudCardHeader>
         <CardHeaderContent>
@@ -7,12 +9,12 @@
     <MudCardContent>
         @if (TotalSum == 0)
         {
-            <DashboardEmptyState Message="Нет завершённых задач за выбранный период" />
+            <DashboardEmptyState Message="@EmptyStateMessage" />
         }
         else
         {
             <div class="weekday-bar-container">
-                <DashboardHistogramChart Items="@Items" DefaultColor="#6366f1" Unit="вып. задач" />
+                <DashboardHistogramChart Items="@Items" DefaultColor="#6366f1" Unit="@UnitText" />
             </div>
         }
     </MudCardContent>
@@ -29,7 +31,16 @@
     [Parameter]
     public Dictionary<DayOfWeek, double> Data { get; set; } = new();
 
+    [Parameter]
+    public DashboardAggregationMode AggregationMode { get; set; } = DashboardAggregationMode.TaskCount;
+
     private double TotalSum => Data.Values.Sum();
+
+    private string EmptyStateMessage => AggregationMode == DashboardAggregationMode.TimeMinutes
+        ? "Нет завершённых задач с оценкой времени за выбранный период"
+        : "Нет завершённых задач за выбранный период";
+
+    private string UnitText => AggregationMode == DashboardAggregationMode.TimeMinutes ? string.Empty : "вып. задач";
 
     private static readonly (DayOfWeek Day, string Label)[] OrderedDays =
     [
@@ -42,11 +53,28 @@
         (DayOfWeek.Sunday, "Вс")
     ];
 
-    private List<DashboardHistogramChart.HistogramItem> Items => OrderedDays
-        .Select(d => new DashboardHistogramChart.HistogramItem
+    private List<DashboardHistogramChart.HistogramItem> Items
+    {
+        get
         {
-            Label = d.Label,
-            Value = Data.GetValueOrDefault(d.Day, 0.0)
-        })
-        .ToList();
+            var blockScale = DurationFormatHelper.ResolveCompactScale(Data.Values);
+            return OrderedDays
+                .Select(d =>
+                {
+                    var val = Data.GetValueOrDefault(d.Day, 0.0);
+                    return new DashboardHistogramChart.HistogramItem
+                    {
+                        Label = d.Label,
+                        Value = val,
+                        FormattedValue = AggregationMode == DashboardAggregationMode.TimeMinutes
+                            ? DurationFormatHelper.FormatCompact(val, blockScale, "0")
+                            : null,
+                        TooltipValue = AggregationMode == DashboardAggregationMode.TimeMinutes
+                            ? DurationFormatHelper.FormatMinutes(val)
+                            : null
+                    };
+                })
+                .ToList();
+        }
+    }
 }

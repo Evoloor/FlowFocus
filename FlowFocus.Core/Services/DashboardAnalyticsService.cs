@@ -10,6 +10,11 @@ namespace FlowFocus.Core.Services;
 /// </summary>
 public class DashboardAnalyticsService : IDashboardAnalyticsService
 {
+    private static DateTime ResolveCurrentDate(DateTime? now) => now?.Date ?? TodoDay.Today.Date;
+
+    private static int GetTaskWeight(TaskItem task, DashboardAggregationMode mode) =>
+        mode == DashboardAggregationMode.TimeMinutes ? Math.Max(0, task.EstimatedMinutes ?? 0) : 1;
+
     /// <inheritdoc />
     public List<TaskItem> GetTasksForDateRange(IEnumerable<TaskItem> allTasks, DateRangeMode mode, DateTime? now = null)
     {
@@ -19,7 +24,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
             return tasksList;
         }
 
-        var currentDate = (now ?? DateTime.UtcNow).Date;
+        var currentDate = ResolveCurrentDate(now);
         var daysWindow = mode == DateRangeMode.Recent ? 14 : 90;
         var minTargetCount = mode == DateRangeMode.Recent ? 100 : 300;
         var thresholdDate = currentDate.AddDays(-daysWindow);
@@ -64,9 +69,11 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
                 .Where(t => t.Status == TaskStatus.Completed)
                 .ToList(),
 
-            EntityScopeType.Tag => filter.TagId.HasValue
-                ? tasksList.Where(t => t.Tags != null && t.Tags.Any(tag => tag.TagId == filter.TagId.Value)).ToList()
-                : tasksList,
+            EntityScopeType.Tag => filter.TagFilterMode == TagFilterMode.Untagged
+                ? tasksList.Where(t => t.Tags == null || t.Tags.Count == 0).ToList()
+                : filter.TagId.HasValue
+                    ? tasksList.Where(t => t.Tags != null && t.Tags.Any(tag => tag.TagId == filter.TagId.Value)).ToList()
+                    : tasksList,
 
             EntityScopeType.Condition => filter.ConditionId.HasValue
                 ? tasksList.Where(t => t.Conditions != null && t.Conditions.Any(c => c.ConditionId == filter.ConditionId.Value)).ToList()
@@ -80,7 +87,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
     public double CalculateActivityMetric(IEnumerable<TaskItem> tasks, DateRangeMode mode, DateTime? now = null)
     {
         var tasksList = tasks.ToList();
-        var currentDate = (now ?? DateTime.UtcNow).Date;
+        var currentDate = ResolveCurrentDate(now);
         int totalDays;
         DateTime? thresholdDate = null;
 
@@ -136,29 +143,8 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         var tasksList = allTasks.ToList();
         if (tasksList.Count == 0) return 0;
 
-        // Построение графа зависимостей: A blocks B => A -> B
-        Dictionary<int, HashSet<int>> adj = new();
+        var adj = BuildDependencyGraph(tasksList);
         HashSet<int> allNodes = new(tasksList.Select(t => t.Id));
-
-        foreach (var task in tasksList)
-        {
-            if (task.Relations != null)
-            {
-                foreach (var rel in task.Relations)
-                {
-                    AddRelationEdge(adj, rel, task.Id);
-                }
-            }
-
-            if (task.InverseRelations != null)
-            {
-                foreach (var rel in task.InverseRelations)
-                {
-                    AddRelationEdge(adj, rel, task.Id);
-                }
-            }
-        }
-
         var maxLength = 0;
 
         foreach (var nodeId in allNodes)
@@ -175,31 +161,159 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         return maxLength;
     }
 
-    private static void AddRelationEdge(Dictionary<int, HashSet<int>> adj, TaskRelation rel, int currentTaskId)
+    /// <inheritdoc />
+    public BlockingImpactResult? CalculateMaxTransitiveBlocker(IEnumerable<TaskItem> tasks)
+    {
+        var activeTasks = tasks.Where(t => t.IsActive).ToList();
+        if (activeTasks.Count == 0) return null;
+
+        var activeMap = activeTasks
+            .DistinctBy(t => t.Id)
+            .ToDictionary(t => t.Id);
+        var allowedNodes = activeMap.Keys.ToHashSet();
+        var adj = BuildDependencyGraph(activeTasks, allowedNodes);
+
+        TaskItem? bestTask = null;
+        var bestCount = 0;
+
+        foreach (var task in activeTasks)
+        {
+            var blockedCount = CountReachableNodes(task.Id, adj);
+            if (blockedCount == 0) continue;
+
+            if (bestTask == null || IsBetterBlockerCandidate(task, blockedCount, bestTask, bestCount))
+            {
+                bestTask = task;
+                bestCount = blockedCount;
+            }
+        }
+
+        return bestTask != null ? new BlockingImpactResult(bestTask, bestCount) : null;
+    }
+
+    private static bool IsBetterBlockerCandidate(TaskItem candidate, int candidateCount, TaskItem currentBest, int currentBestCount)
+    {
+        if (candidateCount != currentBestCount)
+        {
+            return candidateCount > currentBestCount;
+        }
+
+        var candidatePriority = candidate.Priority?.Order ?? int.MaxValue;
+        var currentPriority = currentBest.Priority?.Order ?? int.MaxValue;
+        if (candidatePriority != currentPriority)
+        {
+            return candidatePriority < currentPriority;
+        }
+
+        if (candidate.CreatedDate != currentBest.CreatedDate)
+        {
+            return candidate.CreatedDate < currentBest.CreatedDate;
+        }
+
+        return candidate.Id < currentBest.Id;
+    }
+
+    private static int CountReachableNodes(int startId, Dictionary<int, HashSet<int>> adj)
+    {
+        if (!adj.TryGetValue(startId, out var initialNeighbors) || initialNeighbors.Count == 0)
+        {
+            return 0;
+        }
+
+        HashSet<int> visited = [startId];
+        Queue<int> queue = new();
+
+        foreach (var neighbor in initialNeighbors)
+        {
+            if (visited.Add(neighbor))
+            {
+                queue.Enqueue(neighbor);
+            }
+        }
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            if (!adj.TryGetValue(current, out var nextNeighbors)) continue;
+
+            foreach (var next in nextNeighbors)
+            {
+                if (visited.Add(next))
+                {
+                    queue.Enqueue(next);
+                }
+            }
+        }
+
+        return visited.Count - 1;
+    }
+
+    private static Dictionary<int, HashSet<int>> BuildDependencyGraph(IEnumerable<TaskItem> tasks, HashSet<int>? allowedNodes = null)
+    {
+        Dictionary<int, HashSet<int>> adj = new();
+
+        foreach (var task in tasks)
+        {
+            if (task.Relations != null)
+            {
+                foreach (var rel in task.Relations)
+                {
+                    AddRelationEdge(adj, rel, task.Id, allowedNodes);
+                }
+            }
+
+            if (task.InverseRelations != null)
+            {
+                foreach (var rel in task.InverseRelations)
+                {
+                    AddRelationEdge(adj, rel, task.Id, allowedNodes);
+                }
+            }
+        }
+
+        return adj;
+    }
+
+    private static void AddRelationEdge(
+        Dictionary<int, HashSet<int>> adj,
+        TaskRelation rel,
+        int currentTaskId,
+        HashSet<int>? allowedNodes = null)
     {
         var sourceId = rel.SourceTaskId != 0 ? rel.SourceTaskId : currentTaskId;
         var targetId = rel.TargetTaskId != 0 ? rel.TargetTaskId : currentTaskId;
 
         if (sourceId == targetId) return;
 
+        int blockerId;
+        int blockedId;
+
         if (rel.Type == RelationType.Blocks)
         {
-            if (!adj.TryGetValue(sourceId, out var set))
-            {
-                set = [];
-                adj[sourceId] = set;
-            }
-            set.Add(targetId);
+            blockerId = sourceId;
+            blockedId = targetId;
         }
         else if (rel.Type == RelationType.BlockedBy)
         {
-            if (!adj.TryGetValue(targetId, out var set))
-            {
-                set = [];
-                adj[targetId] = set;
-            }
-            set.Add(sourceId);
+            blockerId = targetId;
+            blockedId = sourceId;
         }
+        else
+        {
+            return;
+        }
+
+        if (allowedNodes != null && (!allowedNodes.Contains(blockerId) || !allowedNodes.Contains(blockedId)))
+        {
+            return;
+        }
+
+        if (!adj.TryGetValue(blockerId, out var set))
+        {
+            set = [];
+            adj[blockerId] = set;
+        }
+        set.Add(blockedId);
     }
 
     private static int GetMaxDepthDFS(int nodeId, Dictionary<int, HashSet<int>> adj, HashSet<int> visitingPath, Dictionary<int, int> memo)
@@ -241,7 +355,9 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
     }
 
     /// <inheritdoc />
-    public Dictionary<DayOfWeek, double> CalculateWeekdayDistribution(IEnumerable<TaskItem> tasks)
+    public Dictionary<DayOfWeek, double> CalculateWeekdayDistribution(
+        IEnumerable<TaskItem> tasks,
+        DashboardAggregationMode mode = DashboardAggregationMode.TaskCount)
     {
         Dictionary<DayOfWeek, double> result = new()
         {
@@ -256,6 +372,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
 
         var completedTasks = tasks
             .Where(t => t.Status == TaskStatus.Completed && t.CompletedDate.HasValue)
+            .Where(t => mode != DashboardAggregationMode.TimeMinutes || t.EstimatedMinutes is > 0)
             .ToList();
 
         if (completedTasks.Count == 0)
@@ -263,26 +380,91 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
             return result;
         }
 
-        var tasksByDate = completedTasks
+        var weightByDate = completedTasks
             .GroupBy(t => t.CompletedDate!.Value.Date)
-            .ToDictionary(g => g.Key, g => g.Count());
+            .ToDictionary(g => g.Key, g => g.Sum(t => GetTaskWeight(t, mode)));
 
-        var datesByWeekday = tasksByDate.Keys.GroupBy(d => d.DayOfWeek);
+        var datesByWeekday = weightByDate.Keys.GroupBy(d => d.DayOfWeek);
 
         foreach (var group in datesByWeekday)
         {
             var weekday = group.Key;
             var activeDates = group.ToList();
-            var totalTasksForWeekday = activeDates.Sum(d => tasksByDate[d]);
+            var totalWeightForWeekday = activeDates.Sum(d => weightByDate[d]);
             var activeDaysCount = activeDates.Count;
 
             if (activeDaysCount > 0)
             {
-                result[weekday] = Math.Round((double)totalTasksForWeekday / activeDaysCount, 1);
+                result[weekday] = Math.Round((double)totalWeightForWeekday / activeDaysCount, 1);
             }
         }
 
         return result;
+    }
+
+    /// <inheritdoc />
+    public WeeklyComparisonDto CalculateWeeklyComparison(IEnumerable<TaskItem> allTasks, DashboardFilter filter, DateTime? now = null)
+    {
+        var today = ResolveCurrentDate(now);
+        var currentStart = today.AddDays(-6);
+        var previousStart = today.AddDays(-13);
+        var previousEnd = today.AddDays(-7);
+
+        var scopedTasks = ApplyEntityScope(allTasks, filter);
+        var completed = scopedTasks
+            .Where(t => t.Status == TaskStatus.Completed && t.CompletedDate.HasValue)
+            .ToList();
+
+        var currentWeek = completed
+            .Where(t =>
+            {
+                var d = t.CompletedDate!.Value.Date;
+                return d >= currentStart && d <= today;
+            })
+            .ToList();
+
+        var previousWeek = completed
+            .Where(t =>
+            {
+                var d = t.CompletedDate!.Value.Date;
+                return d >= previousStart && d <= previousEnd;
+            })
+            .ToList();
+
+        return new WeeklyComparisonDto
+        {
+            CompletedTasksCount = new MetricPeriodComparison
+            {
+                CurrentValue = currentWeek.Count,
+                PreviousValue = previousWeek.Count
+            },
+            CompletedTimeMinutes = new MetricPeriodComparison
+            {
+                CurrentValue = currentWeek.Sum(t => Math.Max(0, t.EstimatedMinutes ?? 0)),
+                PreviousValue = previousWeek.Sum(t => Math.Max(0, t.EstimatedMinutes ?? 0))
+            },
+            AverageComplexity = new MetricPeriodComparison
+            {
+                CurrentValue = CalculateNullableAverage(currentWeek, t => t.Complexity),
+                PreviousValue = CalculateNullableAverage(previousWeek, t => t.Complexity)
+            },
+            AverageInterest = new MetricPeriodComparison
+            {
+                CurrentValue = CalculateNullableAverage(currentWeek, t => t.Interest),
+                PreviousValue = CalculateNullableAverage(previousWeek, t => t.Interest)
+            }
+        };
+    }
+
+    private static double? CalculateNullableAverage(List<TaskItem> tasks, Func<TaskItem, int?> selector)
+    {
+        var values = tasks
+            .Select(selector)
+            .Where(v => v.HasValue)
+            .Select(v => (double)v!.Value)
+            .ToList();
+
+        return values.Count > 0 ? Math.Round(values.Average(), 1) : null;
     }
 
     /// <inheritdoc />
@@ -300,7 +482,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         List<TaskItem>? createdInScope = null;
         if (filter.DateRange != DateRangeMode.AllTime)
         {
-            var currentDate = (now ?? DateTime.UtcNow).Date;
+            var currentDate = ResolveCurrentDate(now);
             var daysWindow = filter.DateRange == DateRangeMode.Recent ? 14 : 90;
             var thresholdDate = currentDate.AddDays(-daysWindow);
             createdInScope = fullyFiltered.Where(t => t.CreatedDate.Date >= thresholdDate).ToList();
@@ -313,10 +495,14 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
     public DashboardMetricsDto CalculateMetrics(IEnumerable<TaskItem> allTasks, DashboardFilter filter, DateTime? now = null)
     {
         var slices = PrepareDataSlices(allTasks, filter, now);
+        var mode = filter.AggregationMode;
 
         DashboardMetricsDto dto = new()
         {
-            CreatedTasksCount = slices.CreatedInScope?.Count
+            AggregationMode = mode,
+            CreatedTasksCount = slices.CreatedInScope?.Count,
+            CreatedTasksTimeMinutes = slices.CreatedInScope?.Sum(t => Math.Max(0, t.EstimatedMinutes ?? 0)),
+            WeeklyComparison = CalculateWeeklyComparison(slices.All, filter, now)
         };
 
         if (slices.FullyFiltered.Count == 0)
@@ -333,22 +519,45 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
 
         dto.TotalTasksCount = slices.FullyFiltered.Count;
         dto.TotalSubtasksCount = slices.FullyFiltered.Sum(t => t.Subtasks?.Count ?? 0);
+        dto.TasksWithTimeEstimateCount = slices.FullyFiltered.Count(t => t.EstimatedMinutes is > 0);
 
-        var completedTasksCount = slices.FullyFiltered.Count(t => t.Status == TaskStatus.Completed);
-        var totalForCompletion = slices.FullyFiltered.Count;
-        dto.CompletionRatePercentage = totalForCompletion > 0
-            ? Math.Round(((double)completedTasksCount / totalForCompletion) * 100.0, 1)
+        var completionPool = slices.FullyFiltered
+            .Where(t => !t.IsRecurring && (t.Status == TaskStatus.Completed || t.Status.IsActive()))
+            .ToList();
+        var completedWeight = completionPool
+            .Where(t => t.Status == TaskStatus.Completed)
+            .Sum(t => GetTaskWeight(t, mode));
+        var totalCompletionWeight = completionPool
+            .Sum(t => GetTaskWeight(t, mode));
+        dto.CompletionRatePercentage = totalCompletionWeight > 0
+            ? Math.Round(((double)completedWeight / totalCompletionWeight) * 100.0, 1)
             : 0.0;
 
         // === Task Structure & Types ===
-        dto.StatusDistribution = DistributionHelper.CalculateEnumDistribution<TaskItem, TaskStatus, StatusDistribution>(slices.FullyFiltered, t => t.Status);
-        dto.DateSourceDistribution = DistributionHelper.CalculateEnumDistribution<TaskItem, DateSource, DateSourceDistribution>(slices.FullyFiltered, t => t.DateSource);
+        dto.StatusDistribution = DistributionHelper.CalculateEnumDistribution<TaskItem, TaskStatus, StatusDistribution>(
+            slices.FullyFiltered,
+            t => t.Status,
+            t => GetTaskWeight(t, mode));
+        dto.DateSourceDistribution = DistributionHelper.CalculateEnumDistribution<TaskItem, DateSource, DateSourceDistribution>(
+            slices.FullyFiltered,
+            t => t.DateSource,
+            t => GetTaskWeight(t, mode));
         dto.TagsDistribution = DistributionHelper.CalculateCollectionDistribution(
             slices.FullyFiltered,
-            t => t.Tags?.Where(tt => tt.Tag != null).Select(tt => tt.Tag!.Name));
+            t => t.Tags?.Where(tt => tt.Tag != null).Select(tt => tt.Tag!.Name),
+            t => GetTaskWeight(t, mode));
         dto.ConditionsDistribution = DistributionHelper.CalculateCollectionDistribution(
             slices.FullyFiltered,
-            t => t.Conditions?.Where(tc => tc.Condition != null).Select(tc => tc.Condition!.Name));
+            t => t.Conditions?.Where(tc => tc.Condition != null).Select(tc => tc.Condition!.Name),
+            t => GetTaskWeight(t, mode));
+
+        var untaggedTasks = slices.FullyFiltered.Where(t => t.Tags == null || t.Tags.Count == 0).ToList();
+        dto.UntaggedTasksCount = untaggedTasks.Count;
+        dto.UntaggedTasksValue = untaggedTasks.Sum(t => GetTaskWeight(t, mode));
+        var totalFilteredWeight = slices.FullyFiltered.Sum(t => GetTaskWeight(t, mode));
+        dto.UntaggedTasksPercentage = totalFilteredWeight > 0
+            ? Math.Round(((double)dto.UntaggedTasksValue / totalFilteredWeight) * 100.0, 1)
+            : 0.0;
 
         // === Deep Analytics Grid ===
         dto.FilteredCount = slices.FullyFiltered.Count;
@@ -394,17 +603,17 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         }
 
         // === Weekday Distribution ===
-        dto.WeekdayAverages = CalculateWeekdayDistribution(slices.FullyFiltered);
+        dto.WeekdayAverages = CalculateWeekdayDistribution(slices.FullyFiltered, mode);
 
         // === Records & Interest-Priority Analytics ===
         dto.Records = CalculateRecords(slices.FullyFiltered);
         dto.InterestPriorityDistribution = CalculateInterestPriorityDistribution(slices.FullyFiltered);
 
         // === Metric Histograms ===
-        dto.InterestHistogram = CalculateInterestHistogram(slices.FullyFiltered);
-        dto.ComplexityHistogram = CalculateComplexityHistogram(slices.FullyFiltered);
-        dto.PriorityHistogram = CalculatePriorityHistogram(slices.FullyFiltered);
-        dto.TimeHistogram = CalculateTimeHistogram(slices.FullyFiltered);
+        dto.InterestHistogram = CalculateInterestHistogram(slices.FullyFiltered, mode);
+        dto.ComplexityHistogram = CalculateComplexityHistogram(slices.FullyFiltered, mode);
+        dto.PriorityHistogram = CalculatePriorityHistogram(slices.FullyFiltered, mode);
+        dto.TimeHistogram = CalculateTimeHistogram(slices.FullyFiltered, mode);
         dto.PriorityInterestHistogram = CalculatePriorityInterestHistogram(slices.FullyFiltered);
 
         return dto;
@@ -440,7 +649,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
             rawRecords.Add(new()
             {
                 Title = "Макс. сумма времени за день",
-                Value = FormatMinutes(totalMins),
+                Value = DurationFormatHelper.FormatMinutes(totalMins),
                 Date = maxTimeGroup.Key
             });
         }
@@ -517,7 +726,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
             rawRecords.Add(new()
             {
                 Title = "Макс. продолжительность задачи",
-                Value = $"{FormatMinutes(maxDurTask.EstimatedMinutes!.Value)} ({maxDurTask.Title})",
+                Value = $"{DurationFormatHelper.FormatMinutes(maxDurTask.EstimatedMinutes!.Value)} ({maxDurTask.Title})",
                 Date = maxDurTask.CompletedDate?.Date
             });
         }
@@ -540,6 +749,22 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         else
         {
             rawRecords.Add(new() { Title = "Самая длинная цепочка блокировок", Value = "-", Date = null });
+        }
+
+        // 8. Задача, блокирующая больше всего активных задач по цепочке
+        var maxBlocker = CalculateMaxTransitiveBlocker(tasks);
+        if (maxBlocker != null)
+        {
+            rawRecords.Add(new()
+            {
+                Title = "Блокирует больше всего задач",
+                Value = $"{maxBlocker.BlockedTasksCount} задач ({maxBlocker.BlockerTask.Title})",
+                Date = null
+            });
+        }
+        else
+        {
+            rawRecords.Add(new() { Title = "Блокирует больше всего задач", Value = "-", Date = null });
         }
 
         // Сортировка по убыванию даты (если дата null, идут в конец)
@@ -574,21 +799,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         return result;
     }
 
-    private static string FormatMinutes(int minutes)
-    {
-        if (minutes <= 0) return "0 мин";
-        if (minutes < 60) return $"{minutes} мин";
-        var hours = minutes / 60;
-        var mins = minutes % 60;
-        return mins > 0 ? $"{hours} ч {mins} мин" : $"{hours} ч";
-    }
-
-    private static int GetSubtasksCount(TaskItem task)
-    {
-        return task.Subtasks?.Count ?? 0;
-    }
-
-    private static Dictionary<string, int> CalculateInterestHistogram(List<TaskItem> tasks)
+    private static Dictionary<string, int> CalculateInterestHistogram(List<TaskItem> tasks, DashboardAggregationMode mode)
     {
         var interestTasks = tasks.Where(t => t.Interest.HasValue).ToList();
         if (interestTasks.Count == 0) return new();
@@ -596,12 +807,16 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         return interestTasks
             .GroupBy(t => t.Interest!.Value)
             .OrderBy(g => g.Key)
-            .ToDictionary(g => g.Key.ToString(), g => g.Count());
+            .Select(g => (Key: g.Key.ToString(), Sum: g.Sum(t => GetTaskWeight(t, mode))))
+            .Where(x => x.Sum > 0)
+            .ToDictionary(x => x.Key, x => x.Sum);
     }
 
-    private static Dictionary<string, int> CalculateComplexityHistogram(List<TaskItem> tasks)
+    private static Dictionary<string, int> CalculateComplexityHistogram(List<TaskItem> tasks, DashboardAggregationMode mode)
     {
-        var compTasks = tasks.Where(t => t.Complexity.HasValue).ToList();
+        var compTasks = tasks
+            .Where(t => t.Complexity.HasValue && GetTaskWeight(t, mode) > 0)
+            .ToList();
         if (compTasks.Count == 0) return new();
 
         var values = compTasks.Select(t => t.Complexity!.Value).OrderBy(v => v).ToList();
@@ -613,7 +828,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
             return compTasks
                 .GroupBy(t => t.Complexity!.Value)
                 .OrderBy(g => g.Key)
-                .ToDictionary(g => g.Key.ToString(), g => g.Count());
+                .ToDictionary(g => g.Key.ToString(), g => g.Sum(t => GetTaskWeight(t, mode)));
         }
 
         // Иначе динамически группируем по диапазонным бакетам на основе min и max имеющихся БД-значений
@@ -630,10 +845,12 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
             if (start > maxVal) break;
 
             var label = start == end ? $"{start}" : $"{start}–{end}";
-            var count = values.Count(v => v >= start && v <= end);
-            if (count > 0 || result.Count > 0)
+            var sum = compTasks
+                .Where(t => t.Complexity!.Value >= start && t.Complexity!.Value <= end)
+                .Sum(t => GetTaskWeight(t, mode));
+            if (sum > 0 || result.Count > 0)
             {
-                result[label] = count;
+                result[label] = sum;
             }
 
             if (end >= maxVal) break;
@@ -642,7 +859,7 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         return result;
     }
 
-    private static Dictionary<string, int> CalculatePriorityHistogram(List<TaskItem> tasks)
+    private static Dictionary<string, int> CalculatePriorityHistogram(List<TaskItem> tasks, DashboardAggregationMode mode)
     {
         var priorityTasks = tasks
             .Where(t => t.Priority != null || t.PriorityId.HasValue)
@@ -653,10 +870,12 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         return priorityTasks
             .GroupBy(t => t.Priority?.Name ?? "Не указан")
             .OrderBy(g => g.First().Priority?.Order ?? int.MaxValue)
-            .ToDictionary(g => g.Key, g => g.Count());
+            .Select(g => (Key: g.Key, Sum: g.Sum(t => GetTaskWeight(t, mode))))
+            .Where(x => x.Sum > 0)
+            .ToDictionary(x => x.Key, x => x.Sum);
     }
 
-    private static Dictionary<string, int> CalculateTimeHistogram(List<TaskItem> tasks)
+    private static Dictionary<string, int> CalculateTimeHistogram(List<TaskItem> tasks, DashboardAggregationMode mode)
     {
         var timeTasks = tasks.Where(t => t.EstimatedMinutes.HasValue).ToList();
         if (timeTasks.Count == 0) return new();
@@ -676,10 +895,12 @@ public class DashboardAnalyticsService : IDashboardAnalyticsService
         Dictionary<string, int> result = new();
         foreach (var range in ranges)
         {
-            var count = timeTasks.Count(t => range.Match(t.EstimatedMinutes!.Value));
-            if (count > 0)
+            var sum = timeTasks
+                .Where(t => range.Match(t.EstimatedMinutes!.Value))
+                .Sum(t => GetTaskWeight(t, mode));
+            if (sum > 0)
             {
-                result[range.Label] = count;
+                result[range.Label] = sum;
             }
         }
 
