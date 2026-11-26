@@ -626,10 +626,10 @@ public class PlanningEngineTests : IntegrationTestBase
     }
 
     /// <summary>
-    /// Verifies that inactive tasks completed or marked irrelevant today consume daily limits for auto-flexible tasks.
+    /// Verifies that completed tasks consume daily limits for auto-flexible tasks, while irrelevant tasks do not.
     /// </summary>
     [Fact]
-    public void InactiveTasks_CompletedOrIrrelevantToday_ConsumeDailyLimitsForAutoFlexible()
+    public void CompletedToday_ConsumesDailyLimits_WhileIrrelevantDoesNot()
     {
         // Arrange
         var completedToday = new TaskItemBuilder()
@@ -657,7 +657,7 @@ public class PlanningEngineTests : IntegrationTestBase
 
         // Assert
         var savedNewTask = TaskRepo.GetById(103);
-        savedNewTask!.ScheduledDate.Should().Be(TodoDay.Today.Tomorrow.ToDateTime());
+        savedNewTask!.ScheduledDate.Should().Be(TodoDay.Today.ToDateTime());
     }
 
     /// <summary>

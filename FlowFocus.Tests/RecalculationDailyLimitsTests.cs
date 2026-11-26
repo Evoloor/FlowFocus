@@ -223,4 +223,61 @@ public class RecalculationDailyLimitsTests : IntegrationTestBase
             "Перенесённые на сегодня повтор-задачи вместе с manual-задачей уже исчерпали дневной лимит");
         savedFlex.DateSource.Should().Be(DateSource.AutoFlexible);
     }
+
+    /// <summary>
+    /// Проверяет, что задачи в статусе Irrelevant не тратят дневной бюджет лимитов,
+    /// в отличие от Completed-задач.
+    /// </summary>
+    [Fact]
+    public void RecalculateAll_IrrelevantTasksDoNotConsumeDailyLimits_WhileCompletedTasksDo()
+    {
+        // Arrange
+        var settings = new UserSettingsBuilder()
+            .WithDailyTimeLimit(60)
+            .WithDailyComplexityLimit(1000)
+            .WithDailyTaskLimit(2)
+            .Build();
+
+        // Irrelevant на сегодня — не должна тратить ни слот, ни минуты
+        var irrelevantTask = new TaskItemBuilder().WithId(601)
+            .WithScheduledDate(_today, DateSource.Manual)
+            .WithEstimatedMinutes(60)
+            .WithStatus(TaskStatus.Irrelevant)
+            .Build();
+
+        // Completed на сегодня — должна занять 1 слот и 30 минут
+        var completedTask = new TaskItemBuilder().WithId(602)
+            .WithScheduledDate(_today, DateSource.Manual)
+            .WithCompletedDate(_today)
+            .WithEstimatedMinutes(30)
+            .WithStatus(TaskStatus.Completed)
+            .Build();
+
+        // Остаток лимита на сегодня: 1 слот и 30 минут -> flexFit помещается сегодня, flexOverflow уходит на завтра
+        var flexFit = new TaskItemBuilder().WithId(603)
+            .WithDateSource(DateSource.AutoFlexible)
+            .WithEstimatedMinutes(30)
+            .WithStatus(TaskStatus.Planned)
+            .Build();
+
+        var flexOverflow = new TaskItemBuilder().WithId(604)
+            .WithDateSource(DateSource.AutoFlexible)
+            .WithEstimatedMinutes(15)
+            .WithStatus(TaskStatus.Planned)
+            .Build();
+
+        TaskRepo.Add(irrelevantTask);
+        TaskRepo.Add(completedTask);
+        TaskRepo.Add(flexFit);
+        TaskRepo.Add(flexOverflow);
+
+        // Act
+        PlannerService.RecalculateAll(settings);
+
+        // Assert
+        TaskRepo.GetById(603)!.ScheduledDate.Should().Be(_today,
+            "Irrelevant задача не должна занимать дневной лимит");
+        TaskRepo.GetById(604)!.ScheduledDate.Should().Be(_tomorrow,
+            "Completed задача и первая AutoFlexible уже исчерпали дневной лимит");
+    }
 }

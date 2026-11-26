@@ -64,11 +64,10 @@ public class TaskDistributionPlanner(ITaskRepository taskRepository)
             DailyStats stats = new();
             foreach (var t in allTasks)
             {
-                var isInactive = t.Status is TaskStatus.Completed or TaskStatus.Irrelevant;
-                if (isInactive)
+                if (t.Status == TaskStatus.Completed)
                 {
-                    var inactiveDate = t.CompletedDate ?? t.ScheduledDate;
-                    if (inactiveDate.HasValue && day.IsSameDay(inactiveDate))
+                    var completedDate = t.CompletedDate ?? t.ScheduledDate;
+                    if (completedDate.HasValue && day.IsSameDay(completedDate))
                     {
                         stats.TotalComplexity += t.TotalComplexity;
                         stats.TotalMinutes += t.TotalEstimatedMinutes;
