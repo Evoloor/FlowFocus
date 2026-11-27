@@ -470,4 +470,64 @@ public class RelationsEngineTests : IntegrationTestBase
         var savedTask = TaskRepo.GetById(newTask.Id);
         savedTask!.Status.Should().Be(expectedStatus);
     }
+
+    /// <summary>
+    /// Verifies that completing a blocker unblocks BOTH blocked tasks in the database,
+    /// persisting across DbContext ChangeTracker clear and repository cache refresh.
+    /// </summary>
+    [Fact]
+    public void CompleteBlocker_WithTwoBlockedTasks_PersistsUnblockedPlannedStatusForBoth()
+    {
+        // Arrange
+        var blocker = new TaskItemBuilder().WithId(701).WithTitle("Blocker").WithStatus(TaskStatus.Planned).Build();
+        var blocked1 = new TaskItemBuilder().WithId(702).WithTitle("Blocked 1").WithStatus(TaskStatus.Blocked).Build();
+        var blocked2 = new TaskItemBuilder().WithId(703).WithTitle("Blocked 2").WithStatus(TaskStatus.Blocked).Build();
+
+        Context.Tasks.AddRange(blocker, blocked1, blocked2);
+        Context.TaskRelations.AddRange(
+            new TaskRelation { Id = 7101, SourceTaskId = blocker.Id, TargetTaskId = blocked1.Id, Type = RelationType.Blocks },
+            new TaskRelation { Id = 7102, SourceTaskId = blocker.Id, TargetTaskId = blocked2.Id, Type = RelationType.Blocks }
+        );
+        Context.SaveChanges();
+
+        // Act
+        TaskRepo.CompleteTask(blocker.Id);
+        PlannerService.UpdateBlockedStatuses();
+
+        Context.ChangeTracker.Clear();
+        NotificationService.NotifyTasksChanged();
+
+        // Assert
+        TaskRepo.GetById(blocked1.Id)!.Status.Should().Be(TaskStatus.Planned);
+        TaskRepo.GetById(blocked2.Id)!.Status.Should().Be(TaskStatus.Planned);
+    }
+
+    /// <summary>
+    /// Verifies that GetTasksUnblockedBy excludes tasks still blocked by an inactive condition and inactive tasks.
+    /// </summary>
+    [Fact]
+    public void GetTasksUnblockedBy_ExcludesTasksWithInactiveConditionOrInactiveStatus()
+    {
+        // Arrange
+        var inactiveCondition = ConditionRepo.GetOrCreate("Условие выключено");
+        var blocker = new TaskItemBuilder().WithId(711).WithTitle("Blocker").WithStatus(TaskStatus.Planned).Build();
+        var readyTarget = new TaskItemBuilder().WithId(712).WithTitle("Ready").WithStatus(TaskStatus.Blocked).Build();
+        var condBlockedTarget = new TaskItemBuilder().WithId(713).WithTitle("Cond Blocked").WithStatus(TaskStatus.Blocked).Build();
+        condBlockedTarget.Conditions.Add(new() { TaskId = condBlockedTarget.Id, ConditionId = inactiveCondition.Id });
+        var notConfiguredTarget = new TaskItemBuilder().WithId(714).WithTitle("NotConfigured").WithStatus(TaskStatus.NotConfigured).Build();
+
+        Context.Tasks.AddRange(blocker, readyTarget, condBlockedTarget, notConfiguredTarget);
+        Context.TaskRelations.AddRange(
+            new TaskRelation { Id = 7201, SourceTaskId = blocker.Id, TargetTaskId = readyTarget.Id, Type = RelationType.Blocks },
+            new TaskRelation { Id = 7202, SourceTaskId = blocker.Id, TargetTaskId = condBlockedTarget.Id, Type = RelationType.Blocks },
+            new TaskRelation { Id = 7203, SourceTaskId = blocker.Id, TargetTaskId = notConfiguredTarget.Id, Type = RelationType.Blocks }
+        );
+        Context.SaveChanges();
+
+        // Act
+        var unblocked = TaskRepo.GetTasksUnblockedBy(blocker.Id);
+
+        // Assert
+        unblocked.Should().ContainSingle(t => t.Id == readyTarget.Id);
+    }
 }

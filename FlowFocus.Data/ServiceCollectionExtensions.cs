@@ -64,11 +64,56 @@ public static class ServiceCollectionExtensions
         // Автоматическое создание БД и применение миграций
         context.Database.Migrate();
 
+        // Синхронизация счётчиков использования тегов и условий с реальными связями задач
+        SyncLabelUsageCounts(context);
+
         // Инициализация TodoDay настройкой времени начала дня
         var settingsRepo = scope.ServiceProvider.GetRequiredService<ISettingsRepository>();
         TodoDay.Configure(settingsRepo.GetUserSettings().DayStartHour);
 
         // Актуализация отложенных повышений приоритета на текущий Todo-день
         scope.ServiceProvider.GetRequiredService<IPlannerService>().ActualizePriorities();
+    }
+
+    private static void SyncLabelUsageCounts(StorageContext context)
+    {
+        var changed = false;
+
+        var tagCounts = context.TaskTags
+            .AsNoTracking()
+            .GroupBy(tt => tt.TagId)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToDictionary(x => x.Key, x => x.Count);
+
+        foreach (var tag in context.Tags)
+        {
+            var actualCount = tagCounts.GetValueOrDefault(tag.Id, 0);
+            if (tag.UsageCount != actualCount)
+            {
+                tag.UsageCount = actualCount;
+                changed = true;
+            }
+        }
+
+        var conditionCounts = context.TaskConditions
+            .AsNoTracking()
+            .GroupBy(tc => tc.ConditionId)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToDictionary(x => x.Key, x => x.Count);
+
+        foreach (var condition in context.ExternalConditions)
+        {
+            var actualCount = conditionCounts.GetValueOrDefault(condition.Id, 0);
+            if (condition.UsageCount != actualCount)
+            {
+                condition.UsageCount = actualCount;
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
+            context.SaveChanges();
+        }
     }
 }

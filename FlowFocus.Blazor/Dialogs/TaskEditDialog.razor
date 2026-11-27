@@ -124,7 +124,7 @@
                                 <ConditionInput SuggestedLabels="_suggestedConditions"
                                                 SelectedLabels="_selectedConditions"
                                                 SelectedLabelIds="_selectedConditionIds"
-                                                OnLabelAdded="@(async (ExternalCondition c) => { await RefreshSuggestedConditions(); await InvokeAsync(StateHasChanged); })"
+                                                OnLabelAdded="@(async (ExternalCondition c) => await AddCondition(c))"
                                                 OnLabelRemoved="@(async (ExternalCondition c) => { await RefreshSuggestedConditions(); await InvokeAsync(StateHasChanged); })" />
                             </div>
 

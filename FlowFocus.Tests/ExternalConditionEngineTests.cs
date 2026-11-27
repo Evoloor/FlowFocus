@@ -329,4 +329,94 @@ public class ExternalConditionEngineTests : IntegrationTestBase
         filteredComb.Should().HaveCount(2);
         filteredComb.Select(t => t.Id).Should().BeEquivalentTo([402, 403]);
     }
+
+    [Fact]
+    public void OverdueManualRecurringTask_WithInactiveCondition_NormalizesToNullScheduledDateAndAutoFixed()
+    {
+        // Arrange
+        var condition = ConditionRepo.GetOrCreate("Удалённый сервер");
+        var yesterday = TodoDay.Today.Yesterday.ToDateTime();
+
+        var task = new TaskItemBuilder()
+            .WithId(501)
+            .WithTitle("Просроченная повторка с неактивным условием")
+            .WithStatus(TaskStatus.Blocked)
+            .WithRecurrence(RecurrenceType.EveryN, interval: 1, unit: RecurrenceUnit.Days)
+            .WithScheduledDate(yesterday, DateSource.Manual)
+            .Build();
+
+        task.Conditions.Add(new() { TaskId = task.Id, ConditionId = condition.Id });
+        Context.Tasks.Add(task);
+        Context.SaveChanges();
+        Context.ChangeTracker.Clear();
+
+        // Act
+        TaskRepo.NormalizeTaskDateSources();
+
+        // Assert
+        var normalized = TaskRepo.GetById(501);
+        normalized.Should().NotBeNull();
+        normalized!.DateSource.Should().Be(DateSource.AutoFixed);
+        normalized.ScheduledDate.Should().BeNull();
+        normalized.Status.Should().Be(TaskStatus.Blocked);
+    }
+
+    [Fact]
+    public void CompleteRecurringTask_WithInactiveCondition_SpawnsBlockedCopyWithoutScheduledDate()
+    {
+        // Arrange
+        var condition = ConditionRepo.GetOrCreate("Поездка в офис");
+        var today = TodoDay.Today.ToDateTime();
+
+        var task = new TaskItemBuilder()
+            .WithId(502)
+            .WithTitle("Повторка с неактивным условием")
+            .WithStatus(TaskStatus.Planned)
+            .WithRecurrence(RecurrenceType.EveryN, interval: 1, unit: RecurrenceUnit.Days)
+            .WithScheduledDate(today, DateSource.Manual)
+            .Build();
+
+        task.Conditions.Add(new() { TaskId = task.Id, ConditionId = condition.Id });
+        TaskRepo.Add(task);
+        Context.ChangeTracker.Clear();
+
+        // Act
+        TaskRepo.CompleteTask(task.Id);
+
+        // Assert
+        var newCopy = TaskRepo.GetAll().FirstOrDefault(t => t.RecurrenceSourceId == task.Id);
+        newCopy.Should().NotBeNull();
+        newCopy!.ScheduledDate.Should().BeNull();
+        newCopy.DateSource.Should().Be(DateSource.AutoFixed);
+        newCopy.Status.Should().Be(TaskStatus.Blocked);
+    }
+
+    [Fact]
+    public void AddAndUpdateRecurringTask_WithInactiveCondition_SetsBlockedAndNullScheduledDate()
+    {
+        // Arrange
+        var condition = ConditionRepo.GetOrCreate("Гараж");
+        var task = new TaskItemBuilder()
+            .WithId(503)
+            .WithTitle("Новая повторка с неактивным условием")
+            .WithStatus(TaskStatus.Planned)
+            .WithRecurrence(RecurrenceType.EveryN, interval: 1, unit: RecurrenceUnit.Days)
+            .WithScheduledDate(TodoDay.Today.ToDateTime(), DateSource.AutoFixed)
+            .Build();
+
+        task.Conditions.Add(new() { TaskId = task.Id, ConditionId = condition.Id });
+
+        // Act 1: Add
+        TaskRepo.Add(task);
+        var added = TaskRepo.GetById(503);
+        added!.Status.Should().Be(TaskStatus.Blocked);
+        added.ScheduledDate.Should().BeNull();
+
+        // Act 2: Update
+        added.Title = "Обновлённая повторка";
+        TaskRepo.Update(added);
+        var updated = TaskRepo.GetById(503);
+        updated!.Status.Should().Be(TaskStatus.Blocked);
+        updated.ScheduledDate.Should().BeNull();
+    }
 }

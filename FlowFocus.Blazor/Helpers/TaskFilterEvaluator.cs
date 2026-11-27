@@ -34,6 +34,42 @@ public static class TaskFilterEvaluator
         };
     }
 
+    public static List<Tag> GetSortedAvailableTags(IEnumerable<TaskItem> tasks)
+    {
+        var taskList = tasks as ICollection<TaskItem> ?? tasks.ToList();
+        var tagCounts = taskList
+            .SelectMany(t => t.Tags)
+            .GroupBy(tt => tt.TagId)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        return taskList
+            .SelectMany(t => t.Tags.Select(tt => tt.Tag))
+            .Where(t => t != null)
+            .Cast<Tag>()
+            .DistinctBy(t => t.Id)
+            .OrderByDescending(t => tagCounts.GetValueOrDefault(t.Id, 0))
+            .ThenBy(t => t.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+    }
+
+    public static List<ExternalCondition> GetSortedAvailableConditions(IEnumerable<TaskItem> tasks)
+    {
+        var taskList = tasks as ICollection<TaskItem> ?? tasks.ToList();
+        var conditionCounts = taskList
+            .SelectMany(t => t.Conditions)
+            .GroupBy(tc => tc.ConditionId)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        return taskList
+            .SelectMany(t => t.Conditions.Select(tc => tc.Condition))
+            .Where(c => c != null)
+            .Cast<ExternalCondition>()
+            .DistinctBy(c => c.Id)
+            .OrderByDescending(c => conditionCounts.GetValueOrDefault(c.Id, 0))
+            .ThenBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+    }
+
     public static IEnumerable<TaskItem> ApplySearchAndFilters(
         IEnumerable<TaskItem> tasks,
         string searchQuery,

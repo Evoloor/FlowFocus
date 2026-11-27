@@ -25,10 +25,10 @@ public class PlannerService(ITaskRepository taskRepository) : IPlannerService
         taskRepository.SaveChangesSilently();
         ActualizePriorities();
         DistributeTasks(settings);
-        UpdateBlockedStatuses();
+        _priorityPlanner.UpdateBlockedStatuses(saveChanges: false);
 
         taskRepository.SaveChangesAndNotify();
     }
 
-    public void UpdateBlockedStatuses() => _priorityPlanner.UpdateBlockedStatuses();
+    public void UpdateBlockedStatuses() => _priorityPlanner.UpdateBlockedStatuses(saveChanges: true);
 }

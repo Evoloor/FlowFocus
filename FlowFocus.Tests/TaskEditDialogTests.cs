@@ -680,6 +680,198 @@ public class TaskEditDialogTests : IntegrationTestBase
         nextInstance!.Status.Should().Be(TaskStatus.Planned);
     }
 
+    [Fact]
+    public async Task TaskEditDialog_OnRecurringChanged_WhenTurnedOffWithManualDate_PreservesManualDate()
+    {
+        // Arrange
+        var manualDate = TodoDay.Today.AddDays(3).ToDateTime();
+        var task = new TaskItemBuilder()
+            .WithId(520)
+            .WithTitle("Повторка с ручной датой")
+            .WithRecurrence(RecurrenceType.EveryN, interval: 1, unit: RecurrenceUnit.Days)
+            .WithScheduledDate(manualDate, DateSource.Manual)
+            .WithStatus(TaskStatus.Planned)
+            .Build();
+        TaskRepo.Add(task);
+
+        var cut = RenderTaskEditDialog(existingTask: task);
+        var dialog = cut.Instance;
+
+        // Act
+        var onRecurringMethod = typeof(TaskEditDialog).GetMethod("OnRecurringChanged", BindingFlags.Instance | BindingFlags.NonPublic);
+        var recTask = (Task)onRecurringMethod!.Invoke(dialog, [false])!;
+        await recTask;
+
+        var scheduledDateField = typeof(TaskEditDialog).GetField("_scheduledDate", BindingFlags.Instance | BindingFlags.NonPublic);
+        var scheduledDate = (DateTime?)scheduledDateField!.GetValue(dialog);
+
+        var taskField = typeof(TaskEditDialog).GetField("_task", BindingFlags.Instance | BindingFlags.NonPublic);
+        var taskInDialog = (TaskItem)taskField!.GetValue(dialog)!;
+
+        // Assert
+        taskInDialog.IsRecurring.Should().BeFalse();
+        taskInDialog.DateSource.Should().Be(DateSource.Manual);
+        taskInDialog.ScheduledDate.Should().Be(manualDate);
+        scheduledDate.Should().Be(manualDate);
+    }
+
+    [Fact]
+    public async Task TaskEditDialog_OnRecurringChanged_WhenTurnedOffWithAutoFixed_ClearsDateAndSetsAutoFlexible()
+    {
+        // Arrange
+        var autoDate = TodoDay.Today.AddDays(1).ToDateTime();
+        var task = new TaskItemBuilder()
+            .WithId(521)
+            .WithTitle("Повторка с авто датой")
+            .WithRecurrence(RecurrenceType.EveryN, interval: 1, unit: RecurrenceUnit.Days)
+            .WithScheduledDate(autoDate, DateSource.AutoFixed)
+            .WithStatus(TaskStatus.Planned)
+            .Build();
+        TaskRepo.Add(task);
+
+        var cut = RenderTaskEditDialog(existingTask: task);
+        var dialog = cut.Instance;
+
+        // Act
+        var onRecurringMethod = typeof(TaskEditDialog).GetMethod("OnRecurringChanged", BindingFlags.Instance | BindingFlags.NonPublic);
+        var recTask = (Task)onRecurringMethod!.Invoke(dialog, [false])!;
+        await recTask;
+
+        var scheduledDateField = typeof(TaskEditDialog).GetField("_scheduledDate", BindingFlags.Instance | BindingFlags.NonPublic);
+        var scheduledDate = (DateTime?)scheduledDateField!.GetValue(dialog);
+
+        var taskField = typeof(TaskEditDialog).GetField("_task", BindingFlags.Instance | BindingFlags.NonPublic);
+        var taskInDialog = (TaskItem)taskField!.GetValue(dialog)!;
+
+        // Assert
+        taskInDialog.IsRecurring.Should().BeFalse();
+        taskInDialog.DateSource.Should().Be(DateSource.AutoFlexible);
+        taskInDialog.ScheduledDate.Should().BeNull();
+        scheduledDate.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SaveTask_WhenRaisingBlockedTaskPriority_CascadesToActiveBlockerAndIgnoresCompletedBlocker()
+    {
+        // Arrange
+        var priorities = PriorityRepo.GetAllOrdered();
+        var critical = priorities[0];
+        var low = priorities[^1];
+
+        var activeBlocker = new TaskItemBuilder()
+            .WithId(530)
+            .WithTitle("Активный блокер")
+            .WithPriorityId(low.Id)
+            .WithStatus(TaskStatus.Planned)
+            .Build();
+
+        var completedBlocker = new TaskItemBuilder()
+            .WithId(531)
+            .WithTitle("Завершённый блокер")
+            .WithPriorityId(low.Id)
+            .WithStatus(TaskStatus.Completed)
+            .Build();
+
+        var blockedTask = new TaskItemBuilder()
+            .WithId(532)
+            .WithTitle("Заблокированная задача")
+            .WithPriorityId(low.Id)
+            .WithStatus(TaskStatus.Blocked)
+            .Build();
+
+        Context.Tasks.AddRange(activeBlocker, completedBlocker, blockedTask);
+        Context.TaskRelations.AddRange(
+            new TaskRelation { Id = 5301, SourceTaskId = activeBlocker.Id, TargetTaskId = blockedTask.Id, Type = RelationType.Blocks },
+            new TaskRelation { Id = 5302, SourceTaskId = completedBlocker.Id, TargetTaskId = blockedTask.Id, Type = RelationType.Blocks }
+        );
+        Context.SaveChanges();
+
+        var dialogTask = TaskRepo.GetById(blockedTask.Id)!;
+        var cut = RenderTaskEditDialog(existingTask: dialogTask);
+        var dialog = cut.Instance;
+
+        var taskField = typeof(TaskEditDialog).GetField("_task", BindingFlags.Instance | BindingFlags.NonPublic);
+        var editedTask = (TaskItem)taskField!.GetValue(dialog)!;
+        editedTask.PriorityId = critical.Id;
+
+        // Act
+        await cut.InvokeAsync(() => InvokeSaveTaskAsync(dialog));
+
+        // Assert
+        AssertNoSnackbarErrors();
+        _snackbar.DidNotReceive().Add(Arg.Any<string>(), Severity.Warning);
+        TaskRepo.GetById(blockedTask.Id)!.PriorityId.Should().Be(critical.Id);
+        TaskRepo.GetById(activeBlocker.Id)!.PriorityId.Should().Be(critical.Id);
+        TaskRepo.GetById(completedBlocker.Id)!.PriorityId.Should().Be(low.Id);
+    }
+
+    [Fact]
+    public async Task TaskEditDialog_AddTagAndCondition_MarksSessionUsageEvenWhenAlreadyAddedToLocalCollection()
+    {
+        // Arrange
+        var tag = TagRepo.GetOrCreate("Дом");
+        var condition = ConditionRepo.GetOrCreate("Интернет");
+
+        var cut = RenderTaskEditDialog(initialTitle: "Тест тегов и условий");
+        var dialog = cut.Instance;
+
+        var selectedTagIds = (HashSet<int>)typeof(TaskEditDialog)
+            .GetField("_selectedTagIds", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(dialog)!;
+        var selectedCondIds = (HashSet<int>)typeof(TaskEditDialog)
+            .GetField("_selectedConditionIds", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(dialog)!;
+
+        // Имитация поведения LabelInputBase.AddLabel, который добавляет Id до вызова OnLabelAdded
+        selectedTagIds.Add(tag.Id);
+        selectedCondIds.Add(condition.Id);
+
+        var addTagMethod = typeof(TaskEditDialog).GetMethod("AddTag", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var addCondMethod = typeof(TaskEditDialog).GetMethod("AddCondition", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+        // Act
+        await cut.InvokeAsync(() => (Task)addTagMethod.Invoke(dialog, [tag])!);
+        await cut.InvokeAsync(() => (Task)addCondMethod.Invoke(dialog, [condition])!);
+
+        // Assert
+        _tagSessionService.Received(1).MarkTagUsed(Arg.Is<Tag>(t => t.Id == tag.Id));
+        _tagSessionService.Received(1).MarkConditionUsed(Arg.Is<ExternalCondition>(c => c.Id == condition.Id));
+    }
+
+    [Fact]
+    public async Task TaskList_WithFiltersAndTagsAndConditions_RendersSelectAllFiltersSuccessfully()
+    {
+        // Arrange
+        var tag = TagRepo.GetOrCreate("Тег1");
+        var cond = ConditionRepo.GetOrCreate("Условие1");
+        var task = new TaskItemBuilder().WithId(540).WithTitle("Задача фильтра").WithStatus(TaskStatus.Planned).Build();
+        task.Tags.Add(new() { TaskId = task.Id, TagId = tag.Id });
+        task.Conditions.Add(new() { TaskId = task.Id, ConditionId = cond.Id });
+        TaskRepo.Add(task);
+
+        await using BunitContext listCtx = new();
+        listCtx.Services.AddMudServices();
+        listCtx.Services.AddSingleton<ITaskRepository>(TaskRepo);
+        listCtx.Services.AddSingleton<ISettingsRepository>(_settingsRepo);
+        listCtx.Services.AddSingleton<INotificationService>(NotificationService);
+        listCtx.Services.AddSingleton<IDialogService>(_dialogService);
+        listCtx.Services.AddSingleton<ISnackbar>(_snackbar);
+        listCtx.Services.AddSingleton<IPlannerService>(PlannerService);
+        listCtx.JSInterop.Mode = JSRuntimeMode.Loose;
+
+        listCtx.Render<MudPopoverProvider>();
+
+        // Act
+        var cut = listCtx.Render<TaskList>(parameters => parameters
+            .Add(p => p.ShowFilters, true)
+            .Add(p => p.ShowTitle, false)
+        );
+
+        // Assert
+        var selects = cut.FindComponents<MudSelect<int?>>();
+        selects.Should().HaveCount(2);
+        selects.Should().OnlyContain(s => s.Instance.SelectAll && s.Instance.Clearable);
+        selects.Should().OnlyContain(s => s.Instance.SelectAllText == "Выделить все");
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)

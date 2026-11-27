@@ -39,15 +39,44 @@ public class ExternalConditionRepository(
         return condition;
     }
 
+    public List<ExternalCondition> GetPopularConditions(int count)
+    {
+        if (count <= 0) return [];
+
+        var all = GetAll();
+        var actualCounts = GetActualUsageCounts();
+
+        return all
+            .OrderByDescending(c => actualCounts.Count > 0 ? actualCounts.GetValueOrDefault(c.Id, 0) : c.UsageCount)
+            .ThenBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase)
+            .Take(count)
+            .ToList();
+    }
+
     public List<ExternalCondition> SearchByName(string query, int limit = 10)
     {
         if (string.IsNullOrWhiteSpace(query)) return [];
 
+        var actualCounts = GetActualUsageCounts();
+
         return GetAll()
             .Where(c => c.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
-            .OrderByDescending(c => c.UsageCount)
+            .OrderByDescending(c => actualCounts.Count > 0 ? actualCounts.GetValueOrDefault(c.Id, 0) : c.UsageCount)
+            .ThenBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase)
             .Take(limit)
             .ToList();
+    }
+
+    private Dictionary<int, int> GetActualUsageCounts()
+    {
+        lock (CacheLock)
+        {
+            return Context.TaskConditions
+                .AsNoTracking()
+                .GroupBy(tc => tc.ConditionId)
+                .Select(g => new { g.Key, Count = g.Count() })
+                .ToDictionary(x => x.Key, x => x.Count);
+        }
     }
 
     public void ToggleConditionActive(int conditionId, bool isActive)
@@ -67,7 +96,7 @@ public class ExternalConditionRepository(
 
             // Пересчитываем статусы всех заблокированных/запланированных задач
             PriorityEscalationPlanner planner = new(new TaskRepository(Context, NotificationService, _recurrenceService));
-            planner.UpdateBlockedStatuses();
+            planner.UpdateBlockedStatuses(saveChanges: false);
 
             Context.SaveChanges();
             MarkDirty();
@@ -94,7 +123,7 @@ public class ExternalConditionRepository(
 
             // Пересчитываем статусы освободившихся задач
             PriorityEscalationPlanner planner = new(new TaskRepository(Context, NotificationService, _recurrenceService));
-            planner.UpdateBlockedStatuses();
+            planner.UpdateBlockedStatuses(saveChanges: false);
 
             Context.SaveChanges();
             MarkDirty();

@@ -24,6 +24,9 @@ public static class RelationValidator
 
             if (relation.Type is not (Core.Enums.RelationType.Blocks or Core.Enums.RelationType.BlockedBy)) continue;
 
+            if (task.Status is Core.Enums.TaskStatus.Completed or Core.Enums.TaskStatus.Irrelevant) continue;
+            if (targetTask.IsInactive) continue;
+
             TaskItem blocker, blocked;
             if (relation.Type == Core.Enums.RelationType.Blocks)
             {
@@ -36,8 +39,6 @@ public static class RelationValidator
                 blocked = task;
             }
 
-            if (blocker.Status is Core.Enums.TaskStatus.Completed or Core.Enums.TaskStatus.Irrelevant) continue;
-
             var blockerDate = blocker.ScheduledDate;
             var blockedDate = blocked.ScheduledDate;
 
@@ -49,6 +50,11 @@ public static class RelationValidator
                         $"Дата задачи \"{blocker.Title}\" ({blockerDate.Value:dd.MM.yyyy}) позже даты задачи, которую она блокирует ({blockedDate.Value:dd.MM.yyyy})");
                 }
             }
+
+            // При редактировании самой заблокированной задачи (BlockedBy) разрешаем повышение приоритета:
+            // после сохранения планировщик автоматически поднимет приоритеты активных блокеров.
+            // При редактировании блокера (Blocks) сохраняем валидацию приоритета.
+            if (relation.Type != Core.Enums.RelationType.Blocks) continue;
 
             var blockerPriorityOrder = blocker.PriorityId.HasValue
                 ? priorities.FirstOrDefault(p => p.Id == blocker.PriorityId)?.Order ?? 99

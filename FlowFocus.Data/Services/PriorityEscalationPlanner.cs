@@ -97,9 +97,10 @@ public class PriorityEscalationPlanner(ITaskRepository taskRepository)
         } while (changed);
     }
 
-    public void UpdateBlockedStatuses()
+    public void UpdateBlockedStatuses(bool saveChanges = true)
     {
         var tasks = taskRepository.GetAll();
+        var hasChanges = false;
 
         foreach (var task in tasks)
         {
@@ -111,11 +112,18 @@ public class PriorityEscalationPlanner(ITaskRepository taskRepository)
             if (isBlocked && task.Status != TaskStatus.Blocked)
             {
                 taskRepository.UpdateTaskStatus(task.Id, TaskStatus.Blocked, saveChanges: false);
+                hasChanges = true;
             }
             else if (!isBlocked && task.Status == TaskStatus.Blocked)
             {
                 taskRepository.UpdateTaskStatus(task.Id, TaskStatus.Planned, saveChanges: false);
+                hasChanges = true;
             }
+        }
+
+        if (saveChanges && hasChanges)
+        {
+            taskRepository.SaveChanges();
         }
     }
 

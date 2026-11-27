@@ -53,7 +53,15 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
             if (entity.IsActive)
             {
                 EnsureBlockerSourcesLoaded(entity);
-                entity.Status = FlowFocus.Core.Helpers.TaskStatusCalculator.DetermineActiveStatus(entity);
+                EnsureConditionsLoaded(entity);
+                var hasInactiveCondition = HasInactiveCondition(entity);
+                if (entity.IsRecurring && entity.DateSource != DateSource.Manual && hasInactiveCondition)
+                {
+                    entity.ScheduledDate = null;
+                }
+                entity.Status = hasInactiveCondition
+                    ? TaskStatus.Blocked
+                    : FlowFocus.Core.Helpers.TaskStatusCalculator.DetermineActiveStatus(entity);
             }
 
             Context.SaveChanges();
@@ -91,7 +99,10 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
             if (trackedEntity.IsActive)
             {
                 EnsureBlockerSourcesLoaded(trackedEntity);
-                trackedEntity.Status = FlowFocus.Core.Helpers.TaskStatusCalculator.DetermineActiveStatus(trackedEntity);
+                EnsureConditionsLoaded(trackedEntity);
+                trackedEntity.Status = HasInactiveCondition(trackedEntity)
+                    ? TaskStatus.Blocked
+                    : FlowFocus.Core.Helpers.TaskStatusCalculator.DetermineActiveStatus(trackedEntity);
             }
 
             trackedEntity.LastChangesOn = DateTime.UtcNow;
@@ -114,6 +125,43 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
         {
             Context.Tasks.Where(t => missingSourceIds.Contains(t.Id)).Load();
         }
+    }
+
+    private void EnsureConditionsLoaded(TaskItem task)
+    {
+        var missingConditionIds = task.Conditions
+            .Where(c => c.Condition == null && c.ConditionId > 0)
+            .Select(c => c.ConditionId)
+            .Distinct()
+            .ToList();
+
+        if (missingConditionIds.Count > 0)
+        {
+            Context.ExternalConditions.Where(c => missingConditionIds.Contains(c.Id)).Load();
+        }
+    }
+
+    private bool HasInactiveCondition(TaskItem task)
+    {
+        if (task.Conditions.Count == 0)
+            return false;
+
+        var missingConditionIds = task.Conditions
+            .Where(c => c.Condition == null && c.ConditionId > 0)
+            .Select(c => c.ConditionId)
+            .Distinct()
+            .ToList();
+
+        var inactiveIds = missingConditionIds.Count > 0
+            ? Context.ExternalConditions.AsNoTracking()
+                .Where(c => missingConditionIds.Contains(c.Id) && !c.IsActive)
+                .Select(c => c.Id)
+                .ToHashSet()
+            : [];
+
+        return task.Conditions.Any(c =>
+            (c.Condition != null && !c.Condition.IsActive) ||
+            inactiveIds.Contains(c.ConditionId));
     }
 
     public override void Delete(int id)
@@ -205,11 +253,13 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
 
     public List<TaskItem> GetTasksUnblockedBy(int taskId) =>
         GetAll()
+            .Where(t => t.IsActive)
             .Where(t => t.InverseRelations.Any(r => r.Type == RelationType.Blocks && r.SourceTaskId == taskId))
+            .Where(t => !t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))
             .Where(t => !t.InverseRelations
                 .Where(r => r.Type == RelationType.Blocks && r.SourceTaskId != taskId)
                 .Select(r => r.SourceTask)
-                .Any(blocker => blocker != null && blocker.Status != TaskStatus.Completed && blocker.Status != TaskStatus.Irrelevant))
+                .Any(blocker => blocker != null && blocker.IsActive))
             .ToList();
 
     public List<TaskItem> GetTasksForAutocomplete() =>
@@ -267,7 +317,9 @@ public class TaskRepository : CachedRepository<TaskItem>, ITaskRepository
                 (sourceId, start, end) => Context.Tasks.AsNoTracking().Any(t =>
                     ((t.RecurrenceSourceId.HasValue && t.RecurrenceSourceId.Value == sourceId) ||
                      (!t.RecurrenceSourceId.HasValue && t.Id == sourceId))
-                    && t.ScheduledDate.HasValue && t.ScheduledDate.Value >= start && t.ScheduledDate.Value < end),
+                    && (start.HasValue && end.HasValue
+                        ? t.ScheduledDate.HasValue && t.ScheduledDate.Value >= start && t.ScheduledDate.Value < end
+                        : (t.Status == TaskStatus.Planned || t.Status == TaskStatus.Blocked) && !t.ScheduledDate.HasValue)),
                 Add);
         }
     }

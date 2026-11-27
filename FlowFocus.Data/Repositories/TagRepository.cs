@@ -33,8 +33,13 @@ public class TagRepository(StorageContext context, INotificationService notifica
 
     public List<Tag> GetPopularTags(int count)
     {
+        if (count <= 0) return [];
+
+        var actualCounts = GetActualUsageCounts();
+
         return GetAll()
-            .OrderByDescending(t => t.UsageCount)
+            .OrderByDescending(t => actualCounts.Count > 0 ? actualCounts.GetValueOrDefault(t.Id, 0) : t.UsageCount)
+            .ThenBy(t => t.Name, StringComparer.CurrentCultureIgnoreCase)
             .Take(count)
             .ToList();
     }
@@ -43,11 +48,26 @@ public class TagRepository(StorageContext context, INotificationService notifica
     {
         if (string.IsNullOrWhiteSpace(query)) return [];
 
+        var actualCounts = GetActualUsageCounts();
+
         return GetAll()
             .Where(t => t.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
-            .OrderByDescending(t => t.UsageCount)
+            .OrderByDescending(t => actualCounts.Count > 0 ? actualCounts.GetValueOrDefault(t.Id, 0) : t.UsageCount)
+            .ThenBy(t => t.Name, StringComparer.CurrentCultureIgnoreCase)
             .Take(limit)
             .ToList();
+    }
+
+    private Dictionary<int, int> GetActualUsageCounts()
+    {
+        lock (CacheLock)
+        {
+            return Context.TaskTags
+                .AsNoTracking()
+                .GroupBy(tt => tt.TagId)
+                .Select(g => new { g.Key, Count = g.Count() })
+                .ToDictionary(x => x.Key, x => x.Count);
+        }
     }
 
     public void IncrementUsage(int tagId)

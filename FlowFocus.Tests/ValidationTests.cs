@@ -193,4 +193,114 @@ public class ValidationTests : IntegrationTestBase
         result.IsValid.Should().BeTrue();
         result.Errors.Should().BeEmpty();
     }
+
+    [Fact]
+    public void ValidateRelations_WhenRaisingBlockedTaskPriorityAboveActiveBlocker_AllowsSave()
+    {
+        // Arrange
+        var priorities = Context.Priorities.OrderBy(p => p.Order).ToList();
+        var critical = priorities[0];
+        var low = priorities[^1];
+
+        var blocker = new TaskItemBuilder()
+            .WithId(7020)
+            .WithTitle("Active Low Blocker")
+            .WithStatus(FlowFocus.Core.Enums.TaskStatus.Planned)
+            .WithPriorityId(low.Id)
+            .Build();
+
+        var blockedTask = new TaskItemBuilder()
+            .WithId(7021)
+            .WithTitle("Blocked Critical Task")
+            .WithStatus(FlowFocus.Core.Enums.TaskStatus.Blocked)
+            .WithPriorityId(critical.Id)
+            .Build();
+
+        var relations = new List<FlowFocus.Blazor.EditDialogContents.RelationDto>
+        {
+            new() { Id = 1, Type = RelationType.BlockedBy, TargetTask = blocker }
+        };
+
+        // Act
+        var result = FlowFocus.Blazor.EditDialogContents.Validators.RelationValidator.ValidateRelations(relations, blockedTask, priorities);
+
+        // Assert
+        result.IsValid.Should().BeTrue();
+        result.Errors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ValidateRelations_WhenLoweringBlockerPriorityBelowActiveBlocked_ReturnsError()
+    {
+        // Arrange
+        var priorities = Context.Priorities.OrderBy(p => p.Order).ToList();
+        var critical = priorities[0];
+        var low = priorities[^1];
+
+        var blocker = new TaskItemBuilder()
+            .WithId(7022)
+            .WithTitle("Low Blocker")
+            .WithStatus(FlowFocus.Core.Enums.TaskStatus.Planned)
+            .WithPriorityId(low.Id)
+            .Build();
+
+        var blockedTask = new TaskItemBuilder()
+            .WithId(7023)
+            .WithTitle("Critical Blocked")
+            .WithStatus(FlowFocus.Core.Enums.TaskStatus.Blocked)
+            .WithPriorityId(critical.Id)
+            .Build();
+
+        var relations = new List<FlowFocus.Blazor.EditDialogContents.RelationDto>
+        {
+            new() { Id = 1, Type = RelationType.Blocks, TargetTask = blockedTask }
+        };
+
+        // Act
+        var result = FlowFocus.Blazor.EditDialogContents.Validators.RelationValidator.ValidateRelations(relations, blocker, priorities);
+
+        // Assert
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().NotBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(FlowFocus.Core.Enums.TaskStatus.Completed)]
+    [InlineData(FlowFocus.Core.Enums.TaskStatus.Irrelevant)]
+    [InlineData(FlowFocus.Core.Enums.TaskStatus.NotConfigured)]
+    public void ValidateRelations_IgnoresInactiveTargetInBlocksDirection(FlowFocus.Core.Enums.TaskStatus targetStatus)
+    {
+        // Arrange
+        var priorities = Context.Priorities.OrderBy(p => p.Order).ToList();
+        var critical = priorities[0];
+        var low = priorities[^1];
+
+        var blocker = new TaskItemBuilder()
+            .WithId(7024)
+            .WithTitle("Low Blocker")
+            .WithStatus(FlowFocus.Core.Enums.TaskStatus.Planned)
+            .WithPriorityId(low.Id)
+            .WithScheduledDate(DateTime.Today.AddDays(5))
+            .Build();
+
+        var inactiveTarget = new TaskItemBuilder()
+            .WithId(7025)
+            .WithTitle("Inactive Target")
+            .WithStatus(targetStatus)
+            .WithPriorityId(critical.Id)
+            .WithScheduledDate(DateTime.Today)
+            .Build();
+
+        var relations = new List<FlowFocus.Blazor.EditDialogContents.RelationDto>
+        {
+            new() { Id = 1, Type = RelationType.Blocks, TargetTask = inactiveTarget }
+        };
+
+        // Act
+        var result = FlowFocus.Blazor.EditDialogContents.Validators.RelationValidator.ValidateRelations(relations, blocker, priorities);
+
+        // Assert
+        result.IsValid.Should().BeTrue();
+        result.Errors.Should().BeEmpty();
+    }
 }

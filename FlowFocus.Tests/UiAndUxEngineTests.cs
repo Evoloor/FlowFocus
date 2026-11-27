@@ -224,6 +224,145 @@ public class UiAndUxEngineTests : IntegrationTestBase
         suggestions.First().Id.Should().Be(sessionTag.Id);
     }
 
+    [Fact]
+    public void GetSuggestedConditions_ReturnsLastUsedSessionConditionFirst_ThenPopularAlphabetically()
+    {
+        // Arrange
+        var condA = new ExternalCondition { Id = 1, Name = "Бэта", UsageCount = 10 };
+        var condB = new ExternalCondition { Id = 2, Name = "Альфа", UsageCount = 10 };
+        var condLast = new ExternalCondition { Id = 3, Name = "Свежее", UsageCount = 1 };
+
+        Context.ExternalConditions.AddRange(condA, condB, condLast);
+        Context.SaveChanges();
+
+        TagSessionService sessionService = new(TagRepo, ConditionRepo);
+
+        // Act
+        sessionService.MarkConditionUsed(condLast);
+        var suggestions = sessionService.GetSuggestedConditions(5);
+
+        // Assert
+        suggestions.Should().HaveCount(3);
+        suggestions[0].Id.Should().Be(condLast.Id);
+        suggestions[1].Name.Should().Be("Альфа");
+        suggestions[2].Name.Should().Be("Бэта");
+    }
+
+    [Fact]
+    public void GetSuggestedConditions_WhenStoredUsageCountsAreZero_OrdersByActualTaskLinksAndLastUsedFirst()
+    {
+        // Arrange: имитация исторических данных в БД, где UsageCount == 0, но есть реальные связи TaskConditions
+        var batumi = new ExternalCondition { Id = 10, Name = "Батуми", UsageCount = 0 };
+        var devushka = new ExternalCondition { Id = 11, Name = "Девушка", UsageCount = 0 };
+        var trati = new ExternalCondition { Id = 12, Name = "Траты", UsageCount = 0 };
+        var poisk = new ExternalCondition { Id = 13, Name = "Поиск работы", UsageCount = 0 };
+        Context.ExternalConditions.AddRange(batumi, devushka, trati, poisk);
+
+        var nextTaskId = 1000;
+        void AddTasksWithCondition(int condId, int count)
+        {
+            for (var i = 0; i < count; i++)
+            {
+                var task = new TaskItemBuilder().WithId(nextTaskId++).WithTitle($"Task {nextTaskId}").Build();
+                task.Conditions.Add(new() { TaskId = task.Id, ConditionId = condId });
+                Context.Tasks.Add(task);
+            }
+        }
+
+        AddTasksWithCondition(batumi.Id, 2);
+        AddTasksWithCondition(devushka.Id, 1);
+        AddTasksWithCondition(trati.Id, 5);
+        AddTasksWithCondition(poisk.Id, 3);
+        Context.SaveChanges();
+
+        TagSessionService sessionService = new(TagRepo, ConditionRepo);
+
+        // Act 1: без последнего выбранного — сортировка по реальному количеству задач
+        var initial = sessionService.GetSuggestedConditions(5);
+
+        // Assert 1
+        initial.Select(c => c.Name).Should().ContainInOrder("Траты", "Поиск работы", "Батуми", "Девушка");
+
+        // Act 2: выбрали "Девушка" -> оно должно стать первым, остальные по реальной популярности
+        sessionService.MarkConditionUsed(devushka);
+        var afterSelect = sessionService.GetSuggestedConditions(5);
+
+        // Assert 2
+        afterSelect.Select(c => c.Name).Should().ContainInOrder("Девушка", "Траты", "Поиск работы", "Батуми");
+    }
+
+    [Fact]
+    public void GetSuggestedTags_WhenStoredUsageCountsAreZero_OrdersByActualTaskLinksAndLastUsedFirst()
+    {
+        // Arrange
+        var tagA = new Tag { Id = 20, Name = "Ааа", UsageCount = 0 };
+        var tagB = new Tag { Id = 21, Name = "Ббб", UsageCount = 0 };
+        var tagPop = new Tag { Id = 22, Name = "Яяя", UsageCount = 0 };
+        Context.Tags.AddRange(tagA, tagB, tagPop);
+
+        var nextTaskId = 2000;
+        void AddTasksWithTag(int tagId, int count)
+        {
+            for (var i = 0; i < count; i++)
+            {
+                var task = new TaskItemBuilder().WithId(nextTaskId++).WithTitle($"TagTask {nextTaskId}").Build();
+                task.Tags.Add(new() { TaskId = task.Id, TagId = tagId });
+                Context.Tasks.Add(task);
+            }
+        }
+
+        AddTasksWithTag(tagA.Id, 1);
+        AddTasksWithTag(tagB.Id, 2);
+        AddTasksWithTag(tagPop.Id, 4);
+        Context.SaveChanges();
+
+        TagSessionService sessionService = new(TagRepo, ConditionRepo);
+
+        // Act 1
+        var initial = sessionService.GetSuggestedTags(5);
+
+        // Assert 1
+        initial.Select(t => t.Name).Should().ContainInOrder("Яяя", "Ббб", "Ааа");
+
+        // Act 2
+        sessionService.MarkTagUsed(tagA);
+        var afterSelect = sessionService.GetSuggestedTags(5);
+
+        // Assert 2
+        afterSelect.Select(t => t.Name).Should().ContainInOrder("Ааа", "Яяя", "Ббб");
+    }
+
+    [Fact]
+    public void TaskFilterEvaluator_SortsAvailableTagsAndConditions_ByTaskCountDescThenNameAsc()
+    {
+        // Arrange
+        Tag tagAlpha = new() { Id = 1, Name = "Alpha", UsageCount = 1 };
+        Tag tagBeta = new() { Id = 2, Name = "Beta", UsageCount = 99 };
+        Tag tagGamma = new() { Id = 3, Name = "Gamma", UsageCount = 50 };
+
+        ExternalCondition condAlpha = new() { Id = 11, Name = "Дома", UsageCount = 1 };
+        ExternalCondition condBeta = new() { Id = 12, Name = "В дороге", UsageCount = 99 };
+        ExternalCondition condGamma = new() { Id = 13, Name = "Офис", UsageCount = 50 };
+
+        var t1 = new TaskItemBuilder().WithId(1).Build();
+        t1.Tags.AddRange([new() { TaskId = 1, TagId = 1, Tag = tagAlpha }, new() { TaskId = 1, TagId = 3, Tag = tagGamma }]);
+        t1.Conditions.AddRange([new() { TaskId = 1, ConditionId = 11, Condition = condAlpha }, new() { TaskId = 1, ConditionId = 13, Condition = condGamma }]);
+
+        var t2 = new TaskItemBuilder().WithId(2).Build();
+        t2.Tags.AddRange([new() { TaskId = 2, TagId = 2, Tag = tagBeta }, new() { TaskId = 2, TagId = 3, Tag = tagGamma }]);
+        t2.Conditions.AddRange([new() { TaskId = 2, ConditionId = 12, Condition = condBeta }, new() { TaskId = 2, ConditionId = 13, Condition = condGamma }]);
+
+        List<TaskItem> tasks = [t1, t2];
+
+        // Act
+        var sortedTags = TaskFilterEvaluator.GetSortedAvailableTags(tasks);
+        var sortedConditions = TaskFilterEvaluator.GetSortedAvailableConditions(tasks);
+
+        // Assert: Gamma (2 tasks) first, then Alpha/Beta (1 task each) alphabetically
+        sortedTags.Select(t => t.Name).Should().ContainInOrder("Gamma", "Alpha", "Beta");
+        sortedConditions.Select(c => c.Name).Should().ContainInOrder("Офис", "В дороге", "Дома");
+    }
+
     /// <summary>
     /// Verifies that Today filter excludes completed and irrelevant tasks when showInactive is false.
     /// </summary>

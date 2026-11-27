@@ -60,10 +60,5 @@
 @code {
     protected override List<Tag> SearchLabels(string query) => TagRepo.SearchByName(query);
     protected override Tag? GetByName(string name) => TagRepo.GetByName(name);
-    protected override Tag GetOrCreate(string name)
-    {
-        var tag = TagRepo.GetOrCreate(name);
-        TagSessionService.MarkTagUsed(tag);
-        return tag;
-    }
+    protected override Tag GetOrCreate(string name) => TagRepo.GetOrCreate(name);
 }

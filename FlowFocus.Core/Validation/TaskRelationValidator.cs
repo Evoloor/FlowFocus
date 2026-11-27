@@ -41,8 +41,9 @@ public static class TaskRelationValidator
             throw new InvalidOperationException($"Достигнут лимит количества связей ({MaxRelationsPerTask}/{MaxRelationsPerTask}).");
         }
 
-        // 2.1.1: Каскадная валидация приоритетов (Принцип блокера)
-        if (type == RelationType.Blocks && sourceTask.Priority != null && targetTask.Priority != null)
+        // 2.1.1: Каскадная валидация приоритетов (Принцип блокера) — только для активных задач
+        if (type == RelationType.Blocks && !sourceTask.IsInactive && !targetTask.IsInactive
+            && sourceTask.Priority != null && targetTask.Priority != null)
         {
             if (sourceTask.Priority.Order > targetTask.Priority.Order)
             {
@@ -50,8 +51,9 @@ public static class TaskRelationValidator
             }
         }
 
-        // 2.1.3: Каскадная валидация сроков / дедлайнов
-        if (type == RelationType.Blocks && sourceTask.ScheduledDate.HasValue && targetTask.ScheduledDate.HasValue)
+        // 2.1.3: Каскадная валидация сроков / дедлайнов — только для активных задач
+        if (type == RelationType.Blocks && !sourceTask.IsInactive && !targetTask.IsInactive
+            && sourceTask.ScheduledDate.HasValue && targetTask.ScheduledDate.HasValue)
         {
             if (sourceTask.ScheduledDate.Value.Date > targetTask.ScheduledDate.Value.Date)
             {

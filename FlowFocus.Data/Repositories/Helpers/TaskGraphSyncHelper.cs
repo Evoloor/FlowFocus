@@ -132,6 +132,7 @@ public static class TaskGraphSyncHelper
             context.TaskConditions.Add(new()
             {
                 TaskId = tracked.Id,
+                Task = tracked,
                 ConditionId = sourceCondition.ConditionId
             });
         }

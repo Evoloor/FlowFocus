@@ -39,6 +39,19 @@ public class TaskRecurrenceService : ITaskRecurrenceService
     {
         try
         {
+            var sourceId = sourceTask.RecurrenceSourceId ?? sourceTask.Id;
+            var hasInactiveCondition = sourceTask.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive);
+            if (hasInactiveCondition)
+            {
+                if (existsPredicate(sourceId, null, null)) return;
+
+                var blockedCopy = CloneTaskItem(sourceTask, scheduledDate: null, dateSource: DateSource.AutoFixed, recurrenceSourceId: sourceId);
+                blockedCopy.ScheduledDate = null;
+                blockedCopy.Status = TaskStatus.Blocked;
+                onNewTaskCreated(blockedCopy);
+                return;
+            }
+
             var nextDate = CalculateNextRecurrenceDate(sourceTask);
             if (nextDate == null) return;
 
@@ -50,7 +63,6 @@ public class TaskRecurrenceService : ITaskRecurrenceService
 
             if (nextDate == null) return;
 
-            var sourceId = sourceTask.RecurrenceSourceId ?? sourceTask.Id;
             var start = nextDate.Value.Date;
             var end = start.AddDays(1);
 

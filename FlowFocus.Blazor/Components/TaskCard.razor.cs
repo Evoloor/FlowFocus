@@ -57,9 +57,15 @@ public partial class TaskCard : WorkItemCardBase<TaskItem>
     {
         if (completed)
         {
-            var unblockedTasks = TaskRepo.GetTasksUnblockedBy(Task.Id);
+            var unblockedTaskIds = TaskRepo.GetTasksUnblockedBy(Task.Id).Select(t => t.Id).ToList();
 
             TaskRepo.CompleteTask(Task.Id);
+            PlannerService.UpdateBlockedStatuses();
+
+            var unblockedTasks = unblockedTaskIds
+                .Select(id => TaskRepo.GetById(id))
+                .OfType<TaskItem>()
+                .ToList();
 
             if (unblockedTasks.Any())
             {
@@ -126,6 +132,7 @@ public partial class TaskCard : WorkItemCardBase<TaskItem>
         if (confirmed == true)
         {
             TaskRepo.MarkIrrelevant(Task.Id);
+            PlannerService.UpdateBlockedStatuses();
             Snackbar.Add("Задача помечена как неактуальная", Severity.Info);
             NotificationService.NotifyTasksChanged();
             await OnTaskChanged.InvokeAsync();
@@ -135,6 +142,7 @@ public partial class TaskCard : WorkItemCardBase<TaskItem>
     private async Task RestoreFromIrrelevant()
     {
         TaskRepo.RestoreFromIrrelevant(Task.Id);
+        PlannerService.UpdateBlockedStatuses();
         Snackbar.Add("Задача возвращена в актуальные", Severity.Success);
         NotificationService.NotifyTasksChanged();
         await OnTaskChanged.InvokeAsync();

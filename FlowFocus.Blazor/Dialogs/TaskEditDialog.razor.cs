@@ -216,13 +216,26 @@ public partial class TaskEditDialog
 
     private async Task AddTag(Tag tag)
     {
-        if (_selectedTagIds.Contains(tag.Id)) return;
+        if (!_selectedTagIds.Contains(tag.Id))
+        {
+            _selectedTags.Add(tag);
+            _selectedTagIds.Add(tag.Id);
+        }
 
-        _selectedTags.Add(tag);
-        _selectedTagIds.Add(tag.Id);
         TagSessionService.MarkTagUsed(tag);
-
         await RefreshSuggestedTags();
+    }
+
+    private async Task AddCondition(ExternalCondition condition)
+    {
+        if (!_selectedConditionIds.Contains(condition.Id))
+        {
+            _selectedConditions.Add(condition);
+            _selectedConditionIds.Add(condition.Id);
+        }
+
+        TagSessionService.MarkConditionUsed(condition);
+        await RefreshSuggestedConditions();
     }
 
     private void RemoveTag(Tag tag)
@@ -606,9 +619,13 @@ public partial class TaskEditDialog
         }
         else
         {
+            var wasManual = _task.DateSource == DateSource.Manual;
             _task.ResetRecurrence();
-            _scheduledDate = null;
-            _task.ScheduledDate = null;
+            if (!wasManual)
+            {
+                _scheduledDate = null;
+                _task.ScheduledDate = null;
+            }
         }
         await InvokeAsync(StateHasChanged);
     }
@@ -667,7 +684,7 @@ public partial class TaskEditDialog
         try
         {
             if (_relationsToRemove.Count > 0) return true;
-            var originalCount = _originalTask?.Relations?.Count ?? 0;
+            var originalCount = (_originalTask?.Relations?.Count ?? 0) + (_originalTask?.InverseRelations?.Count ?? 0);
             if (_relations.Count != originalCount) return true;
         }
         catch
@@ -681,7 +698,7 @@ public partial class TaskEditDialog
 
     private async Task RefreshSuggestedTags()
     {
-        var allSuggested = TagSessionService.GetSuggestedTags(10);
+        var allSuggested = TagSessionService.GetSuggestedTags(10) ?? [];
         _suggestedTags = allSuggested.Where(t => !_selectedTagIds.Contains(t.Id)).Take(5).ToList();
 
         if (_suggestedTags.Count < 5)
@@ -699,12 +716,19 @@ public partial class TaskEditDialog
 
     private async Task RefreshSuggestedConditions()
     {
-        var allConditions = ConditionRepo.GetAll();
-        _suggestedConditions = allConditions
-            .Where(c => !_selectedConditionIds.Contains(c.Id))
-            .OrderByDescending(c => c.UsageCount)
-            .Take(5)
-            .ToList();
+        var allSuggested = TagSessionService.GetSuggestedConditions(10) ?? [];
+        _suggestedConditions = allSuggested.Where(c => !_selectedConditionIds.Contains(c.Id)).Take(5).ToList();
+
+        if (_suggestedConditions.Count < 5)
+        {
+            var popular = ConditionRepo.GetPopularConditions(10);
+
+            foreach (var cond in popular.Where(c => !_selectedConditionIds.Contains(c.Id) && _suggestedConditions.All(s => s.Id != c.Id)))
+            {
+                if (_suggestedConditions.Count >= 5) break;
+                _suggestedConditions.Add(cond);
+            }
+        }
 
         await InvokeAsync(StateHasChanged);
     }

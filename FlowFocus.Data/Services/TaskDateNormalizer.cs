@@ -16,13 +16,28 @@ public static class TaskDateNormalizer
     public static bool NormalizeDateSources(StorageContext context, ITaskRecurrenceService recurrenceService)
     {
         var hasChanges = false;
+        var today = TodoDay.Today;
+        var todayDt = today.ToDateTime();
+
+        var activeTasks = context.Tasks
+            .WhereActive()
+            .Include(t => t.Conditions).ThenInclude(tc => tc.Condition)
+            .ToList();
+
+        var inactiveConditionIds = context.ExternalConditions
+            .AsNoTracking()
+            .Where(c => !c.IsActive)
+            .Select(c => c.Id)
+            .ToHashSet();
+
+        bool HasInactiveCondition(TaskItem t) =>
+            t.Conditions.Any(c => (c.Condition != null && !c.Condition.IsActive) || inactiveConditionIds.Contains(c.ConditionId));
 
         // 0. Нормализация задач, у которых было отключено повторение:
         // Если у активной задачи отключено повторение (!IsRecurring), но сохранились признаки серии повторений (RecurrenceSourceId != null или RecurrenceType != None):
         // - Отвязываем её от серии повторений (RecurrenceSourceId = null) и сбрасываем параметры повтора.
         // - Если статус даты был AutoFixed (унаследованный от повторений), переводим в AutoFlexible, чтобы задача не висела вечным якорем.
-        var recurrenceDetachedTasks = context.Tasks
-            .WhereActive()
+        var recurrenceDetachedTasks = activeTasks
             .Where(t => !t.IsRecurring && (t.RecurrenceSourceId != null || t.RecurrenceType != RecurrenceType.None))
             .ToList();
 
@@ -38,8 +53,7 @@ public static class TaskDateNormalizer
 
         // 1. Нормализация неназначенных дат для обычных (не повторяющихся) задач:
         // Если ScheduledDate == null и задача не повторяющаяся, её статус должен быть AutoFlexible
-        var tasksToNormalize = context.Tasks
-            .WhereActive()
+        var tasksToNormalize = activeTasks
             .Where(t => t.ScheduledDate == null && !t.IsRecurring && t.RecurrenceSourceId == null && (t.DateSource == DateSource.Manual || t.DateSource == DateSource.AutoFixed))
             .ToList();
 
@@ -55,8 +69,7 @@ public static class TaskDateNormalizer
 
         // 1.1. Нормализация повторяющихся задач со статусом AutoFlexible:
         // Повторяющиеся задачи не могут иметь статус AutoFlexible — они переводятся в AutoFixed.
-        var recurringAutoFlexibleTasks = context.Tasks
-            .WhereActive()
+        var recurringAutoFlexibleTasks = activeTasks
             .Where(t => t.IsRecurring && t.DateSource == DateSource.AutoFlexible)
             .ToList();
 
@@ -70,14 +83,10 @@ public static class TaskDateNormalizer
             hasChanges = true;
         }
 
-        var today = TodoDay.Today;
-
         // 1.2. Нормализация просроченных задач с ручной датой:
         // Просроченная задача с DateSource.Manual переводится в AutoFlexible для обычных задач и AutoFixed для повтор-задач.
-        var overdueManualTasks = context.Tasks
-            .WhereActive()
+        var overdueManualTasks = activeTasks
             .Where(t => t.DateSource == DateSource.Manual)
-            .ToList()
             .Where(t => today.IsOverdue(t.ScheduledDate))
             .ToList();
 
@@ -92,11 +101,10 @@ public static class TaskDateNormalizer
         }
 
         // 1.3. Сброс дат для заблокированных неактивным условием повторяющихся задач ("улетают" из расписания)
-        var blockedRecurringTasks = context.Tasks
-            .WhereActive()
+        var blockedRecurringTasks = activeTasks
             .Where(t => t.IsRecurring)
             .Where(t => t.DateSource != DateSource.Manual)
-            .Where(t => t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))
+            .Where(HasInactiveCondition)
             .Where(t => t.ScheduledDate != null)
             .ToList();
 
@@ -110,21 +118,18 @@ public static class TaskDateNormalizer
             hasChanges = true;
         }
 
-        var todayDt = today.ToDateTime();
-
-        // Собираем из базы все задачи для анализа серии повторений без N+1 запросов
-        var allTasks = context.Tasks.AsNoTracking().ToList();
-
-        var lastCompletedDates = allTasks
-            .Where(t => t is { Status: TaskStatus.Completed, CompletedDate: not null })
+        // Собираем из базы завершённые задачи для анализа серии повторений без N+1 запросов
+        var lastCompletedDates = context.Tasks
+            .AsNoTracking()
+            .Where(t => t.Status == TaskStatus.Completed && t.CompletedDate != null)
+            .ToList()
             .GroupBy(t => t.RecurrenceSourceId ?? t.Id)
             .ToDictionary(g => g.Key, g => g.Max(t => t.CompletedDate!.Value));
 
-        var activeRecurringTasks = context.Tasks
-            .WhereActive()
+        var activeRecurringTasks = activeTasks
             .Where(t => t.IsRecurring)
             .Where(t => t.DateSource != DateSource.Manual)
-            .Where(t => !t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))
+            .Where(t => !HasInactiveCondition(t))
             .ToList();
 
         foreach (var task in activeRecurringTasks)
@@ -153,10 +158,9 @@ public static class TaskDateNormalizer
 
         // 2.1. Гарантия инварианта: если активная задача не заблокирована неактивным условием и имеет статус AutoFixed,
         // то её ScheduledDate после нормализации должен быть непустым.
-        var unassignedAutoFixed = context.Tasks
-            .WhereActive()
+        var unassignedAutoFixed = activeTasks
             .Where(t => t.DateSource == DateSource.AutoFixed && t.ScheduledDate == null)
-            .Where(t => !t.Conditions.Any(c => c.Condition != null && !c.Condition.IsActive))
+            .Where(t => !HasInactiveCondition(t))
             .ToList();
 
         if (unassignedAutoFixed.Count > 0)

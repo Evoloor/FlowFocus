@@ -16,6 +16,9 @@ public interface IExternalConditionRepository : IRepository<ExternalCondition>
     /// <summary>Найти условия по части имени</summary>
     List<ExternalCondition> SearchByName(string query, int limit = 10);
 
+    /// <summary>Получить самые популярные условия</summary>
+    List<ExternalCondition> GetPopularConditions(int count);
+
     /// <summary>Переключить флаг активности условия</summary>
     void ToggleConditionActive(int conditionId, bool isActive);
 

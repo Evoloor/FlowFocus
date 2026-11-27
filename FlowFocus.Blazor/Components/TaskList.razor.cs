@@ -107,21 +107,17 @@ public partial class TaskList : IDisposable
             _allTasks = TaskRepo.GetAll().ToList();
         }
 
-        _availableTags = _allTasks
-            .SelectMany(t => t.Tags.Select(tt => tt.Tag))
-            .DistinctBy(t => t.Id)
-            .OrderByDescending(t => t.UsageCount)
-            .ToList();
-
-        _availableConditions = _allTasks
-            .SelectMany(t => t.Conditions.Select(tc => tc.Condition))
-            .Where(c => c != null)
-            .DistinctBy(c => c.Id)
-            .OrderByDescending(c => c.UsageCount)
-            .ToList();
+        _availableTags = TaskFilterEvaluator.GetSortedAvailableTags(_allTasks);
+        _availableConditions = TaskFilterEvaluator.GetSortedAvailableConditions(_allTasks);
 
         _currentPage = 1;
     }
+
+    private string TagSelectAllText =>
+        (_selectedTagIds?.Count() ?? 0) >= _availableTags.Count + 1 ? "Снять все" : "Выделить все";
+
+    private string ConditionSelectAllText =>
+        (_selectedConditionIds?.Count() ?? 0) >= _availableConditions.Count + 1 ? "Снять все" : "Выделить все";
 
     private async Task HandleTaskChanged()
     {
@@ -132,10 +128,10 @@ public partial class TaskList : IDisposable
     private bool HasActiveFilters =>
         !string.IsNullOrEmpty(_searchQuery) ||
         _dateRange != null ||
-        (ShowFilters && _selectedStatuses.Any()) ||
+        (ShowFilters && (_selectedStatuses?.Any() ?? false)) ||
         _durationFilter != DurationFilter.All ||
-        _selectedTagIds.Any() ||
-        _selectedConditionIds.Any() ||
+        (_selectedTagIds?.Any() ?? false) ||
+        (_selectedConditionIds?.Any() ?? false) ||
         _hideWithDates ||
         _showInactive;
 
