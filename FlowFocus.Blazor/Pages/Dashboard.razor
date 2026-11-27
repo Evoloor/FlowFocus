@@ -45,12 +45,15 @@
         {
             <ActivityMetricCard Value="@_metrics.ActivityPercentage" />
         }
-        <TotalCountStatCard TotalTasks="@_metrics.TotalTasksCount"
-                            TotalSubtasks="@_metrics.TotalSubtasksCount"
-                            TotalTimeMinutes="@_metrics.FilteredTotalTimeMinutes"
-                            TasksWithTimeEstimateCount="@_metrics.TasksWithTimeEstimateCount"
-                            AggregationMode="@_metrics.AggregationMode" />
-        @if (_filter.Scope != EntityScopeType.Active && _filter.Scope != EntityScopeType.Completed)
+        @if (_filter.DateRange == DateRangeMode.AllTime)
+        {
+            <TotalCountStatCard TotalTasks="@_metrics.TotalTasksCount"
+                                TotalSubtasks="@_metrics.TotalSubtasksCount"
+                                TotalTimeMinutes="@_metrics.FilteredTotalTimeMinutes"
+                                TasksWithTimeEstimateCount="@_metrics.TasksWithTimeEstimateCount"
+                                AggregationMode="@_metrics.AggregationMode" />
+        }
+        @if (_filter.DateRange == DateRangeMode.AllTime && _filter.Scope != EntityScopeType.Active && _filter.Scope != EntityScopeType.Completed)
         {
             <CompletionRateStatCard Value="@_metrics.CompletionRatePercentage"
                                     AggregationMode="@_metrics.AggregationMode" />

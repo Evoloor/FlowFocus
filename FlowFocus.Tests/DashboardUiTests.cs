@@ -585,4 +585,61 @@ public class DashboardUiTests : IntegrationTestBase
 
         cut.Markup.Should().NotContain("Без тегов");
     }
+
+    [Fact]
+    public void DashboardPage_DateRangeSelect_HidesTotalCountAndCompletionRateCardsWhenNotAllTime()
+    {
+        var activeTask = new TaskItemBuilder()
+            .WithId(0)
+            .WithTitle("Active Task")
+            .WithStatus(TaskStatus.Planned)
+            .WithScheduledDate(DateTime.UtcNow.AddDays(-1))
+            .Build();
+
+        var completedTask = new TaskItemBuilder()
+            .WithId(0)
+            .WithTitle("Completed Task")
+            .WithStatus(TaskStatus.Completed)
+            .WithCompletedDate(DateTime.UtcNow.AddDays(-1))
+            .Build();
+
+        TaskRepo.Add(activeTask);
+        TaskRepo.Add(completedTask);
+
+        var cut = _ctx.Render<Dashboard>();
+
+        cut.FindComponents<TotalCountStatCard>().Should().NotBeEmpty();
+        cut.FindComponents<CompletionRateStatCard>().Should().NotBeEmpty();
+
+        var dateSelect = cut.FindComponent<DateRangeSelect>();
+        cut.InvokeAsync(() => dateSelect.Instance.ValueChanged.InvokeAsync(DateRangeMode.Recent));
+
+        cut.FindComponents<TotalCountStatCard>().Should().BeEmpty();
+        cut.FindComponents<CompletionRateStatCard>().Should().BeEmpty();
+        cut.FindComponents<ActivityMetricCard>().Should().NotBeEmpty();
+        cut.FindComponents<CreatedTasksStatCard>().Should().NotBeEmpty();
+
+        cut.InvokeAsync(() => dateSelect.Instance.ValueChanged.InvokeAsync(DateRangeMode.Representative));
+
+        cut.FindComponents<TotalCountStatCard>().Should().BeEmpty();
+        cut.FindComponents<CompletionRateStatCard>().Should().BeEmpty();
+
+        var scopeSelect = cut.FindComponent<EntityScopeSelect>();
+        cut.InvokeAsync(() => scopeSelect.Instance.FilterChanged.InvokeAsync(new()
+        {
+            DateRange = DateRangeMode.Recent,
+            Scope = EntityScopeType.Completed
+        }));
+
+        cut.FindComponents<TotalCountStatCard>().Should().BeEmpty();
+
+        cut.InvokeAsync(() => scopeSelect.Instance.FilterChanged.InvokeAsync(new()
+        {
+            DateRange = DateRangeMode.AllTime,
+            Scope = EntityScopeType.All
+        }));
+
+        cut.FindComponents<TotalCountStatCard>().Should().NotBeEmpty();
+        cut.FindComponents<CompletionRateStatCard>().Should().NotBeEmpty();
+    }
 }
